@@ -82,6 +82,50 @@ Mở `http://<ip-vps>` (hoặc cổng `HTTP_PORT` trong .env).
 được qua **HTTPS**. Khuyến nghị đặt reverse proxy có TLS (Caddy/nginx + Let's Encrypt,
 hoặc Cloudflare) trước cổng của client. Khi đó chỉ cần trỏ proxy về `HTTP_PORT`.
 
+## CI/CD (GitHub Actions → VPS)
+
+Hai workflow trong `.github/workflows/`:
+
+- **`ci.yml`** — chạy trên mọi `push` (dev, master) và `pull_request`: build + test server (.NET 10) và client (Angular 21) song song.
+- **`cd.yml`** — chạy khi push/merge vào **`master`** (hoặc bấm Run thủ công): build 2 image rồi push lên **GHCR** (`ghcr.io/<owner>/hungsilver-api`, `…-client`), sau đó SSH vào VPS `pull` image và `up -d` bằng `docker-compose.prod.yml`.
+
+Khác biệt compose: `docker-compose.yml` **build từ source** (dùng local / fallback); `docker-compose.prod.yml` **kéo image** từ GHCR (VPS không phải compile).
+
+### GitHub Secrets cần tạo (Settings → Secrets and variables → Actions)
+
+| Secret | Bắt buộc | Giá trị |
+|---|---|---|
+| `VPS_HOST` | ✅ | IP công khai của VPS |
+| `VPS_USER` | ✅ | User SSH (vd `deploy` hoặc `root`) |
+| `VPS_SSH_KEY` | ✅ | **Private key** SSH (toàn bộ nội dung OpenSSH) |
+| `VPS_PORT` | ⬜ | Cổng SSH nếu khác `22` |
+| `GHCR_PAT` | ✅* | PAT (classic) scope `read:packages` để VPS pull image |
+
+`GITHUB_TOKEN` (dùng ở job build-push) là tự động, **không cần tạo**.
+\*Có thể bỏ `GHCR_PAT` nếu đặt 2 package GHCR ở chế độ **Public** (khi đó xóa bước `docker login` trong `cd.yml`).
+
+### Chuẩn bị VPS Ubuntu (làm 1 lần)
+
+```bash
+# 1. Cài Docker Engine + Compose plugin
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER          # logout/login lại
+
+# 2. Thư mục deploy + .env chứa secret thật (KHÔNG commit)
+sudo mkdir -p /opt/hungsilver && sudo chown $USER /opt/hungsilver
+cd /opt/hungsilver
+cp <repo>/.env.example .env
+nano .env   # set POSTGRES_PASSWORD, JWT_SECRET (>=32 ký tự), GHCR_OWNER=<owner thường>, IMAGE_TAG=latest, HTTP_PORT=80
+
+# 3. SSH key cho CI: thêm public key vào ~/.ssh/authorized_keys của VPS_USER,
+#    bỏ private key vào secret VPS_SSH_KEY.
+
+# 4. Mở firewall
+sudo ufw allow 80,22/tcp
+```
+
+Sau đó mỗi lần push vào `master` sẽ tự build → push GHCR → deploy. App ở `http://<ip-vps>`.
+
 ## API chính
 
 | Endpoint | Method | Quyền | Mô tả |

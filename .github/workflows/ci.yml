@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, master]
+  pull_request:
+  workflow_dispatch:
+
+# Hủy run cũ khi có push mới trên cùng nhánh/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (.NET 10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: server/global.json   # pin SDK theo global.json (10.0.100)
+
+      - name: Restore
+        run: dotnet restore server/HungSilver.slnx
+
+      - name: Build
+        run: dotnet build server/HungSilver.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test server/HungSilver.slnx -c Release --no-build --verbosity normal
+
+  client:
+    name: Client (Angular 21)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test -- --watch=false   # ng test (Vitest + jsdom), chạy 1 lần rồi thoát
