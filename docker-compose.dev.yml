@@ -1,0 +1,24 @@
+# Dev local: chỉ chạy PostgreSQL 18, không cần cài Postgres vào máy.
+# docker compose -f docker-compose.dev.yml up -d
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: hungsilver-postgres-dev
+    environment:
+      POSTGRES_DB: hungsilver
+      POSTGRES_USER: hungsilver
+      POSTGRES_PASSWORD: hungsilver_dev
+    ports:
+      # 5433 vì máy dev có PostgreSQL native đang chiếm 5432
+      - "5433:5432"
+    volumes:
+      # PG 18+: mount tại /var/lib/postgresql (image tự đặt data vào thư mục con theo major version)
+      - hungsilver_pgdata_dev:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hungsilver -d hungsilver"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  hungsilver_pgdata_dev:

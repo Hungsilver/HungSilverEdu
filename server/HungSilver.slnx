@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HungSilver.Domain/HungSilver.Domain.csproj" />
+    <Project Path="src/HungSilver.Application/HungSilver.Application.csproj" />
+    <Project Path="src/HungSilver.Infrastructure/HungSilver.Infrastructure.csproj" />
+    <Project Path="src/HungSilver.WebApi/HungSilver.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HungSilver.UnitTests/HungSilver.UnitTests.csproj" />
+  </Folder>
+</Solution>

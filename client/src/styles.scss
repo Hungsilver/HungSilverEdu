@@ -1,0 +1,32 @@
+/* Global styles */
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+
+  .auth-card {
+    width: 380px;
+  }
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.text-deleted {
+  text-decoration: line-through;
+  color: rgba(0, 0, 0, 0.35);
+}
