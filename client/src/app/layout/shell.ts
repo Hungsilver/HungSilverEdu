@@ -68,7 +68,7 @@ import { AuthService } from '../core/auth.service';
     <nz-layout class="shell">
       @if (!isMobile()) {
         <nz-sider nzCollapsible [nzWidth]="220">
-          <div class="logo">HungSilver</div>
+          <div class="logo">H-edu</div>
           <ng-container [ngTemplateOutlet]="menu" />
         </nz-sider>
       }
@@ -109,7 +109,7 @@ import { AuthService } from '../core/auth.service';
       nzWrapClassName="nav-drawer"
       (nzOnClose)="drawerOpen.set(false)">
       <ng-container *nzDrawerContent>
-        <div class="logo logo-drawer">HungSilver</div>
+        <div class="logo logo-drawer">H-edu</div>
         <ng-container [ngTemplateOutlet]="menu" />
       </ng-container>
     </nz-drawer>
