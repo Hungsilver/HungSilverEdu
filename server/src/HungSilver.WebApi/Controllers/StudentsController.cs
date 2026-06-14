@@ -46,4 +46,10 @@ public class StudentsController(IStudentService studentService) : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> Restore(Guid id, CancellationToken ct) =>
         (await studentService.RestoreAsync(id, ct)).ToActionResult();
+
+    /// <summary>Liên kết hồ sơ học sinh với một tài khoản (để học sinh đăng nhập portal).</summary>
+    [HttpPut("{id:guid}/link-user")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult> LinkUser(Guid id, LinkUserRequest request, CancellationToken ct) =>
+        (await studentService.LinkUserAsync(id, request.UserId, ct)).ToActionResult();
 }

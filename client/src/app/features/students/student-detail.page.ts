@@ -3,24 +3,30 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { EChartsCoreOption } from 'echarts/core';
+import { FormsModule } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzDescriptionsModule } from 'ng-zorro-antd/descriptions';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
+import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
+import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
-import { ApiProblem, RewardTier, REWARD_TIER_LABELS, SKILLS, Student, StudentProgress } from '../../core/models';
+import { ApiProblem, ROLE_USER, RewardTier, REWARD_TIER_LABELS, SKILLS, Student, StudentProgress, UserListItem } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
+import { UsersService } from '../../core/users.service';
 import { Chart } from '../../shared/chart';
 
 @Component({
   selector: 'app-student-detail-page',
   imports: [
-    RouterLink, DatePipe,
+    RouterLink, DatePipe, FormsModule,
     NzCardModule, NzGridModule, NzStatisticModule, NzDescriptionsModule, NzButtonModule, NzIconModule,
-    Chart
+    NzModalModule, NzDatePickerModule, NzSelectModule, NzTagModule, Chart
   ],
   template: `
     <a routerLink="/students" class="back"><nz-icon nzType="arrow-left" /> Danh sách học viên</a>
@@ -58,6 +64,21 @@ import { Chart } from '../../shared/chart';
                 </button>
               }
             </nz-card>
+            <nz-card nzTitle="Báo cáo phụ huynh" class="mt">
+              <button nz-button (click)="reportOpen.set(true)"><nz-icon nzType="file-text" /> Tạo báo cáo tháng</button>
+            </nz-card>
+            <nz-card nzTitle="Tài khoản học sinh" class="mt">
+              @if (s.userId) {
+                <nz-tag nzColor="green">Đã liên kết tài khoản (portal)</nz-tag>
+              } @else {
+                <div class="report-bar">
+                  <nz-select class="link-select" nzShowSearch nzPlaceHolder="Chọn tài khoản học sinh" [(ngModel)]="linkUserId">
+                    @for (u of users(); track u.id) { <nz-option [nzValue]="u.id" [nzLabel]="(u.fullName || u.email)" /> }
+                  </nz-select>
+                  <button nz-button nzType="primary" [disabled]="!linkUserId" (click)="link()">Liên kết</button>
+                </div>
+              }
+            </nz-card>
           }
         </nz-col>
 
@@ -75,20 +96,39 @@ import { Chart } from '../../shared/chart';
         </nz-col>
       </nz-row>
     }
+
+    <nz-modal [nzVisible]="reportOpen()" nzTitle="Báo cáo phụ huynh theo tháng" [nzFooter]="null"
+      (nzOnCancel)="reportOpen.set(false)" [nzWidth]="560">
+      <ng-container *nzModalContent>
+        <div class="report-bar">
+          <nz-date-picker nzMode="month" [(ngModel)]="reportPeriod" nzFormat="MM/yyyy" />
+          <button nz-button nzType="primary" [nzLoading]="reportLoading()" (click)="genReport()"><nz-icon nzType="file-text" /> Tạo</button>
+          @if (reportContent()) { <button nz-button (click)="copyReport()"><nz-icon nzType="copy" /> Sao chép</button> }
+        </div>
+        @if (reportContent()) { <pre class="report">{{ reportContent() }}</pre> }
+      </ng-container>
+    </nz-modal>
   `,
   styles: `
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .mt { margin-top: 16px; }
     .redeem-btn { margin: 0 8px 8px 0; }
     .muted { color: rgba(0,0,0,0.45); }
+    .report-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .link-select { min-width: 220px; flex: 1; }
+    .report { white-space: pre-wrap; font-family: inherit; background: #fafafa; padding: 12px; border-radius: 6px; }
   `
 })
 export class StudentDetailPage implements OnInit {
   readonly id = input.required<string>();
 
   private readonly studentsService = inject(StudentsService);
+  private readonly usersService = inject(UsersService);
   private readonly auth = inject(AuthService);
   private readonly message = inject(NzMessageService);
+
+  protected readonly users = signal<UserListItem[]>([]);
+  protected linkUserId: string | null = null;
 
   protected readonly tiers = [RewardTier.SmallGift, RewardTier.FreeMaterials, RewardTier.FeeDiscount];
   protected readonly tierLabels = REWARD_TIER_LABELS;
@@ -96,6 +136,11 @@ export class StudentDetailPage implements OnInit {
 
   protected readonly student = signal<Student | null>(null);
   protected readonly prog = signal<StudentProgress | null>(null);
+
+  protected readonly reportOpen = signal(false);
+  protected readonly reportLoading = signal(false);
+  protected readonly reportContent = signal('');
+  protected reportPeriod = new Date();
 
   protected readonly radarOption = computed<EChartsCoreOption>(() => {
     const sk = this.prog()?.latestSkills;
@@ -122,6 +167,18 @@ export class StudentDetailPage implements OnInit {
 
   ngOnInit(): void {
     this.reload();
+    if (this.auth.isAdmin()) {
+      this.usersService.getPaged(1, 200).subscribe(r =>
+        this.users.set(r.items.filter(u => !u.isDeleted && u.roles.includes(ROLE_USER))));
+    }
+  }
+
+  protected link(): void {
+    if (!this.linkUserId) return;
+    this.studentsService.linkUser(this.id(), this.linkUserId).subscribe({
+      next: () => { this.message.success('Đã liên kết tài khoản.'); this.linkUserId = null; this.reload(); },
+      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Liên kết thất bại.')
+    });
   }
 
   private reload(): void {
@@ -135,5 +192,20 @@ export class StudentDetailPage implements OnInit {
       next: () => { this.message.success('Đã quy đổi điểm thưởng.'); this.reload(); },
       error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Quy đổi thất bại.')
     });
+  }
+
+  protected genReport(): void {
+    this.reportLoading.set(true);
+    this.studentsService.generateParentReport(this.id(), this.reportPeriod.getFullYear(), this.reportPeriod.getMonth() + 1).subscribe({
+      next: r => { this.reportLoading.set(false); this.reportContent.set(r.content); },
+      error: (err: HttpErrorResponse) => { this.reportLoading.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Tạo báo cáo thất bại.'); }
+    });
+  }
+
+  protected copyReport(): void {
+    navigator.clipboard.writeText(this.reportContent()).then(
+      () => this.message.success('Đã sao chép.'),
+      () => this.message.error('Không sao chép được.')
+    );
   }
 }

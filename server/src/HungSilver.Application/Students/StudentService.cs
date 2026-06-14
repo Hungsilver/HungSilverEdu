@@ -17,6 +17,7 @@ public interface IStudentService
     Task<Result<StudentDto>> UpdateAsync(Guid id, UpdateStudentRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<Result> RestoreAsync(Guid id, CancellationToken ct = default);
+    Task<Result> LinkUserAsync(Guid studentId, Guid userId, CancellationToken ct = default);
 }
 
 public sealed class StudentService(
@@ -26,6 +27,7 @@ public sealed class StudentService(
     IClassAccessGuard accessGuard,
     IUnitOfWork unitOfWork,
     IMapper mapper,
+    IUserDirectory userDirectory,
     IValidator<CreateStudentRequest> createValidator,
     IValidator<UpdateStudentRequest> updateValidator) : IStudentService
 {
@@ -150,6 +152,21 @@ public sealed class StudentService(
         if (!restored)
             return Result.Failure(NotFoundError);
 
+        await unitOfWork.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    public async Task<Result> LinkUserAsync(Guid studentId, Guid userId, CancellationToken ct = default)
+    {
+        var student = await students.GetByIdAsync(studentId, ct: ct);
+        if (student is null)
+            return Result.Failure(NotFoundError);
+
+        if (!await userDirectory.ExistsAsync(userId, ct))
+            return Result.Failure(Error.Validation("Student.UserNotFound", "Không tìm thấy tài khoản người dùng."));
+
+        student.UserId = userId;
+        students.Update(student);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success();
     }

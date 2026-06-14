@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard, roleGuard } from './core/guards';
-import { ROLE_ADMIN, ROLE_TEACHER } from './core/models';
+import { ROLE_ADMIN, ROLE_TEACHER, ROLE_USER } from './core/models';
 
 const teacherOrAdmin = { roles: [ROLE_ADMIN, ROLE_TEACHER] };
 
@@ -111,8 +111,8 @@ export const routes: Routes = [
       {
         path: 'notifications',
         canActivate: [roleGuard],
-        data: { roles: [ROLE_ADMIN], title: 'Thông báo' },
-        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
+        loadComponent: () => import('./features/notifications/notifications.page').then(m => m.NotificationsPage)
       },
       {
         path: 'evaluations',
@@ -123,8 +123,14 @@ export const routes: Routes = [
       {
         path: 'warnings',
         canActivate: [roleGuard],
-        data: { roles: [ROLE_ADMIN], title: 'Cảnh báo' },
-        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
+        loadComponent: () => import('./features/warnings/warnings.page').then(m => m.WarningsPage)
+      },
+      {
+        path: 'portal',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_USER] },
+        loadComponent: () => import('./features/portal/portal.page').then(m => m.PortalPage)
       }
     ]
   },

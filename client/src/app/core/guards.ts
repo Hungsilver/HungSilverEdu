@@ -15,7 +15,7 @@ export const guestGuard: CanActivateFn = () => {
   return auth.isLoggedIn() ? router.createUrlTree(['/']) : true;
 };
 
-/** Dùng với route data: { roles: ['Admin'] }. */
+/** Dùng với route data: { roles: ['Admin'] }. Điều hướng an toàn theo vai trò khi bị từ chối. */
 export const roleGuard: CanActivateFn = route => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -23,7 +23,9 @@ export const roleGuard: CanActivateFn = route => {
   const allowedRoles = (route.data['roles'] as string[] | undefined) ?? [];
   const userRoles = auth.currentUser()?.roles ?? [];
 
-  return allowedRoles.some(role => userRoles.includes(role))
-    ? true
-    : router.createUrlTree(['/']);
+  if (allowedRoles.some(role => userRoles.includes(role))) return true;
+
+  // Học sinh (chỉ role User) → về portal; còn lại → dashboard. Tránh vòng lặp redirect.
+  const target = auth.isStudent() && !auth.isAdmin() && !auth.isTeacher() ? '/portal' : '/dashboard';
+  return router.createUrlTree([target]);
 };

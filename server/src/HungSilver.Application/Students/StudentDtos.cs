@@ -37,6 +37,8 @@ public sealed record CreateStudentRequest(
     string? Curriculum,
     bool IsActive = true);
 
+public sealed record LinkUserRequest(Guid UserId);
+
 public sealed record UpdateStudentRequest(
     string FullName,
     DateOnly? DateOfBirth,

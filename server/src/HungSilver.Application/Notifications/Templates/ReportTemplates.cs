@@ -22,6 +22,17 @@ public sealed record ScheduleNoticeModel(
     TimeOnly? End,
     string? Topic);
 
+public sealed record ParentReportModel(
+    string StudentName,
+    int Year,
+    int Month,
+    int SessionsAttended,
+    int SessionsTotal,
+    decimal HomeworkPercent,
+    int RewardPoints,
+    string? AssessmentText,
+    string? Suggestion);
+
 /// <summary>Mẫu nội dung báo cáo/thông báo (thuần chuỗi, không phụ thuộc hạ tầng).</summary>
 public static class ReportTemplates
 {
@@ -59,6 +70,29 @@ public static class ReportTemplates
             sb.AppendLine();
         }
 
+        sb.AppendLine();
+        sb.AppendLine("Trân trọng!");
+        return sb.ToString();
+    }
+
+    public static string RenderParentReport(ParentReportModel m)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"BÁO CÁO THÁNG {m.Month}/{m.Year}");
+        sb.AppendLine($"Học sinh: {m.StudentName}");
+        sb.AppendLine();
+        sb.AppendLine($"📅 Đi học: {m.SessionsAttended}/{m.SessionsTotal} buổi");
+        sb.AppendLine($"🏠 Bài tập: {m.HomeworkPercent:0}%");
+        sb.AppendLine($"⭐ Điểm thưởng: {(m.RewardPoints >= 0 ? "+" : "")}{m.RewardPoints}");
+        sb.AppendLine();
+        sb.AppendLine("📝 Đánh giá:");
+        sb.AppendLine(string.IsNullOrWhiteSpace(m.AssessmentText) ? "- (chưa cập nhật)" : m.AssessmentText);
+        if (!string.IsNullOrWhiteSpace(m.Suggestion))
+        {
+            sb.AppendLine();
+            sb.AppendLine("💡 Đề xuất:");
+            sb.AppendLine(m.Suggestion);
+        }
         sb.AppendLine();
         sb.AppendLine("Trân trọng!");
         return sb.ToString();

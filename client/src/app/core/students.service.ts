@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { PagedResult, RedeemRewardRequest, Student, StudentProgress, StudentRequest } from './models';
+import { PagedResult, ParentReport, RedeemRewardRequest, Student, StudentProgress, StudentRequest } from './models';
 
 export interface StudentQuery {
   page: number;
@@ -49,5 +49,14 @@ export class StudentsService {
 
   redeem(studentId: string, request: RedeemRewardRequest): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/${studentId}/redeem`, request);
+  }
+
+  generateParentReport(studentId: string, year: number, month: number): Observable<ParentReport> {
+    const params = new HttpParams().set('year', year).set('month', month);
+    return this.http.post<ParentReport>(`${this.apiUrl}/${studentId}/parent-report`, {}, { params });
+  }
+
+  linkUser(studentId: string, userId: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${studentId}/link-user`, { userId });
   }
 }

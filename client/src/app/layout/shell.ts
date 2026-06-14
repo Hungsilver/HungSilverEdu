@@ -20,48 +20,46 @@ import { AuthService } from '../core/auth.service';
   template: `
     <ng-template #menu>
       <ul nz-menu nzTheme="dark" nzMode="inline">
-        <li nz-menu-item routerLink="/dashboard" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="dashboard" />
-          <span>Tổng quan</span>
-        </li>
-        <li nz-menu-item routerLink="/students" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="idcard" />
-          <span>Học viên</span>
-        </li>
-        <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="book" />
-          <span>Lớp học</span>
-        </li>
-        <li nz-menu-item routerLink="/schedule" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="calendar" />
-          <span>Lịch học</span>
-        </li>
-        <li nz-menu-item routerLink="/tuition" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="dollar" />
-          <span>Học phí</span>
-        </li>
-        <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="link" />
-          <span>Kho tài liệu</span>
-        </li>
-        <li nz-menu-item routerLink="/evaluations" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-          <nz-icon nzType="audit" />
-          <span>Đánh giá hàng tháng</span>
-        </li>
-        @if (auth.isAdmin()) {
-          <li nz-menu-item routerLink="/admin/users" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-            <nz-icon nzType="team" />
-            <span>Quản lý người dùng</span>
+        @if (auth.isAdmin() || auth.isTeacher()) {
+          <li nz-menu-item routerLink="/dashboard" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="dashboard" /><span>Tổng quan</span>
           </li>
-          <li nz-menu-item routerLink="/settings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-            <nz-icon nzType="setting" />
-            <span>Cấu hình hệ thống</span>
+          <li nz-menu-item routerLink="/students" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="idcard" /><span>Học viên</span>
           </li>
-          <li nz-submenu nzTitle="Sắp ra mắt" nzIcon="appstore">
-            <ul>
-              <li nz-menu-item routerLink="/notifications" (click)="closeDrawer()"><nz-icon nzType="bell" /><span>Thông báo</span></li>
-              <li nz-menu-item routerLink="/warnings" (click)="closeDrawer()"><nz-icon nzType="warning" /><span>Cảnh báo</span></li>
-            </ul>
+          <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="book" /><span>Lớp học</span>
+          </li>
+          <li nz-menu-item routerLink="/schedule" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="calendar" /><span>Lịch học</span>
+          </li>
+          <li nz-menu-item routerLink="/tuition" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="dollar" /><span>Học phí</span>
+          </li>
+          <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="link" /><span>Kho tài liệu</span>
+          </li>
+          <li nz-menu-item routerLink="/evaluations" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="audit" /><span>Đánh giá hàng tháng</span>
+          </li>
+          <li nz-menu-item routerLink="/notifications" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="bell" /><span>Thông báo</span>
+          </li>
+          <li nz-menu-item routerLink="/warnings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="warning" /><span>Cảnh báo</span>
+          </li>
+          @if (auth.isAdmin()) {
+            <li nz-menu-item routerLink="/admin/users" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+              <nz-icon nzType="team" /><span>Quản lý người dùng</span>
+            </li>
+            <li nz-menu-item routerLink="/settings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+              <nz-icon nzType="setting" /><span>Cấu hình hệ thống</span>
+            </li>
+          }
+        }
+        @if (auth.isStudent()) {
+          <li nz-menu-item routerLink="/portal" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="solution" /><span>Trang của tôi</span>
           </li>
         }
       </ul>

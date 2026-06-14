@@ -149,6 +149,29 @@ export enum EvaluationRank {
   NeedsImprovement = 'NeedsImprovement'
 }
 
+export enum NotificationChannel {
+  Email = 'Email',
+  Zalo = 'Zalo',
+  Messenger = 'Messenger'
+}
+
+export enum NotificationType {
+  Schedule = 'Schedule',
+  DayOff = 'DayOff',
+  Report = 'Report',
+  Tuition = 'Tuition',
+  Homework = 'Homework'
+}
+
+export enum NotificationDeliveryStatus {
+  Pending = 'Pending',
+  Sent = 'Sent',
+  Failed = 'Failed',
+  Manual = 'Manual'
+}
+
+export type NotificationTargetScope = 'All' | 'Class' | 'Student';
+
 // ----------------- Học sinh -----------------
 
 export interface Student {
@@ -662,6 +685,104 @@ export const EVAL_RANK_COLORS: Record<EvaluationRank, string> = {
   [EvaluationRank.Satisfactory]: 'blue',
   [EvaluationRank.NeedsImprovement]: 'red'
 };
+
+// ----------------- Thông báo & Báo cáo phụ huynh -----------------
+
+export interface CreateNotificationRequest {
+  title: string;
+  content: string;
+  type: NotificationType;
+  channels: NotificationChannel[];
+  scope: NotificationTargetScope;
+  classId: string | null;
+  studentId: string | null;
+}
+
+export interface NotificationDelivery {
+  id: string;
+  studentId: string | null;
+  studentName: string;
+  channel: NotificationChannel;
+  renderedContent: string;
+  status: NotificationDeliveryStatus;
+  errorMessage: string | null;
+}
+
+export interface NotificationResult {
+  notificationId: string;
+  deliveries: NotificationDelivery[];
+}
+
+export interface ParentReport {
+  id: string | null;
+  year: number;
+  month: number;
+  content: string;
+  generatedAtUtc: string;
+}
+
+export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
+  [NotificationType.Schedule]: 'Lịch học',
+  [NotificationType.DayOff]: 'Nghỉ học',
+  [NotificationType.Report]: 'Báo cáo',
+  [NotificationType.Tuition]: 'Học phí',
+  [NotificationType.Homework]: 'Bài tập'
+};
+
+export const NOTIFICATION_CHANNEL_LABELS: Record<NotificationChannel, string> = {
+  [NotificationChannel.Email]: 'Email',
+  [NotificationChannel.Zalo]: 'Zalo',
+  [NotificationChannel.Messenger]: 'Messenger'
+};
+
+export const DELIVERY_STATUS_LABELS: Record<NotificationDeliveryStatus, string> = {
+  [NotificationDeliveryStatus.Pending]: 'Chờ gửi',
+  [NotificationDeliveryStatus.Sent]: 'Đã gửi',
+  [NotificationDeliveryStatus.Failed]: 'Lỗi',
+  [NotificationDeliveryStatus.Manual]: 'Gửi tay'
+};
+
+export const DELIVERY_STATUS_COLORS: Record<NotificationDeliveryStatus, string> = {
+  [NotificationDeliveryStatus.Pending]: 'default',
+  [NotificationDeliveryStatus.Sent]: 'green',
+  [NotificationDeliveryStatus.Failed]: 'red',
+  [NotificationDeliveryStatus.Manual]: 'blue'
+};
+
+// ----------------- Cảnh báo & Portal học sinh -----------------
+
+export interface WarningItem {
+  studentId: string;
+  studentName: string;
+  detail: string;
+}
+
+export interface Warnings {
+  consecutiveAbsences: WarningItem[];
+  missedHomework: WarningItem[];
+  scoreDrop: WarningItem[];
+  tuitionOverdue: WarningItem[];
+}
+
+export interface PortalSession {
+  sessionId: string;
+  className: string;
+  sessionDate: string;
+  startTime: string | null;
+  topic: string | null;
+}
+
+export interface PortalProfile {
+  studentId: string;
+  fullName: string;
+  englishLevel: string | null;
+  learningGoal: string | null;
+  totalSessions: number;
+  attendedSessions: number;
+  homeworkCompleted: number;
+  rewardBalance: number;
+  upcomingSessions: PortalSession[];
+}
 
 // ----------------- Nhãn hiển thị tiếng Việt -----------------
 

@@ -61,9 +61,11 @@
 - [x] **Học phí (Tuition)** — `Application/Tuition`, `Infrastructure/Tuition/TuitionService` (status tính lại + scope teacher), `TuitionController`; FE `tuition.page` + service. DONE, build sạch.
 - [x] **Kho tài liệu (Materials)** — `Application/Materials/MaterialService` (URL/ServerFile), `MaterialsController`; FE `materials.page` (nz-upload theo FileStorage.Mode). DONE.
 - [x] **Đánh giá tháng + Bảng vàng** — `Application/Evaluations` + `Infrastructure/Evaluations/EvaluationService` (rank tự tính, leaderboard tuần), `EvaluationsController`; FE `evaluations.page`. DONE.
-- [ ] **#14 Báo cáo phụ huynh + Thông báo** — chưa làm.
-- [ ] **#15 Cảnh báo + Portal học sinh** — chưa làm.
-- Nav: Học phí/Kho tài liệu/Đánh giá đã chuyển ra menu chính (Teacher+Admin); submenu "Sắp ra mắt" còn Thông báo/Cảnh báo.
+- [x] **Báo cáo phụ huynh + Thông báo** — ParentReportService (template), NotificationService (Email thật + Zalo/Messenger Manual); FE notifications.page + nút báo cáo ở student-detail. DONE.
+- [x] **Cảnh báo + Portal học sinh** — WarningsService (4 nhóm cảnh báo); PortalService (`/api/portal/me`) + route `/portal` role User + roleGuard điều hướng HS; Admin liên kết tài khoản (`link-user`) ở student-detail. DONE.
+- **✅ GIAI ĐOẠN 2 HOÀN TẤT.** Build BE/FE sạch, 10/10 test pass, smoke test toàn bộ endpoint GĐ2 PASS (tuition/warnings/leaderboard/parent-report/notification/evaluation/portal).
+- Nav menu chính (Teacher+Admin): Tổng quan/Học viên/Lớp học/Lịch học/Học phí/Kho tài liệu/Đánh giá/Thông báo/Cảnh báo (+ Admin: Quản lý người dùng/Cấu hình). Học sinh (User): "Trang của tôi" (/portal).
+- **Còn lại:** kiểm thử UI/responsive trình duyệt; job nền nhắc học phí/cảnh báo; tích hợp API Zalo/Messenger thật.
 
 ## 5. Cách tiếp tục nếu mất session
 1. Đọc file này + plan file (mục 0).
