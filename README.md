@@ -1,145 +1,173 @@
-# HungSilver — Base project .NET 10 + Angular 21
+# HungSilver — Hệ thống quản lý trung tâm tiếng Anh
 
-Project base full-stack sẵn sàng chạy thực tế trên VPS:
+Phần mềm web giúp **trung tâm/giáo viên tiếng Anh** quản lý toàn bộ hoạt động dạy–học trên một nơi duy nhất:
+học sinh, lớp học, lịch học, điểm danh từng buổi, điểm thưởng, tiến bộ học tập, học phí, báo cáo phụ huynh
+và thông báo — thay cho sổ sách giấy và file Excel rời rạc.
 
-- **Backend**: .NET 10 Web API, Clean Architecture 4 tầng (Domain / Application / Infrastructure / WebApi)
-- **Frontend**: Angular 21 (standalone, signals, zoneless) + ng-zorro-antd
-- **Database**: PostgreSQL 18 (Docker)
-- **Auth**: ASP.NET Core Identity + JWT (access token 15') + refresh token rotation (HttpOnly cookie) + Google Login
-- **Phân quyền**: Role `Admin` / `User`, policy `AdminOnly`, route guard phía client
-- **Patterns**: Result pattern (không ném exception cho luồng nghiệp vụ), generic `Repository<T>` CRUD chung, **soft delete trên mọi bảng** (global query filter + interceptor)
+> Luồng sử dụng chính: **Tổng quan → Học sinh → Lớp học → Buổi học → Báo cáo & Thông báo**.
 
-## Cấu trúc
+---
+
+## 1. Hệ thống làm được gì (chức năng)
+
+**Dạy & học hằng ngày**
+- **Quản lý học sinh:** hồ sơ cá nhân (họ tên, ngày sinh, trường, phụ huynh, SĐT, địa chỉ…) + hồ sơ học tập (trình độ, giáo trình, mục tiêu, điểm đầu vào).
+- **Quản lý lớp học & ghi danh:** mỗi lớp có giáo viên phụ trách, sĩ số tối đa, giáo trình; xem danh sách học sinh, **sĩ số / điểm trung bình lớp / tỷ lệ chuyên cần** tự tính.
+- **Lịch học:** xem theo **tháng** (như Google Calendar) hoặc **tuần**; khai báo khung giờ lặp tuần và **sinh buổi học tự động** cho cả khoảng thời gian.
+- **Module buổi học (dùng nhiều nhất):** một màn nhập liệu nhanh cho cả lớp — **điểm danh** (có mặt / đi muộn / vắng có phép / không phép), **bài tập về nhà**, **thái độ**, **điểm thưởng/phạt** (tự cộng dồn, có mốc **quy đổi** quà/giảm học phí) và **ghi chú** từng học sinh; "Lưu tất cả" một lần.
+- **Nhật ký giáo viên:** ghi nội dung đã dạy, hoạt động, khó khăn, ghi chú cho buổi sau.
+
+**Theo dõi & báo cáo**
+- **Hồ sơ tiến bộ học tập:** thống kê chuyên cần, hoàn thành bài tập, điểm thưởng và **6 kỹ năng** (Nghe/Nói/Đọc/Viết/Ngữ pháp/Từ vựng) — kèm **biểu đồ radar + đường tiến bộ điểm số**.
+- **Dashboard:** số liệu tổng quan (lịch hôm nay, tổng học sinh/lớp, học phí sắp đến hạn, vắng gần đây, chưa làm bài, **top 10 tích cực**, học sinh cần theo dõi) + biểu đồ (chuyên cần theo tháng, tỷ lệ hoàn thành bài tập, điểm thưởng theo lớp, tăng trưởng điểm).
+- **Báo cáo tự động:** một nút sinh **báo cáo buổi học** và **báo cáo phụ huynh theo tháng** (đi học, bài tập, điểm thưởng, nhận xét, đề xuất) — xem trước, sao chép, gửi.
+- **Đánh giá hàng tháng & xếp hạng:** chấm 5 tiêu chí → xếp hạng (Xuất sắc/Tốt/Đạt/Cần cố gắng); **Bảng vàng** tuần (top điểm thưởng, chuyên cần, hoàn thành bài tập).
+- **Cảnh báo tự động:** vắng 3 buổi liên tiếp, không làm bài 3 lần liên tiếp, điểm giảm mạnh, học phí quá hạn.
+
+**Vận hành trung tâm**
+- **Học phí:** theo tháng/học sinh, trạng thái **tự tính** (🟢 đã đóng / 🟡 sắp đến hạn / 🔴 quá hạn), đánh dấu đã đóng.
+- **Kho tài liệu:** theo lớp — lưu **link ngoài** (Google Drive/YouTube…) hoặc **upload file lên server** (do quản trị viên cấu hình).
+- **Thông báo:** soạn một lần, gửi qua **Email** (tự động), **Zalo/Messenger** (tạo sẵn nội dung để gửi nhanh); dùng cho lịch học, nghỉ học, báo cáo, học phí, bài tập.
+- **Portal học sinh:** học sinh đăng nhập xem tiến độ, điểm thưởng và lịch học của **chính mình**.
+- **Cấu hình hệ thống:** thiết lập phân tầng (toàn hệ thống → theo lớp → theo người dùng): chế độ lưu file, mốc nhắc học phí, ngưỡng cảnh báo, múi giờ…
+
+---
+
+## 2. Lợi ích khi dùng web
+
+- **Một nơi duy nhất, hết rời rạc:** thay sổ điểm danh giấy + nhiều file Excel bằng dữ liệu tập trung, truy cập mọi lúc trên máy tính/điện thoại (giao diện **responsive**).
+- **Điểm danh & chấm buổi học siêu nhanh:** cả lớp trên một màn hình, lưu một lần — giảm thời gian giấy tờ sau giờ dạy.
+- **Tiết kiệm thời gian báo cáo:** báo cáo buổi học và báo cáo phụ huynh tháng được **sinh tự động** chỉ với một nút.
+- **Nhìn thấy tiến bộ thật:** biểu đồ năng lực 6 kỹ năng + tăng trưởng điểm giúp tư vấn lộ trình cho phụ huynh thuyết phục hơn.
+- **Không bỏ sót việc quan trọng:** cảnh báo sớm học sinh vắng/bỏ bài/điểm giảm và **học phí sắp đến hạn / quá hạn**.
+- **Tạo động lực học sinh:** điểm thưởng cộng dồn, quy đổi quà, **Bảng vàng** hằng tuần — rất hiệu quả với học sinh tiểu học/THCS.
+- **Phù hợp trung tâm nhiều giáo viên:** mỗi giáo viên chỉ thấy và quản lý **lớp của mình**; quản trị viên thấy toàn bộ.
+- **Giữ liên lạc với phụ huynh:** gửi báo cáo/thông báo qua Email, hoặc copy nhanh sang Zalo/Messenger.
+
+**Theo từng vai trò:**
+| Vai trò | Nhận được gì |
+|---|---|
+| **Chủ trung tâm / Quản trị** | Bức tranh toàn cảnh, quản lý lớp–học sinh–học phí, phân quyền giáo viên, cấu hình hệ thống |
+| **Giáo viên** | Điểm danh/chấm bài nhanh, nhật ký, báo cáo & đánh giá — gọn trong các lớp mình phụ trách |
+| **Phụ huynh** | Báo cáo tháng + thông báo rõ ràng, kịp thời |
+| **Học sinh** | Portal xem tiến độ, điểm thưởng, lịch học của mình |
+
+---
+
+## 3. Phân quyền
+
+- **Quản trị viên (Admin):** toàn quyền + cấu hình hệ thống.
+- **Giáo viên (Teacher):** quản lý nghiệp vụ hằng ngày, chỉ trong **lớp của mình**.
+- **Học sinh (User):** portal xem dữ liệu cá nhân (chỉ đọc).
+
+Phân quyền được kiểm soát hai lớp: theo vai trò (policy `AdminOnly` / `TeacherOrAdmin`) và **theo dòng dữ liệu** (giáo viên chỉ truy cập lớp/học sinh thuộc lớp mình).
+
+---
+
+## 4. Công nghệ
+
+- **Backend:** .NET 10 Web API, Clean Architecture 4 tầng · PostgreSQL (EF Core/Npgsql) · ASP.NET Identity + JWT (access 15') + refresh rotation (HttpOnly cookie) + Google Login · AutoMapper · gửi Email qua MailKit.
+- **Frontend:** Angular 21 (standalone, signals, zoneless) + **ng-zorro-antd**, tiếng Việt, biểu đồ **ECharts**, responsive mobile.
+- **Patterns:** Result pattern (không ném exception cho luồng nghiệp vụ), generic `Repository<T>`, **soft delete trên mọi bảng**, cấu hình phân tầng.
+- API docs: **Scalar** tại `/scalar/v1` (chỉ Development).
+
+> Chi tiết kiến trúc & luồng: xem [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
+## 5. Cấu trúc
 
 ```
 ├── docker-compose.yml          # Full stack: postgres + api + client (VPS)
-├── docker-compose.dev.yml      # Dev: chỉ PostgreSQL 18 (cổng 5433)
+├── docker-compose.dev.yml      # Dev: chỉ PostgreSQL
+├── docker-compose.prod.yml     # Prod: kéo image từ GHCR
 ├── .env.example                # Mẫu secrets — copy thành .env
 ├── server/
-│   ├── HungSilver.slnx
-│   ├── global.json             # pin .NET SDK 10
-│   ├── src/
-│   │   ├── HungSilver.Domain/          # Entities, BaseEntity, ISoftDeletable, Result/Error
-│   │   ├── HungSilver.Application/     # Interfaces, DTOs, validators, ProductService
-│   │   ├── HungSilver.Infrastructure/  # EF Core + Npgsql, Identity, JWT, Google, Repository, Seeder
-│   │   └── HungSilver.WebApi/          # Controllers, middleware, cấu hình
-│   └── tests/HungSilver.UnitTests/
-└── client/                     # Angular 21 + ng-zorro (login, register, products, admin users)
+│   ├── HungSilver.slnx · global.json (pin .NET SDK 10)
+│   └── src/
+│       ├── HungSilver.Domain/          # Entities, Enums, BaseEntity, Result/Error
+│       ├── HungSilver.Application/      # Interfaces, DTOs, validators, AutoMapper profiles, services CRUD
+│       ├── HungSilver.Infrastructure/   # EF Core + Npgsql, Identity, JWT, services join/aggregate, Seeder
+│       └── HungSilver.WebApi/           # Controllers, middleware, cấu hình
+└── client/                     # Angular 21 + ng-zorro (dashboard, students, classes, schedule, sessions, ...)
 ```
 
-## Dev trên máy này
-
-Máy dùng .NET 10 SDK **cách ly** tại `E:\dotnet10` (không ảnh hưởng dotnet 6/9 của hệ thống):
+## 6. Chạy thử trên máy dev
 
 ```powershell
-# 1. Kích hoạt SDK 10 cho phiên shell hiện tại
-. E:\dotnet10\use-dotnet10.ps1
-
-# 2. Database dev (PostgreSQL 18, cổng 5433 — vì 5432 đã có Postgres khác của máy)
+# 1. Database dev (PostgreSQL qua Docker). Kiểm tra cổng khớp ConnectionStrings:Default
+#    trong server/src/HungSilver.WebApi/appsettings.Development.json
 docker compose -f docker-compose.dev.yml up -d
 
-# 3. Backend (http://localhost:5000, Scalar API docs: /scalar/v1)
+# 2. Backend → http://localhost:5000 (Scalar API docs: /scalar/v1). Migrations + seed tự chạy.
 cd server/src/HungSilver.WebApi
 dotnet run --launch-profile http
 
-# 4. Frontend (http://localhost:4200, proxy /api -> :5000)
+# 3. Frontend → http://localhost:4200 (proxy /api -> :5000)
 cd client
+npm install
 npm start
 ```
 
-Migrations + seed tự chạy khi API khởi động. Tài khoản admin mặc định (dev):
-`admin@hungsilver.local` / `Admin@12345`.
+**Tài khoản demo (seed sẵn khi chạy lần đầu):**
 
-Tạo migration mới (dotnet-ef là local tool, đã có trong `server/.config/dotnet-tools.json`):
+| Vai trò | Email | Mật khẩu |
+|---|---|---|
+| Quản trị viên | `admin@hungsilver.local` | `Admin@12345` |
+| Giáo viên | `teacher@hungsilver.local` | `Teacher@12345` |
+
+Kèm dữ liệu mẫu: lớp **Movers A**, 3 học sinh, khung giờ + buổi học demo.
+
+Tạo migration mới:
 
 ```powershell
-cd server
-dotnet tool run dotnet-ef -- migrations add <TenMigration> --project src/HungSilver.Infrastructure --startup-project src/HungSilver.WebApi
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+dotnet ef migrations add <TenMigration> --project server/src/HungSilver.Infrastructure --startup-project server/src/HungSilver.WebApi
 ```
 
-## Google Login
+## 7. Cấu hình tính năng
 
-1. Vào [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create Credentials → **OAuth client ID** → loại **Web application**.
-2. Authorized JavaScript origins: thêm `http://localhost:4200` (dev) và domain thật (prod).
-3. Copy Client ID, điền vào **2 chỗ**:
-   - `client/src/environments/environment.development.ts` và `environment.ts` → `googleClientId`
-   - `.env` → `GOOGLE_CLIENT_ID` (backend dùng để validate ID token)
+- **Upload file (Kho tài liệu):** vào **Cấu hình hệ thống** chọn chế độ `ExternalUrl` (chỉ lưu link, mặc định) hoặc `Server` (cho upload file lên máy chủ).
+- **Gửi Email:** điền section `Smtp` (Host/Port/User/Password/FromEmail) trong cấu hình backend. Chưa cấu hình thì email báo "chưa cấu hình"; Zalo/Messenger luôn cho phép tạo nội dung để gửi tay.
+- **Google Login:** tạo OAuth Client ID (Web application) ở [Google Cloud Console](https://console.cloud.google.com/apis/credentials), thêm origin `http://localhost:4200` (dev) + domain thật; điền `googleClientId` vào `client/src/environments/*.ts` **và** `Google__ClientId` (backend). Chưa cấu hình thì nút Google tự ẩn.
 
-Chưa cấu hình thì nút Google tự ẩn, login thường vẫn hoạt động bình thường.
-
-## Deploy VPS
+## 8. Deploy VPS
 
 ```bash
 # Trên VPS đã cài Docker + Docker Compose
 cp .env.example .env
-nano .env          # đổi POSTGRES_PASSWORD, JWT_SECRET (bắt buộc), admin, Google ClientId
+nano .env          # đổi POSTGRES_PASSWORD, JWT_SECRET (>=32 ký tự, bắt buộc), tài khoản seed, Google ClientId
 docker compose up -d --build
 ```
 
-Mở `http://<ip-vps>` (hoặc cổng `HTTP_PORT` trong .env).
+Mở `http://<ip-vps>` (hoặc cổng `HTTP_PORT` trong `.env`).
 
-**Lưu ý HTTPS**: ở Production, refresh cookie được set `Secure` — đăng nhập chỉ duy trì
-được qua **HTTPS**. Khuyến nghị đặt reverse proxy có TLS (Caddy/nginx + Let's Encrypt,
-hoặc Cloudflare) trước cổng của client. Khi đó chỉ cần trỏ proxy về `HTTP_PORT`.
+**HTTPS:** ở Production refresh cookie được set `Secure` — phiên đăng nhập chỉ duy trì qua **HTTPS**. Khuyến nghị reverse proxy có TLS (Caddy/nginx + Let's Encrypt hoặc Cloudflare) trỏ về client.
 
-## CI/CD (GitHub Actions → VPS)
+## 9. CI/CD (GitHub Actions → VPS)
 
-Hai workflow trong `.github/workflows/`:
+- **`ci.yml`** — chạy trên mọi `push` (dev, master) và PR: build + test server (.NET 10) và client (Angular 21).
+- **`cd.yml`** — chạy khi push/merge vào **`master`**: build 2 image → push **GHCR** → SSH vào VPS `pull` + `up -d` bằng `docker-compose.prod.yml`.
 
-- **`ci.yml`** — chạy trên mọi `push` (dev, master) và `pull_request`: build + test server (.NET 10) và client (Angular 21) song song.
-- **`cd.yml`** — chạy khi push/merge vào **`master`** (hoặc bấm Run thủ công): build 2 image rồi push lên **GHCR** (`ghcr.io/<owner>/hungsilver-api`, `…-client`), sau đó SSH vào VPS `pull` image và `up -d` bằng `docker-compose.prod.yml`.
+**GitHub Secrets cần:** `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (private key OpenSSH), `VPS_PORT` (nếu khác 22), `GHCR_PAT` (scope `read:packages`, có thể bỏ nếu để package GHCR Public). `GITHUB_TOKEN` tự động.
 
-Khác biệt compose: `docker-compose.yml` **build từ source** (dùng local / fallback); `docker-compose.prod.yml` **kéo image** từ GHCR (VPS không phải compile).
+Chuẩn bị VPS (làm 1 lần): cài Docker (`curl -fsSL https://get.docker.com | sh`), tạo `/opt/hungsilver` + `.env` (set `JWT_SECRET`, `POSTGRES_PASSWORD`, `GHCR_OWNER`, `IMAGE_TAG=latest`, `HTTP_PORT=80`), thêm SSH public key của CI, mở firewall `80,22/tcp`.
 
-### GitHub Secrets cần tạo (Settings → Secrets and variables → Actions)
+## 10. API chính
 
-| Secret | Bắt buộc | Giá trị |
+Base path `/api`. Lỗi trả `ProblemDetails { status, title, detail }`. Liệt kê đầy đủ ở Scalar `/scalar/v1`.
+
+| Nhóm | Endpoint tiêu biểu | Quyền |
 |---|---|---|
-| `VPS_HOST` | ✅ | IP công khai của VPS |
-| `VPS_USER` | ✅ | User SSH (vd `deploy` hoặc `root`) |
-| `VPS_SSH_KEY` | ✅ | **Private key** SSH (toàn bộ nội dung OpenSSH) |
-| `VPS_PORT` | ⬜ | Cổng SSH nếu khác `22` |
-| `GHCR_PAT` | ✅* | PAT (classic) scope `read:packages` để VPS pull image |
-
-`GITHUB_TOKEN` (dùng ở job build-push) là tự động, **không cần tạo**.
-\*Có thể bỏ `GHCR_PAT` nếu đặt 2 package GHCR ở chế độ **Public** (khi đó xóa bước `docker login` trong `cd.yml`).
-
-### Chuẩn bị VPS Ubuntu (làm 1 lần)
-
-```bash
-# 1. Cài Docker Engine + Compose plugin
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER          # logout/login lại
-
-# 2. Thư mục deploy + .env chứa secret thật (KHÔNG commit)
-sudo mkdir -p /opt/hungsilver && sudo chown $USER /opt/hungsilver
-cd /opt/hungsilver
-cp <repo>/.env.example .env
-nano .env   # set POSTGRES_PASSWORD, JWT_SECRET (>=32 ký tự), GHCR_OWNER=<owner thường>, IMAGE_TAG=latest, HTTP_PORT=80
-
-# 3. SSH key cho CI: thêm public key vào ~/.ssh/authorized_keys của VPS_USER,
-#    bỏ private key vào secret VPS_SSH_KEY.
-
-# 4. Mở firewall
-sudo ufw allow 80,22/tcp
-```
-
-Sau đó mỗi lần push vào `master` sẽ tự build → push GHCR → deploy. App ở `http://<ip-vps>`.
-
-## API chính
-
-| Endpoint | Method | Quyền | Mô tả |
-|---|---|---|---|
-| `/api/auth/register` `/login` `/google` | POST | Public | Đăng ký / đăng nhập / Google |
-| `/api/auth/refresh` `/logout` | POST | Cookie | Refresh rotation / thu hồi |
-| `/api/auth/me` | GET | User | Thông tin user hiện tại |
-| `/api/products` (+`/{id}`, `/restore`) | CRUD | GET: User, còn lại: Admin | Demo repository + soft delete |
-| `/api/users` (+roles, delete, restore) | * | Admin | Quản lý user, gán role |
-| `/health` | GET | Public | Health check |
-
-## Quy ước quan trọng
-
-- **Soft delete**: mọi entity implement `ISoftDeletable` (gồm cả Users). `Remove()` được interceptor chuyển thành `UPDATE IsDeleted = true`; query mặc định tự lọc bản ghi đã xóa; dùng `includeDeleted`/`IgnoreQueryFilters` khi cần xem/khôi phục.
-- **Result pattern**: service trả `Result`/`Result<T>` với `Error(Code, Message, Type)`; `ResultExtensions.ToActionResult()` map sang HTTP status + ProblemDetails.
-- **Thêm entity mới**: kế thừa `BaseEntity` → có ngay Id/audit/soft-delete + dùng được `IRepository<T>` không cần viết repository riêng.
-- **Token**: access token chỉ giữ trong memory phía client (không localStorage); refresh token nằm trong HttpOnly cookie path `/api/auth`.
+| Xác thực | `/auth/register` `/login` `/google` `/refresh` `/logout` `/me` | Public/Cookie/User |
+| Học sinh | `/students` (CRUD) · `/students/{id}/progress` · `/redeem` · `/parent-report` · `/link-user` | Teacher/Admin (ghi: Admin) |
+| Lớp học | `/classes` (CRUD) · `/roster` · `/teacher` · `/enroll` | Teacher/Admin (ghi: Admin) |
+| Lịch học | `/schedule?from&to` · `/slots` · `/generate-sessions` · `/sessions` | Teacher/Admin |
+| Buổi học | `/sessions/{id}/sheet` · `/attendance` · `/points` · `/journal` · `/report/generate` | Teacher/Admin |
+| Dashboard | `/dashboard/summary` · `/charts` | Teacher/Admin |
+| Học phí | `/tuition` (CRUD) · `/mark-paid` | Teacher/Admin (ghi: Admin) |
+| Tài liệu | `/materials?classId` (CRUD) · `/files` (upload) | Teacher/Admin |
+| Đánh giá | `/evaluations` · `/leaderboard` | Teacher/Admin |
+| Thông báo | `/notifications` | Teacher/Admin |
+| Cảnh báo | `/warnings` | Teacher/Admin |
+| Portal HS | `/portal/me` | Học sinh |
+| Cấu hình | `/settings/effective` · `/scope/{scope}` | Admin (lớp: GV) |
+| Health | `/health` | Public |
