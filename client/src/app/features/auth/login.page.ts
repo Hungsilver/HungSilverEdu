@@ -22,7 +22,7 @@ import { GoogleSigninButton } from '../../shared/google-signin-button';
   ],
   template: `
     <div class="auth-page">
-      <nz-card class="auth-card" nzTitle="Đăng nhập HungSilver">
+      <nz-card class="auth-card" nzTitle="Đăng nhập H-edu">
         @if (error()) {
           <nz-alert nzType="error" [nzMessage]="error()" nzShowIcon class="error-alert" />
         }
