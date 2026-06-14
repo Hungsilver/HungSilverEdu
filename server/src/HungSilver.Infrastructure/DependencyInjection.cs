@@ -1,12 +1,27 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Auth;
+using HungSilver.Application.Files;
+using HungSilver.Application.Settings;
 using HungSilver.Application.Users;
+using HungSilver.Application.Classes;
+using HungSilver.Application.Dashboard;
+using HungSilver.Application.Reports;
+using HungSilver.Application.Schedule;
+using HungSilver.Application.Sessions;
 using HungSilver.Infrastructure.Auth;
+using HungSilver.Infrastructure.Classes;
+using HungSilver.Infrastructure.Dashboard;
 using HungSilver.Infrastructure.Identity;
+using HungSilver.Infrastructure.Notifications;
+using HungSilver.Infrastructure.Reports;
+using HungSilver.Infrastructure.Schedule;
+using HungSilver.Infrastructure.Sessions;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.Infrastructure.Persistence.Interceptors;
 using HungSilver.Infrastructure.Persistence.Repositories;
 using HungSilver.Infrastructure.Services;
+using HungSilver.Infrastructure.Settings;
+using HungSilver.Infrastructure.Storage;
 using HungSilver.Infrastructure.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +37,8 @@ public static class DependencyInjection
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
+        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+        services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
 
         services.AddSingleton<AuditSaveChangesInterceptor>();
 
@@ -52,6 +69,27 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
+
+        // File storage + cấu hình phân tầng
+        services.AddScoped<IFileStorage, LocalDiskFileStorage>();
+        services.AddScoped<IFileService, FileService>();
+        services.AddScoped<SettingsService>();
+        services.AddScoped<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
+        services.AddScoped<ISettingsResolver>(sp => sp.GetRequiredService<SettingsService>());
+
+        // Service nghiệp vụ (Infrastructure)
+        services.AddScoped<IClassService, ClassService>();
+        services.AddScoped<IScheduleService, ScheduleService>();
+        services.AddScoped<ISessionService, SessionService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<ISessionReportService, SessionReportService>();
+
+        // Thông báo: Email gửi thật (MailKit); Zalo/Messenger stub (gửi tay).
+        services.AddScoped<INotificationSender, EmailNotificationSender>();
+        services.AddScoped<INotificationSender, ZaloNotificationSender>();
+        services.AddScoped<INotificationSender, MessengerNotificationSender>();
+        services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
 
         return services;
     }

@@ -1,5 +1,7 @@
+using HungSilver.Application.Settings;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Entities;
+using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
@@ -59,6 +61,30 @@ public static class DbSeeder
             }
         }
 
+        // Giáo viên demo (role Teacher).
+        var teacher = await userManager.FindByEmailAsync(seedOptions.TeacherEmail);
+        if (teacher is null)
+        {
+            teacher = new AppUser
+            {
+                UserName = seedOptions.TeacherEmail,
+                Email = seedOptions.TeacherEmail,
+                EmailConfirmed = true,
+                FullName = seedOptions.TeacherFullName
+            };
+            var createdTeacher = await userManager.CreateAsync(teacher, seedOptions.TeacherPassword);
+            if (createdTeacher.Succeeded)
+            {
+                await userManager.AddToRoleAsync(teacher, AppRoles.Teacher);
+                logger.LogInformation("Seeded teacher account {Email}", seedOptions.TeacherEmail);
+            }
+            else
+            {
+                logger.LogError("Seed teacher failed: {Errors}",
+                    string.Join(" | ", createdTeacher.Errors.Select(e => e.Description)));
+            }
+        }
+
         if (!await context.Products.IgnoreQueryFilters().AnyAsync())
         {
             context.Products.AddRange(
@@ -68,6 +94,64 @@ public static class DbSeeder
 
             await context.SaveChangesAsync();
             logger.LogInformation("Seeded demo products");
+        }
+
+        // Cấu hình mặc định (scope System).
+        if (!await context.Settings.IgnoreQueryFilters().AnyAsync())
+        {
+            foreach (var kv in SettingKeys.Defaults)
+                context.Settings.Add(new AppSetting { Key = kv.Key, Value = kv.Value, Scope = SettingScope.System });
+            await context.SaveChangesAsync();
+            logger.LogInformation("Seeded default settings");
+        }
+
+        // Dữ liệu nghiệp vụ demo.
+        if (teacher is not null && !await context.Classes.IgnoreQueryFilters().AnyAsync())
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+
+            var curriculum = new Curriculum { Name = "Movers", Level = "Pre-A1", Description = "Cambridge Movers" };
+            context.Curriculums.Add(curriculum);
+
+            var cls = new ClassRoom
+            {
+                Name = "Movers A",
+                TeacherId = teacher.Id,
+                CurriculumId = curriculum.Id,
+                MaxCapacity = 15,
+                Schedule = "Thứ 2, 4 - 19:00",
+                StartDate = today,
+                IsActive = true
+            };
+            context.Classes.Add(cls);
+
+            var students = new[]
+            {
+                new Student { FullName = "Nguyễn Văn Nam", EnrollmentDate = today, EnglishLevel = "Movers", LearningGoal = "Thi đỗ lớp chuyên Anh", ParentName = "Nguyễn Văn A", ParentPhone = "0900000001", Phone = "0900000011", IsActive = true },
+                new Student { FullName = "Trần Thị Lan", EnrollmentDate = today, EnglishLevel = "Movers", LearningGoal = "IELTS 6.5", ParentName = "Trần Văn B", ParentPhone = "0900000002", IsActive = true },
+                new Student { FullName = "Lê Minh", EnrollmentDate = today, EnglishLevel = "Movers", ParentName = "Lê Văn C", ParentPhone = "0900000003", IsActive = true }
+            };
+            context.Students.AddRange(students);
+
+            foreach (var s in students)
+                context.Enrollments.Add(new Enrollment { ClassId = cls.Id, StudentId = s.Id, EnrolledOn = today, IsActive = true });
+
+            context.ClassScheduleSlots.Add(new ClassScheduleSlot { ClassId = cls.Id, DayOfWeek = DayOfWeek.Monday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(20, 30) });
+            context.ClassScheduleSlots.Add(new ClassScheduleSlot { ClassId = cls.Id, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(20, 30) });
+
+            context.ClassSessions.Add(new ClassSession
+            {
+                ClassId = cls.Id,
+                SessionNumber = 1,
+                SessionDate = today,
+                StartTime = new TimeOnly(19, 0),
+                EndTime = new TimeOnly(20, 30),
+                Topic = "Unit 1: My Family",
+                Status = SessionStatus.Scheduled
+            });
+
+            await context.SaveChangesAsync();
+            logger.LogInformation("Seeded demo teaching data");
         }
     }
 }

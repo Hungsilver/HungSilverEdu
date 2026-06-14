@@ -5,4 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- AutoMapper 14.0.0: GHSA-rvv3-g6hj-g44x (DoS đệ quy ~25k cấp khi map đồ thị tự tham chiếu).
+         Đã đánh giá & chấp nhận: hệ thống chỉ map DTO phẳng entity↔DTO, không map đồ thị lồng sâu
+         từ input ngoài nên không khai thác được. Pin AutoMapper 14.x theo yêu cầu (bản vá chỉ có ở 15.1.1+).
+         Chỉ suppress đúng advisory này; mọi package khác vẫn được audit. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+  </ItemGroup>
 </Project>

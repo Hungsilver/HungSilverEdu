@@ -3,7 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, firstValueFrom, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { AuthResponse, ROLE_ADMIN, UserDto } from './models';
+import { AuthResponse, ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserDto } from './models';
 
 /**
  * Access token chỉ giữ trong memory (signal) — không đụng localStorage để tránh XSS.
@@ -20,6 +20,8 @@ export class AuthService {
   readonly currentUser = signal<UserDto | null>(null);
   readonly isLoggedIn = computed(() => this.currentUser() !== null);
   readonly isAdmin = computed(() => this.currentUser()?.roles.includes(ROLE_ADMIN) ?? false);
+  readonly isTeacher = computed(() => this.currentUser()?.roles.includes(ROLE_TEACHER) ?? false);
+  readonly isStudent = computed(() => this.currentUser()?.roles.includes(ROLE_USER) ?? false);
 
   login(email: string, password: string): Observable<AuthResponse> {
     return this.http

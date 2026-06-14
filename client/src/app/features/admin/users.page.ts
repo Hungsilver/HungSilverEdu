@@ -10,7 +10,7 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { ApiProblem, ROLE_ADMIN, ROLE_USER, UserListItem } from '../../core/models';
+import { ApiProblem, ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserListItem } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
 import { UsersService } from '../../core/users.service';
 
@@ -60,8 +60,9 @@ import { UsersService } from '../../core/users.service';
                 nzPlaceHolder="Chọn quyền"
                 [nzDisabled]="user.isDeleted || user.id === currentUserId"
                 class="roles-select">
-                <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Admin" />
-                <nz-option [nzValue]="ROLE_USER" nzLabel="User" />
+                <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
+                <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
+                <nz-option [nzValue]="ROLE_USER" nzLabel="Học sinh" />
               </nz-select>
             </td>
             <td>
@@ -105,6 +106,7 @@ import { UsersService } from '../../core/users.service';
 })
 export class UsersPage {
   protected readonly ROLE_ADMIN = ROLE_ADMIN;
+  protected readonly ROLE_TEACHER = ROLE_TEACHER;
   protected readonly ROLE_USER = ROLE_USER;
 
   private readonly usersService = inject(UsersService);

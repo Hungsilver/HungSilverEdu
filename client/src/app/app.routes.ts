@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard, roleGuard } from './core/guards';
-import { ROLE_ADMIN } from './core/models';
+import { ROLE_ADMIN, ROLE_TEACHER } from './core/models';
+
+const teacherOrAdmin = { roles: [ROLE_ADMIN, ROLE_TEACHER] };
 
 export const routes: Routes = [
   {
@@ -18,7 +20,70 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./layout/shell').then(m => m.Shell),
     children: [
-      { path: '', redirectTo: 'products', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+
+      {
+        path: 'dashboard',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/dashboard/dashboard.page').then(m => m.DashboardPage)
+      },
+      {
+        path: 'students',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/students/students.page').then(m => m.StudentsPage)
+      },
+      {
+        path: 'students/:id',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/students/student-detail.page').then(m => m.StudentDetailPage)
+      },
+      {
+        path: 'classes',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/classes/classes.page').then(m => m.ClassesPage)
+      },
+      {
+        path: 'classes/:id',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/classes/class-detail.page').then(m => m.ClassDetailPage)
+      },
+      {
+        path: 'schedule',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/schedule/schedule.page').then(m => m.SchedulePage)
+      },
+      {
+        path: 'sessions/:id',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/sessions/session.page').then(m => m.SessionPage)
+      },
+      {
+        path: 'sessions/:id/journal',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/sessions/session-journal.page').then(m => m.SessionJournalPage)
+      },
+      {
+        path: 'sessions/:id/report',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/sessions/session-report.page').then(m => m.SessionReportPage)
+      },
+      {
+        path: 'settings',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN] },
+        loadComponent: () => import('./features/settings/settings.page').then(m => m.SettingsPage)
+      },
+
+      // Demo cũ (giữ làm tham chiếu, không hiện trên menu).
       {
         path: 'products',
         loadComponent: () => import('./features/products/products.page').then(m => m.ProductsPage)
@@ -28,6 +93,38 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { roles: [ROLE_ADMIN] },
         loadComponent: () => import('./features/admin/users.page').then(m => m.UsersPage)
+      },
+
+      // Giai đoạn 2 — placeholder.
+      {
+        path: 'tuition',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN], title: 'Học phí' },
+        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+      },
+      {
+        path: 'materials',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER], title: 'Kho tài liệu' },
+        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+      },
+      {
+        path: 'notifications',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN], title: 'Thông báo' },
+        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+      },
+      {
+        path: 'evaluations',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER], title: 'Đánh giá hàng tháng' },
+        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+      },
+      {
+        path: 'warnings',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN], title: 'Cảnh báo' },
+        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
       }
     ]
   },

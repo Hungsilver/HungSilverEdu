@@ -57,4 +57,484 @@ export interface ApiProblem {
 }
 
 export const ROLE_ADMIN = 'Admin';
-export const ROLE_USER = 'User';
+export const ROLE_TEACHER = 'Teacher';
+export const ROLE_USER = 'User'; // = học sinh
+
+// ----------------- Enums (khớp tên enum backend, serialize dạng string) -----------------
+
+export enum AttendanceStatus {
+  Present = 'Present',
+  ExcusedAbsence = 'ExcusedAbsence',
+  UnexcusedAbsence = 'UnexcusedAbsence',
+  Late = 'Late'
+}
+
+export enum HomeworkStatus {
+  NotAssigned = 'NotAssigned',
+  CompletedWell = 'CompletedWell',
+  Completed = 'Completed',
+  NotCompleted = 'NotCompleted'
+}
+
+export enum AttitudeStatus {
+  Positive = 'Positive',
+  Normal = 'Normal',
+  Unfocused = 'Unfocused'
+}
+
+export enum SessionStatus {
+  Scheduled = 'Scheduled',
+  Completed = 'Completed',
+  Cancelled = 'Cancelled'
+}
+
+export enum PointType {
+  Reward = 'Reward',
+  Penalty = 'Penalty'
+}
+
+export enum RewardTier {
+  SmallGift = 'SmallGift',
+  FreeMaterials = 'FreeMaterials',
+  FeeDiscount = 'FeeDiscount'
+}
+
+export enum AssessmentType {
+  Entry = 'Entry',
+  Periodic = 'Periodic',
+  Final = 'Final'
+}
+
+export enum TuitionStatus {
+  Pending = 'Pending',
+  Paid = 'Paid',
+  DueSoon = 'DueSoon',
+  Overdue = 'Overdue'
+}
+
+export enum SettingScope {
+  System = 'System',
+  Role = 'Role',
+  Class = 'Class',
+  User = 'User'
+}
+
+export enum FileStorageMode {
+  ExternalUrl = 'ExternalUrl',
+  Server = 'Server'
+}
+
+export enum MaterialSource {
+  ExternalUrl = 'ExternalUrl',
+  ServerFile = 'ServerFile'
+}
+
+export enum ReportType {
+  SessionNotice = 'SessionNotice',
+  ScheduleNotice = 'ScheduleNotice'
+}
+
+// ----------------- Học sinh -----------------
+
+export interface Student {
+  id: string;
+  fullName: string;
+  dateOfBirth: string | null;
+  school: string | null;
+  gradeLevel: string | null;
+  phone: string | null;
+  parentName: string | null;
+  parentPhone: string | null;
+  address: string | null;
+  enrollmentDate: string;
+  englishLevel: string | null;
+  learningGoal: string | null;
+  entryScore: number | null;
+  curriculum: string | null;
+  userId: string | null;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface StudentRequest {
+  fullName: string;
+  dateOfBirth: string | null;
+  school: string | null;
+  gradeLevel: string | null;
+  phone: string | null;
+  parentName: string | null;
+  parentPhone: string | null;
+  address: string | null;
+  enrollmentDate: string | null;
+  englishLevel: string | null;
+  learningGoal: string | null;
+  entryScore: number | null;
+  curriculum: string | null;
+  isActive: boolean;
+}
+
+// ----------------- Lớp học -----------------
+
+export interface ClassListItem {
+  id: string;
+  name: string;
+  teacherId: string;
+  teacherName: string | null;
+  maxCapacity: number;
+  currentSize: number;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAtUtc: string;
+}
+
+export interface ClassDetail {
+  id: string;
+  name: string;
+  teacherId: string;
+  teacherName: string | null;
+  curriculumId: string | null;
+  curriculumName: string | null;
+  maxCapacity: number;
+  schedule: string | null;
+  startDate: string | null;
+  isActive: boolean;
+  currentSize: number;
+  averageScore: number | null;
+  attendanceRate: number;
+  isDeleted: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface ClassRequest {
+  name: string;
+  teacherId: string;
+  curriculumId: string | null;
+  maxCapacity: number;
+  schedule: string | null;
+  startDate: string | null;
+  isActive: boolean;
+}
+
+export interface RosterItem {
+  enrollmentId: string;
+  studentId: string;
+  fullName: string;
+  phone: string | null;
+  parentPhone: string | null;
+  enrolledOn: string;
+}
+
+// ----------------- Lịch học -----------------
+
+export interface CalendarSession {
+  id: string;
+  classId: string;
+  className: string;
+  sessionNumber: number;
+  sessionDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  topic: string | null;
+  status: SessionStatus;
+}
+
+export interface ScheduleSlot {
+  id: string;
+  classId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface CreateSlotRequest {
+  classId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface CreateSessionRequest {
+  classId: string;
+  sessionDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  topic: string | null;
+  sessionNumber: number | null;
+}
+
+export interface GenerateSessionsRequest {
+  fromDate: string;
+  toDate: string;
+}
+
+// ----------------- Buổi học (module nhập liệu) -----------------
+
+export interface PointEntry {
+  id: string;
+  studentId: string;
+  type: PointType;
+  points: number;
+  reason: string;
+  createdAtUtc: string;
+}
+
+export interface SessionStudentRow {
+  studentId: string;
+  fullName: string;
+  attendance: AttendanceStatus;
+  homework: HomeworkStatus;
+  attitude: AttitudeStatus;
+  personalNote: string | null;
+  rewardBalance: number;
+  points: PointEntry[];
+}
+
+export interface SessionSheet {
+  sessionId: string;
+  classId: string;
+  className: string;
+  sessionNumber: number;
+  sessionDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  topic: string | null;
+  status: SessionStatus;
+  rows: SessionStudentRow[];
+}
+
+export interface SaveAttendanceRow {
+  studentId: string;
+  attendance: AttendanceStatus;
+  homework: HomeworkStatus;
+  attitude: AttitudeStatus;
+  personalNote: string | null;
+}
+
+export interface AddPointRequest {
+  studentId: string;
+  type: PointType;
+  points: number;
+  reason: string;
+}
+
+export interface RedeemRewardRequest {
+  tier: RewardTier;
+  note: string | null;
+}
+
+export interface SkillScores {
+  overall: number | null;
+  vocabulary: number | null;
+  grammar: number | null;
+  listening: number | null;
+  speaking: number | null;
+  reading: number | null;
+  writing: number | null;
+}
+
+export interface AssessmentPoint {
+  takenOn: string;
+  overall: number | null;
+  vocabulary: number | null;
+  grammar: number | null;
+  listening: number | null;
+  speaking: number | null;
+  reading: number | null;
+  writing: number | null;
+}
+
+export interface StudentProgress {
+  studentId: string;
+  fullName: string;
+  totalSessions: number;
+  attendedSessions: number;
+  absentSessions: number;
+  homeworkCompleted: number;
+  homeworkNotCompleted: number;
+  rewardPoints: number;
+  penaltyPoints: number;
+  rewardBalance: number;
+  latestSkills: SkillScores | null;
+  scoreTrend: AssessmentPoint[];
+}
+
+// ----------------- Nhật ký & Báo cáo -----------------
+
+export interface TeacherJournal {
+  id: string;
+  classSessionId: string;
+  contentTaught: string | null;
+  activities: string | null;
+  difficulties: string | null;
+  notesForNextSession: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string | null;
+}
+
+export interface UpsertJournalRequest {
+  contentTaught: string | null;
+  activities: string | null;
+  difficulties: string | null;
+  notesForNextSession: string | null;
+}
+
+export interface GeneratedReport {
+  id: string | null;
+  type: ReportType;
+  content: string;
+  generatedAtUtc: string;
+}
+
+// ----------------- Dashboard -----------------
+
+export interface TodaySession {
+  sessionId: string;
+  classId: string;
+  className: string;
+  startTime: string | null;
+  endTime: string | null;
+  topic: string | null;
+}
+
+export interface TuitionDue {
+  studentId: string;
+  studentName: string;
+  amount: number;
+  dueDate: string;
+  status: TuitionStatus;
+}
+
+export interface Absentee {
+  studentId: string;
+  studentName: string;
+  className: string;
+  sessionDate: string;
+}
+
+export interface MissingHomework {
+  studentId: string;
+  studentName: string;
+  className: string;
+  sessionDate: string;
+}
+
+export interface TopStudent {
+  studentId: string;
+  studentName: string;
+  rewardBalance: number;
+}
+
+export interface AttentionStudent {
+  studentId: string;
+  studentName: string;
+  reason: string;
+}
+
+export interface DashboardSummary {
+  totalActiveStudents: number;
+  totalClasses: number;
+  sessionsToday: number;
+  todaySchedule: TodaySession[];
+  tuitionDueSoon: TuitionDue[];
+  recentAbsentees: Absentee[];
+  missingHomework: MissingHomework[];
+  topStudents: TopStudent[];
+  needAttention: AttentionStudent[];
+}
+
+export interface MonthRate {
+  month: string;
+  rate: number;
+}
+
+export interface ClassPoints {
+  className: string;
+  points: number;
+}
+
+export interface MonthScore {
+  month: string;
+  averageScore: number;
+}
+
+export interface DashboardCharts {
+  attendanceByMonth: MonthRate[];
+  homeworkByMonth: MonthRate[];
+  rewardPointsByClass: ClassPoints[];
+  testScoreGrowth: MonthScore[];
+}
+
+// ----------------- Cấu hình & File -----------------
+
+export interface AppSetting {
+  id: string;
+  key: string;
+  value: string | null;
+  scope: SettingScope;
+  scopeId: string | null;
+  dataType: string | null;
+  description: string | null;
+}
+
+export interface UpsertSettingRequest {
+  key: string;
+  value: string | null;
+  scope: SettingScope;
+  scopeId: string | null;
+  dataType: string | null;
+  description: string | null;
+}
+
+export interface EffectiveSettings {
+  values: Record<string, string>;
+}
+
+export interface StoredFile {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+}
+
+// ----------------- Nhãn hiển thị tiếng Việt -----------------
+
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  [AttendanceStatus.Present]: 'Có mặt',
+  [AttendanceStatus.Late]: 'Đi muộn',
+  [AttendanceStatus.ExcusedAbsence]: 'Vắng có phép',
+  [AttendanceStatus.UnexcusedAbsence]: 'Vắng không phép'
+};
+
+export const HOMEWORK_LABELS: Record<HomeworkStatus, string> = {
+  [HomeworkStatus.NotAssigned]: 'Không giao',
+  [HomeworkStatus.CompletedWell]: 'Hoàn thành tốt',
+  [HomeworkStatus.Completed]: 'Hoàn thành',
+  [HomeworkStatus.NotCompleted]: 'Chưa hoàn thành'
+};
+
+export const ATTITUDE_LABELS: Record<AttitudeStatus, string> = {
+  [AttitudeStatus.Positive]: 'Tích cực',
+  [AttitudeStatus.Normal]: 'Bình thường',
+  [AttitudeStatus.Unfocused]: 'Chưa tập trung'
+};
+
+export const REWARD_TIER_LABELS: Record<RewardTier, string> = {
+  [RewardTier.SmallGift]: 'Quà nhỏ (50 điểm)',
+  [RewardTier.FreeMaterials]: 'Miễn phí tài liệu (100 điểm)',
+  [RewardTier.FeeDiscount]: 'Giảm học phí (150 điểm)'
+};
+
+export const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+export const SKILLS: { key: keyof SkillScores; label: string }[] = [
+  { key: 'listening', label: 'Nghe' },
+  { key: 'speaking', label: 'Nói' },
+  { key: 'reading', label: 'Đọc' },
+  { key: 'writing', label: 'Viết' },
+  { key: 'grammar', label: 'Ngữ pháp' },
+  { key: 'vocabulary', label: 'Từ vựng' }
+];

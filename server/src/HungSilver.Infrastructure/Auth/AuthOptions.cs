@@ -25,4 +25,8 @@ public sealed class SeedOptions
     public string AdminEmail { get; set; } = "admin@hungsilver.local";
     public string AdminPassword { get; set; } = "Admin@12345";
     public string AdminFullName { get; set; } = "System Administrator";
+
+    public string TeacherEmail { get; set; } = "teacher@hungsilver.local";
+    public string TeacherPassword { get; set; } = "Teacher@12345";
+    public string TeacherFullName { get; set; } = "Giáo viên Demo";
 }

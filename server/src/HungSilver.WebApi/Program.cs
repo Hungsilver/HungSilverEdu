@@ -46,7 +46,10 @@ builder.Services
     });
 
 builder.Services.AddAuthorization(options =>
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole(AppRoles.Admin)));
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole(AppRoles.Admin));
+    options.AddPolicy("TeacherOrAdmin", policy => policy.RequireRole(AppRoles.Admin, AppRoles.Teacher));
+});
 
 var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("Client", policy => policy
@@ -55,7 +58,10 @@ builder.Services.AddCors(options => options.AddPolicy("Client", policy => policy
     .AllowAnyMethod()
     .AllowCredentials()));
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
