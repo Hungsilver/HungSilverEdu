@@ -19,3 +19,4 @@ dist/
 
 # Claude Code agent tooling (local)
 .agents/
+skills-lock.json
