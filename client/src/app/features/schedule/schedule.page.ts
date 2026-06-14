@@ -21,7 +21,7 @@ import { ScheduleService } from '../../core/schedule.service';
   template: `
     <div class="page-header">
       <h2>Lịch học</h2>
-      <nz-radio-group [(ngModel)]="mode" (ngModelChange)="onModeChange()" nzButtonStyle="solid">
+      <nz-radio-group [ngModel]="mode()" (ngModelChange)="onMode($event)" nzButtonStyle="solid">
         <label nz-radio-button nzValue="month">Tháng</label>
         <label nz-radio-button nzValue="week">Tuần</label>
       </nz-radio-group>
@@ -94,6 +94,11 @@ export class SchedulePage {
 
   constructor() {
     this.loadMonth(this.monthValue);
+  }
+
+  protected onMode(value: 'month' | 'week'): void {
+    this.mode.set(value);
+    this.onModeChange();
   }
 
   protected onModeChange(): void {

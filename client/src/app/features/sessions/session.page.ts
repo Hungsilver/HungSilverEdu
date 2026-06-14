@@ -146,8 +146,10 @@ export class SessionPage implements OnInit {
   protected readonly sheet = signal<SessionSheet | null>(null);
   protected readonly rows = signal<SessionStudentRow[]>([]);
   protected readonly saving = signal(false);
-  protected readonly presentCount = computed(() =>
-    this.rows().filter(r => r.attendance === AttendanceStatus.Present || r.attendance === AttendanceStatus.Late).length);
+  // Là method (không phải computed) để cập nhật ngay khi sửa từng dòng (row được mutate tại chỗ).
+  protected presentCount(): number {
+    return this.rows().filter(r => r.attendance === AttendanceStatus.Present || r.attendance === AttendanceStatus.Late).length;
+  }
 
   protected readonly pointOpen = signal(false);
   protected readonly busy = signal(false);

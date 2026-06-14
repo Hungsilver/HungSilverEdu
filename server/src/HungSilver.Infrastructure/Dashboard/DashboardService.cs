@@ -34,14 +34,19 @@ public sealed class DashboardService(
 
         var dueSoonDays = await GetIntSettingAsync(SettingKeys.TuitionDueSoonDays, 7, ct);
         var dueLimit = today.AddDays(dueSoonDays);
-        var tuitionDue = await (
+        var dueRaw = await (
             from t in context.TuitionInvoices.AsNoTracking()
             join s in context.Students.AsNoTracking() on t.StudentId equals s.Id
             where studentIds.Contains(t.StudentId) && t.PaidOn == null && t.DueDate <= dueLimit
             orderby t.DueDate
-            select new TuitionDueDto(s.Id, s.FullName, t.Amount, t.DueDate, t.Status))
+            select new { s.Id, s.FullName, t.Amount, t.DueDate })
             .Take(10)
             .ToListAsync(ct);
+        // Tính lại trạng thái hiệu lực (đều chưa đóng & trong hạn cảnh báo → Overdue/DueSoon).
+        var tuitionDue = dueRaw
+            .Select(t => new TuitionDueDto(t.Id, t.FullName, t.Amount, t.DueDate,
+                t.DueDate < today ? TuitionStatus.Overdue : TuitionStatus.DueSoon))
+            .ToList();
 
         // Bản ghi buổi học (có ngày + tên) trong phạm vi — dùng cho vắng/thiếu BTVN/cảnh báo.
         var recs = await (

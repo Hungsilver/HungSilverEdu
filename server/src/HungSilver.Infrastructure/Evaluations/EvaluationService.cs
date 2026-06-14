@@ -51,9 +51,9 @@ public sealed class EvaluationService(
         if (!validation.IsValid)
             return Result.Failure<MonthlyEvaluationDto>(validation.ToError("Evaluation.Validation"));
 
-        var access = request.ClassId is not null
-            ? await accessGuard.EnsureCanAccessClassAsync(request.ClassId.Value, ct)
-            : await accessGuard.EnsureCanAccessStudentAsync(request.StudentId, ct);
+        // Luôn kiểm quyền theo học sinh: Teacher chỉ đánh giá HS thuộc lớp của mình
+        // (tránh truyền ClassId của mình + StudentId của lớp khác để ghi đè).
+        var access = await accessGuard.EnsureCanAccessStudentAsync(request.StudentId, ct);
         if (access.IsFailure)
             return Result.Failure<MonthlyEvaluationDto>(access.Error);
 

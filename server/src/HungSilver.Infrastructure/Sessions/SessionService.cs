@@ -81,13 +81,19 @@ public sealed class SessionService(
         if (access.IsFailure)
             return access;
 
-        var studentIds = request.Entries.Select(e => e.StudentId).ToList();
+        // Chỉ chấp nhận học sinh đang ghi danh trong lớp của buổi học (tránh ghi cho HS lớp khác).
+        var rosterIds = await context.Enrollments
+            .Where(e => e.ClassId == session.ClassId && e.IsActive)
+            .Select(e => e.StudentId).ToListAsync(ct);
+        var entries = request.Entries.Where(e => rosterIds.Contains(e.StudentId)).ToList();
+
+        var studentIds = entries.Select(e => e.StudentId).ToList();
         var existing = await context.StudentSessionRecords
             .Where(r => r.ClassSessionId == sessionId && studentIds.Contains(r.StudentId))
             .ToListAsync(ct);
         var existingMap = existing.ToDictionary(r => r.StudentId);
 
-        foreach (var entry in request.Entries)
+        foreach (var entry in entries)
         {
             if (existingMap.TryGetValue(entry.StudentId, out var rec))
             {
@@ -131,6 +137,11 @@ public sealed class SessionService(
         var access = await accessGuard.EnsureCanAccessClassAsync(session.ClassId, ct);
         if (access.IsFailure)
             return Result.Failure<PointEntryDto>(access.Error);
+
+        var inClass = await context.Enrollments.AnyAsync(
+            e => e.ClassId == session.ClassId && e.StudentId == request.StudentId && e.IsActive, ct);
+        if (!inClass)
+            return Result.Failure<PointEntryDto>(Error.Validation("Point.NotInClass", "Học sinh không thuộc lớp của buổi học."));
 
         var entry = new PointEntry
         {

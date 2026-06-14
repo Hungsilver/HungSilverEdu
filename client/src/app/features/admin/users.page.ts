@@ -36,7 +36,8 @@ import { UsersService } from '../../core/users.service';
       [nzTotal]="total()"
       [nzPageIndex]="page()"
       [nzPageSize]="pageSize()"
-      (nzPageIndexChange)="onPageChange($event)">
+      (nzPageIndexChange)="onPageChange($event)"
+      [nzScroll]="{ x: '760px' }">
       <thead>
         <tr>
           <th>Email</th>
