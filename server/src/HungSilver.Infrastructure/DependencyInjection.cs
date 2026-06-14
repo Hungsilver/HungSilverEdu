@@ -5,17 +5,21 @@ using HungSilver.Application.Settings;
 using HungSilver.Application.Users;
 using HungSilver.Application.Classes;
 using HungSilver.Application.Dashboard;
+using HungSilver.Application.Evaluations;
 using HungSilver.Application.Reports;
 using HungSilver.Application.Schedule;
 using HungSilver.Application.Sessions;
+using HungSilver.Application.Tuition;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Classes;
 using HungSilver.Infrastructure.Dashboard;
+using HungSilver.Infrastructure.Evaluations;
 using HungSilver.Infrastructure.Identity;
 using HungSilver.Infrastructure.Notifications;
 using HungSilver.Infrastructure.Reports;
 using HungSilver.Infrastructure.Schedule;
 using HungSilver.Infrastructure.Sessions;
+using HungSilver.Infrastructure.Tuition;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.Infrastructure.Persistence.Interceptors;
 using HungSilver.Infrastructure.Persistence.Repositories;
@@ -84,6 +88,8 @@ public static class DependencyInjection
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ISessionReportService, SessionReportService>();
+        services.AddScoped<ITuitionService, TuitionService>();
+        services.AddScoped<IEvaluationService, EvaluationService>();
 
         // Thông báo: Email gửi thật (MailKit); Zalo/Messenger stub (gửi tay).
         services.AddScoped<INotificationSender, EmailNotificationSender>();

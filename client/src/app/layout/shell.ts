@@ -36,6 +36,18 @@ import { AuthService } from '../core/auth.service';
           <nz-icon nzType="calendar" />
           <span>Lịch học</span>
         </li>
+        <li nz-menu-item routerLink="/tuition" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+          <nz-icon nzType="dollar" />
+          <span>Học phí</span>
+        </li>
+        <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+          <nz-icon nzType="link" />
+          <span>Kho tài liệu</span>
+        </li>
+        <li nz-menu-item routerLink="/evaluations" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+          <nz-icon nzType="audit" />
+          <span>Đánh giá hàng tháng</span>
+        </li>
         @if (auth.isAdmin()) {
           <li nz-menu-item routerLink="/admin/users" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="team" />
@@ -47,10 +59,7 @@ import { AuthService } from '../core/auth.service';
           </li>
           <li nz-submenu nzTitle="Sắp ra mắt" nzIcon="appstore">
             <ul>
-              <li nz-menu-item routerLink="/tuition" (click)="closeDrawer()"><nz-icon nzType="dollar" /><span>Học phí</span></li>
-              <li nz-menu-item routerLink="/materials" (click)="closeDrawer()"><nz-icon nzType="link" /><span>Kho tài liệu</span></li>
               <li nz-menu-item routerLink="/notifications" (click)="closeDrawer()"><nz-icon nzType="bell" /><span>Thông báo</span></li>
-              <li nz-menu-item routerLink="/evaluations" (click)="closeDrawer()"><nz-icon nzType="audit" /><span>Đánh giá hàng tháng</span></li>
               <li nz-menu-item routerLink="/warnings" (click)="closeDrawer()"><nz-icon nzType="warning" /><span>Cảnh báo</span></li>
             </ul>
           </li>

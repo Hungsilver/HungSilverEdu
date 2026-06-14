@@ -129,9 +129,24 @@ export enum MaterialSource {
   ServerFile = 'ServerFile'
 }
 
+export enum MaterialType {
+  Pdf = 'Pdf',
+  Video = 'Video',
+  Vocabulary = 'Vocabulary',
+  Test = 'Test',
+  Homework = 'Homework'
+}
+
 export enum ReportType {
   SessionNotice = 'SessionNotice',
   ScheduleNotice = 'ScheduleNotice'
+}
+
+export enum EvaluationRank {
+  Excellent = 'Excellent',
+  Good = 'Good',
+  Satisfactory = 'Satisfactory',
+  NeedsImprovement = 'NeedsImprovement'
 }
 
 // ----------------- Học sinh -----------------
@@ -499,6 +514,154 @@ export interface StoredFile {
   sizeBytes: number;
   url: string;
 }
+
+// ----------------- Học phí -----------------
+
+export interface TuitionInvoice {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classId: string | null;
+  periodYear: number;
+  periodMonth: number;
+  amount: number;
+  dueDate: string;
+  status: TuitionStatus;
+  paidOn: string | null;
+  note: string | null;
+  isDeleted: boolean;
+  createdAtUtc: string;
+}
+
+export interface CreateTuitionInvoiceRequest {
+  studentId: string;
+  classId: string | null;
+  periodYear: number;
+  periodMonth: number;
+  amount: number;
+  dueDate: string;
+  note: string | null;
+}
+
+export interface UpdateTuitionInvoiceRequest {
+  amount: number;
+  dueDate: string;
+  note: string | null;
+}
+
+export const TUITION_STATUS_LABELS: Record<TuitionStatus, string> = {
+  [TuitionStatus.Pending]: 'Chưa tới hạn',
+  [TuitionStatus.Paid]: 'Đã đóng',
+  [TuitionStatus.DueSoon]: 'Sắp đến hạn',
+  [TuitionStatus.Overdue]: 'Quá hạn'
+};
+
+export const TUITION_STATUS_COLORS: Record<TuitionStatus, string> = {
+  [TuitionStatus.Pending]: 'default',
+  [TuitionStatus.Paid]: 'green',
+  [TuitionStatus.DueSoon]: 'gold',
+  [TuitionStatus.Overdue]: 'red'
+};
+
+// ----------------- Kho tài liệu -----------------
+
+export interface Material {
+  id: string;
+  classId: string;
+  title: string;
+  type: MaterialType;
+  source: MaterialSource;
+  url: string | null;
+  storedFileId: string | null;
+  description: string | null;
+  downloadUrl: string;
+  createdAtUtc: string;
+}
+
+export interface CreateMaterialRequest {
+  classId: string;
+  title: string;
+  type: MaterialType;
+  source: MaterialSource;
+  url: string | null;
+  storedFileId: string | null;
+  description: string | null;
+}
+
+export interface UpdateMaterialRequest {
+  title: string;
+  type: MaterialType;
+  source: MaterialSource;
+  url: string | null;
+  storedFileId: string | null;
+  description: string | null;
+}
+
+export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
+  [MaterialType.Pdf]: 'PDF',
+  [MaterialType.Video]: 'Video',
+  [MaterialType.Vocabulary]: 'Từ vựng',
+  [MaterialType.Test]: 'Đề kiểm tra',
+  [MaterialType.Homework]: 'Bài tập'
+};
+
+// ----------------- Đánh giá tháng + Bảng vàng -----------------
+
+export interface MonthlyEvaluation {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classId: string | null;
+  year: number;
+  month: number;
+  attendanceScore: number;
+  homeworkScore: number;
+  attitudeScore: number;
+  vocabularyScore: number;
+  grammarScore: number;
+  total: number;
+  rank: EvaluationRank;
+  comment: string | null;
+}
+
+export interface UpsertEvaluationRequest {
+  studentId: string;
+  classId: string | null;
+  year: number;
+  month: number;
+  attendanceScore: number;
+  homeworkScore: number;
+  attitudeScore: number;
+  vocabularyScore: number;
+  grammarScore: number;
+  comment: string | null;
+}
+
+export interface LeaderEntry {
+  studentId: string;
+  studentName: string;
+  value: number;
+}
+
+export interface Leaderboard {
+  topReward: LeaderEntry[];
+  topAttendance: LeaderEntry[];
+  topHomework: LeaderEntry[];
+}
+
+export const EVAL_RANK_LABELS: Record<EvaluationRank, string> = {
+  [EvaluationRank.Excellent]: '🥇 Xuất sắc',
+  [EvaluationRank.Good]: '🥈 Tốt',
+  [EvaluationRank.Satisfactory]: '🥉 Đạt yêu cầu',
+  [EvaluationRank.NeedsImprovement]: '⚠️ Cần cố gắng'
+};
+
+export const EVAL_RANK_COLORS: Record<EvaluationRank, string> = {
+  [EvaluationRank.Excellent]: 'gold',
+  [EvaluationRank.Good]: 'green',
+  [EvaluationRank.Satisfactory]: 'blue',
+  [EvaluationRank.NeedsImprovement]: 'red'
+};
 
 // ----------------- Nhãn hiển thị tiếng Việt -----------------
 

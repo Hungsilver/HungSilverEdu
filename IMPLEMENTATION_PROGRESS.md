@@ -57,6 +57,14 @@
 - [ ] **#9 Frontend core + nav + shared** — models.ts (roles/enums/interfaces), services, app.routes.ts, shell.ts (responsive drawer), app.config.ts icons, auth.service isTeacher/isStudent, shared/chart.ts (ECharts) + shared/file-input.ts, `npm i echarts`.
 - [ ] **#10 Frontend pages** — dashboard, students(list+detail), classes(list+detail), schedule(month nz-calendar + week grid), sessions(màn nhập liệu + journal + report), settings(admin), coming-soon. Responsive 375px/1280px. npm build + smoke test.
 
+## GIAI ĐOẠN 2 (đang làm)
+- [x] **Học phí (Tuition)** — `Application/Tuition`, `Infrastructure/Tuition/TuitionService` (status tính lại + scope teacher), `TuitionController`; FE `tuition.page` + service. DONE, build sạch.
+- [x] **Kho tài liệu (Materials)** — `Application/Materials/MaterialService` (URL/ServerFile), `MaterialsController`; FE `materials.page` (nz-upload theo FileStorage.Mode). DONE.
+- [x] **Đánh giá tháng + Bảng vàng** — `Application/Evaluations` + `Infrastructure/Evaluations/EvaluationService` (rank tự tính, leaderboard tuần), `EvaluationsController`; FE `evaluations.page`. DONE.
+- [ ] **#14 Báo cáo phụ huynh + Thông báo** — chưa làm.
+- [ ] **#15 Cảnh báo + Portal học sinh** — chưa làm.
+- Nav: Học phí/Kho tài liệu/Đánh giá đã chuyển ra menu chính (Teacher+Admin); submenu "Sắp ra mắt" còn Thông báo/Cảnh báo.
+
 ## 5. Cách tiếp tục nếu mất session
 1. Đọc file này + plan file (mục 0).
 2. `git status` / liệt kê `server/src/**` để xác nhận file nào đã tạo.

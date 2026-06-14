@@ -99,14 +99,14 @@ export const routes: Routes = [
       {
         path: 'tuition',
         canActivate: [roleGuard],
-        data: { roles: [ROLE_ADMIN], title: 'Học phí' },
-        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
+        loadComponent: () => import('./features/tuition/tuition.page').then(m => m.TuitionPage)
       },
       {
         path: 'materials',
         canActivate: [roleGuard],
-        data: { roles: [ROLE_ADMIN, ROLE_TEACHER], title: 'Kho tài liệu' },
-        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
+        loadComponent: () => import('./features/materials/materials.page').then(m => m.MaterialsPage)
       },
       {
         path: 'notifications',
@@ -117,8 +117,8 @@ export const routes: Routes = [
       {
         path: 'evaluations',
         canActivate: [roleGuard],
-        data: { roles: [ROLE_ADMIN, ROLE_TEACHER], title: 'Đánh giá hàng tháng' },
-        loadComponent: () => import('./features/placeholder/coming-soon.page').then(m => m.ComingSoonPage)
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
+        loadComponent: () => import('./features/evaluations/evaluations.page').then(m => m.EvaluationsPage)
       },
       {
         path: 'warnings',

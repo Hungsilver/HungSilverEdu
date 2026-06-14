@@ -1,6 +1,7 @@
 using FluentValidation;
 using HungSilver.Application.Common;
 using HungSilver.Application.Journals;
+using HungSilver.Application.Materials;
 using HungSilver.Application.Products;
 using HungSilver.Application.Students;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IClassAccessGuard, ClassAccessGuard>();
         services.AddScoped<ITeacherJournalService, TeacherJournalService>();
+        services.AddScoped<IMaterialService, MaterialService>();
         return services;
     }
 }
