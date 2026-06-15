@@ -7,34 +7,35 @@ import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzListModule } from 'ng-zorro-antd/list';
-import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { DashboardService } from '../../core/dashboard.service';
 import { DashboardCharts, DashboardSummary } from '../../core/models';
 import { Chart } from '../../shared/chart';
+import { PageHeader } from '../../shared/page-header';
+import { StatCard } from '../../shared/stat-card';
 
 @Component({
   selector: 'app-dashboard-page',
   imports: [
     RouterLink, DatePipe, CurrencyPipe,
-    NzGridModule, NzCardModule, NzStatisticModule, NzListModule, NzTagModule, NzIconModule, NzEmptyModule,
-    Chart
+    NzGridModule, NzCardModule, NzListModule, NzTagModule, NzIconModule, NzEmptyModule,
+    Chart, PageHeader, StatCard
   ],
   template: `
-    <h2>Tổng quan</h2>
+    <app-page-header title="Tổng quan" subtitle="Bức tranh nhanh của trung tâm hôm nay" icon="dashboard" />
 
     <nz-row [nzGutter]="[16, 16]">
       <nz-col [nzXs]="12" [nzSm]="12" [nzLg]="6">
-        <nz-card><nz-statistic [nzValue]="summary()?.totalActiveStudents ?? 0" nzTitle="Học sinh đang học" /></nz-card>
+        <app-stat-card title="Học sinh đang học" [value]="summary()?.totalActiveStudents ?? 0" icon="idcard" color="#4f46e5" />
       </nz-col>
       <nz-col [nzXs]="12" [nzSm]="12" [nzLg]="6">
-        <nz-card><nz-statistic [nzValue]="summary()?.totalClasses ?? 0" nzTitle="Tổng số lớp" /></nz-card>
+        <app-stat-card title="Tổng số lớp" [value]="summary()?.totalClasses ?? 0" icon="book" color="#16a34a" />
       </nz-col>
       <nz-col [nzXs]="12" [nzSm]="12" [nzLg]="6">
-        <nz-card><nz-statistic [nzValue]="summary()?.sessionsToday ?? 0" nzTitle="Buổi học hôm nay" /></nz-card>
+        <app-stat-card title="Buổi học hôm nay" [value]="summary()?.sessionsToday ?? 0" icon="calendar" color="#7c3aed" />
       </nz-col>
       <nz-col [nzXs]="12" [nzSm]="12" [nzLg]="6">
-        <nz-card><nz-statistic [nzValue]="summary()?.tuitionDueSoon?.length ?? 0" nzTitle="Học phí sắp đến hạn" /></nz-card>
+        <app-stat-card title="Học phí sắp đến hạn" [value]="summary()?.tuitionDueSoon?.length ?? 0" icon="dollar" color="#f59e0b" />
       </nz-col>
     </nz-row>
 
@@ -118,9 +119,9 @@ import { Chart } from '../../shared/chart';
   `,
   styles: `
     .mt { margin-top: 16px; }
-    .row-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+    .row-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--hs-border); }
     .row-item:last-child { border-bottom: none; }
-    .muted { color: rgba(0,0,0,0.45); font-size: 12px; }
+    .muted { color: var(--hs-text-muted); font-size: 12px; }
   `
 })
 export class DashboardPage {
@@ -130,16 +131,16 @@ export class DashboardPage {
   protected readonly charts = signal<DashboardCharts | null>(null);
 
   protected readonly attendanceOption = computed<EChartsCoreOption>(() =>
-    lineOption(this.charts()?.attendanceByMonth.map(x => x.month) ?? [], this.charts()?.attendanceByMonth.map(x => x.rate) ?? [], '#1890ff'));
+    lineOption(this.charts()?.attendanceByMonth.map(x => x.month) ?? [], this.charts()?.attendanceByMonth.map(x => x.rate) ?? [], '#4f46e5'));
 
   protected readonly homeworkOption = computed<EChartsCoreOption>(() =>
-    barOption(this.charts()?.homeworkByMonth.map(x => x.month) ?? [], this.charts()?.homeworkByMonth.map(x => x.rate) ?? [], '#52c41a'));
+    barOption(this.charts()?.homeworkByMonth.map(x => x.month) ?? [], this.charts()?.homeworkByMonth.map(x => x.rate) ?? [], '#16a34a'));
 
   protected readonly rewardOption = computed<EChartsCoreOption>(() =>
-    barOption(this.charts()?.rewardPointsByClass.map(x => x.className) ?? [], this.charts()?.rewardPointsByClass.map(x => x.points) ?? [], '#faad14'));
+    barOption(this.charts()?.rewardPointsByClass.map(x => x.className) ?? [], this.charts()?.rewardPointsByClass.map(x => x.points) ?? [], '#f59e0b'));
 
   protected readonly growthOption = computed<EChartsCoreOption>(() =>
-    lineOption(this.charts()?.testScoreGrowth.map(x => x.month) ?? [], this.charts()?.testScoreGrowth.map(x => x.averageScore) ?? [], '#722ed1'));
+    lineOption(this.charts()?.testScoreGrowth.map(x => x.month) ?? [], this.charts()?.testScoreGrowth.map(x => x.averageScore) ?? [], '#7c3aed'));
 
   constructor() {
     this.dashboardService.getSummary().subscribe(s => this.summary.set(s));

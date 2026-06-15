@@ -265,6 +265,18 @@ export interface RosterItem {
   enrolledOn: string;
 }
 
+export interface ClassStudentOverview {
+  studentId: string;
+  fullName: string;
+  rewardBalance: number;
+  attendedSessions: number;
+  totalRecords: number;
+  attendanceRate: number;
+  homeworkCompleted: number;
+  homeworkAssigned: number;
+  homeworkRate: number;
+}
+
 // ----------------- Lịch học -----------------
 
 export interface CalendarSession {
@@ -590,7 +602,9 @@ export const TUITION_STATUS_COLORS: Record<TuitionStatus, string> = {
 
 export interface Material {
   id: string;
-  classId: string;
+  classId: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   title: string;
   type: MaterialType;
   source: MaterialSource;
@@ -602,7 +616,8 @@ export interface Material {
 }
 
 export interface CreateMaterialRequest {
-  classId: string;
+  classId: string | null;
+  categoryId: string | null;
   title: string;
   type: MaterialType;
   source: MaterialSource;
@@ -612,12 +627,125 @@ export interface CreateMaterialRequest {
 }
 
 export interface UpdateMaterialRequest {
+  categoryId: string | null;
   title: string;
   type: MaterialType;
   source: MaterialSource;
   url: string | null;
   storedFileId: string | null;
   description: string | null;
+}
+
+export interface MaterialCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+}
+
+export interface MaterialCategoryRequest {
+  name: string;
+  description: string | null;
+  sortOrder: number;
+}
+
+// ----------------- Bài tập & nộp bài (Đợt 4) -----------------
+
+export enum SubmissionStatus {
+  NotSubmitted = 'NotSubmitted',
+  Submitted = 'Submitted',
+  Late = 'Late'
+}
+
+export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
+  [SubmissionStatus.NotSubmitted]: 'Chưa nộp',
+  [SubmissionStatus.Submitted]: 'Đã nộp',
+  [SubmissionStatus.Late]: 'Muộn'
+};
+
+export const SUBMISSION_STATUS_COLORS: Record<SubmissionStatus, string> = {
+  [SubmissionStatus.NotSubmitted]: 'default',
+  [SubmissionStatus.Submitted]: 'green',
+  [SubmissionStatus.Late]: 'red'
+};
+
+export interface Assignment {
+  id: string;
+  classId: string;
+  classSessionId: string | null;
+  materialId: string | null;
+  materialTitle: string | null;
+  title: string;
+  instructions: string | null;
+  dueDate: string | null;
+  submittedCount: number;
+  totalCount: number;
+  createdAtUtc: string;
+}
+
+export interface CreateAssignmentRequest {
+  classId: string;
+  classSessionId: string | null;
+  materialId: string | null;
+  title: string;
+  instructions: string | null;
+  dueDate: string | null;
+}
+
+export interface SubmissionStatusInfo {
+  studentId: string;
+  fullName: string;
+  status: SubmissionStatus;
+  submittedOn: string | null;
+  link: string | null;
+  note: string | null;
+}
+
+export interface PortalAssignment {
+  id: string;
+  className: string;
+  title: string;
+  instructions: string | null;
+  materialTitle: string | null;
+  materialUrl: string | null;
+  dueDate: string | null;
+  status: SubmissionStatus;
+  submittedOn: string | null;
+  link: string | null;
+}
+
+export interface SubmitAssignmentRequest {
+  link: string | null;
+  note: string | null;
+}
+
+// ----------------- Import Excel học viên (Đợt 6) -----------------
+
+export interface StudentImportRow {
+  rowNumber: number;
+  fullName: string | null;
+  dateOfBirth: string | null;
+  school: string | null;
+  phone: string | null;
+  parentName: string | null;
+  parentPhone: string | null;
+  englishLevel: string | null;
+  learningGoal: string | null;
+  isValid: boolean;
+  error: string | null;
+}
+
+export interface StudentImportPreview {
+  rows: StudentImportRow[];
+  validCount: number;
+  invalidCount: number;
+}
+
+export interface StudentImportResult {
+  created: number;
+  accountsCreated: number;
+  skipped: number;
+  errors: string[];
 }
 
 export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {

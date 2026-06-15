@@ -16,6 +16,7 @@ import {
   BarChartOutline,
   BellOutline,
   BookOutline,
+  BulbOutline,
   CalendarOutline,
   CheckOutline,
   CloseOutline,
@@ -50,12 +51,14 @@ import {
   UserOutline,
   WarningOutline
 } from '@ant-design/icons-angular/icons';
+import { provideNzConfig } from 'ng-zorro-antd/core/config';
 import { provideNzI18n, vi_VN } from 'ng-zorro-antd/i18n';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
 import { AuthService } from './core/auth.service';
+import { ThemeService } from './core/theme.service';
 
 registerLocaleData(localeVi);
 
@@ -73,10 +76,24 @@ export const appConfig: ApplicationConfig = {
       LineChartOutline, DollarOutline, BellOutline, WarningOutline, LinkOutline,
       MailOutline, CopyOutline, SaveOutline, CheckOutline, CloseOutline, MinusOutline,
       EyeOutline, AppstoreOutline, SettingOutline, MenuOutline, ArrowLeftOutline,
-      ReloadOutline, GiftOutline, TrophyOutline
+      ReloadOutline, GiftOutline, TrophyOutline, BulbOutline
     ]),
+    // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
+    provideNzConfig({
+      theme: {
+        primaryColor: '#4F46E5',
+        infoColor: '#4F46E5',
+        successColor: '#16A34A',
+        warningColor: '#F59E0B',
+        errorColor: '#DC2626'
+      }
+    }),
     { provide: LOCALE_ID, useValue: 'vi' },
-    // Khôi phục phiên từ HttpOnly refresh cookie trước khi app render (guards cần biết trạng thái đăng nhập).
-    provideAppInitializer(() => inject(AuthService).tryRestoreSession())
+    // Khôi phục phiên + áp theme sáng/tối (lấy từ localStorage) trước khi app render —
+    // ThemeService khởi tạo sớm để cả trang login cũng đúng chế độ.
+    provideAppInitializer(() => {
+      inject(ThemeService);
+      return inject(AuthService).tryRestoreSession();
+    })
   ]
 };

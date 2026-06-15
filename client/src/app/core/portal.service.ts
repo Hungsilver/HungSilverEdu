@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { PortalProfile } from './models';
+import { PortalAssignment, PortalProfile, SubmitAssignmentRequest } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class PortalService {
@@ -11,5 +11,13 @@ export class PortalService {
 
   me(): Observable<PortalProfile> {
     return this.http.get<PortalProfile>(`${this.apiUrl}/me`);
+  }
+
+  assignments(): Observable<PortalAssignment[]> {
+    return this.http.get<PortalAssignment[]>(`${this.apiUrl}/assignments`);
+  }
+
+  submit(id: string, request: SubmitAssignmentRequest): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/assignments/${id}/submit`, request);
   }
 }

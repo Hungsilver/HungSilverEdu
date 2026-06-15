@@ -2,7 +2,10 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { ClassDetail, ClassListItem, ClassRequest, PagedResult, RosterItem } from './models';
+import {
+  ClassDetail, ClassListItem, ClassRequest, ClassStudentOverview, PagedResult, RosterItem,
+  StudentImportPreview, StudentImportResult
+} from './models';
 
 export interface ClassQuery {
   page: number;
@@ -31,6 +34,10 @@ export class ClassesService {
     return this.http.get<RosterItem[]>(`${this.apiUrl}/${id}/roster`);
   }
 
+  getOverview(id: string): Observable<ClassStudentOverview[]> {
+    return this.http.get<ClassStudentOverview[]>(`${this.apiUrl}/${id}/overview`);
+  }
+
   create(request: ClassRequest): Observable<ClassDetail> {
     return this.http.post<ClassDetail>(this.apiUrl, request);
   }
@@ -57,5 +64,23 @@ export class ClassesService {
 
   withdraw(id: string, studentId: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}/students/${studentId}`);
+  }
+
+  // ---- Import Excel học viên ----
+  downloadImportTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/import-template`, { responseType: 'blob' });
+  }
+
+  importPreview(classId: string, file: File): Observable<StudentImportPreview> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<StudentImportPreview>(`${this.apiUrl}/${classId}/import-students/preview`, fd);
+  }
+
+  importCommit(classId: string, file: File, createAccounts: boolean): Observable<StudentImportResult> {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('createAccounts', String(createAccounts));
+    return this.http.post<StudentImportResult>(`${this.apiUrl}/${classId}/import-students`, fd);
   }
 }

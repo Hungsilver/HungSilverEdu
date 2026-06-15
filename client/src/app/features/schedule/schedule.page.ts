@@ -1,34 +1,42 @@
 import { DatePipe } from '@angular/common';
-import { Component, signal } from '@angular/core';
-import { inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { NzBadgeModule } from 'ng-zorro-antd/badge';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCalendarModule } from 'ng-zorro-antd/calendar';
+import { NzDrawerModule } from 'ng-zorro-antd/drawer';
+import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
+import { NzInputModule } from 'ng-zorro-antd/input';
+import { NzMessageService } from 'ng-zorro-antd/message';
+import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
+import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { CalendarSession, WEEKDAY_LABELS } from '../../core/models';
+import { NzTimePickerModule } from 'ng-zorro-antd/time-picker';
+import { ClassesService } from '../../core/classes.service';
+import { CalendarSession, ClassListItem, WEEKDAY_LABELS } from '../../core/models';
 import { ScheduleService } from '../../core/schedule.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-schedule-page',
   imports: [
     FormsModule, RouterLink, DatePipe,
-    NzCalendarModule, NzBadgeModule, NzRadioModule, NzButtonModule, NzIconModule, NzTagModule
+    NzCalendarModule, NzBadgeModule, NzRadioModule, NzButtonModule, NzIconModule, NzTagModule,
+    NzDrawerModule, NzModalModule, NzSelectModule, NzTimePickerModule, NzFormModule, NzInputModule, PageHeader
   ],
   template: `
-    <div class="page-header">
-      <h2>Lịch học</h2>
+    <app-page-header title="Lịch học" subtitle="Bấm vào một ngày để xem & tạo buổi học" icon="calendar">
       <nz-radio-group [ngModel]="mode()" (ngModelChange)="onMode($event)" nzButtonStyle="solid">
         <label nz-radio-button nzValue="month">Tháng</label>
         <label nz-radio-button nzValue="week">Tuần</label>
       </nz-radio-group>
-    </div>
+    </app-page-header>
 
     @if (mode() === 'month') {
-      <nz-calendar [(nzValue)]="monthValue" (nzPanelChange)="onPanelChange($event)">
+      <nz-calendar [(nzValue)]="monthValue" (nzPanelChange)="onPanelChange($event)" (nzSelectChange)="openDay($event)">
         <ng-container *nzDateCell="let date">
           <div class="cell">
             @for (s of sessionsOn(date); track s.id) {
@@ -50,7 +58,9 @@ import { ScheduleService } from '../../core/schedule.service';
       <div class="week-grid">
         @for (d of weekDays(); track d.iso) {
           <div class="day-col">
-            <div class="day-head">{{ weekdays[d.date.getDay()] }}<br /><span class="muted">{{ d.date | date: 'dd/MM' }}</span></div>
+            <div class="day-head" (click)="openDay(d.date)">
+              {{ weekdays[d.date.getDay()] }}<br /><span class="muted">{{ d.date | date: 'dd/MM' }}</span>
+            </div>
             @for (s of daySessions(d.iso); track s.id) {
               <a class="day-ev" [routerLink]="['/sessions', s.id]" [class.cancelled]="s.status === 'Cancelled'">
                 <strong>{{ s.startTime ? s.startTime.substring(0,5) : '' }}</strong>
@@ -62,25 +72,77 @@ import { ScheduleService } from '../../core/schedule.service';
         }
       </div>
     }
+
+    <!-- Drawer: toàn bộ lịch trong ngày -->
+    <nz-drawer [nzVisible]="dayOpen()" nzPlacement="right" [nzWidth]="360"
+      [nzTitle]="dayTitle()" (nzOnClose)="dayOpen.set(false)">
+      <ng-container *nzDrawerContent>
+        <button nz-button nzType="primary" nzBlock class="mb" (click)="openCreate()">
+          <nz-icon nzType="plus" /> Tạo buổi học ngày này
+        </button>
+        @for (s of selectedDaySessions(); track s.id) {
+          <a class="day-row" [routerLink]="['/sessions', s.id]" (click)="dayOpen.set(false)">
+            <span class="t">{{ s.startTime ? s.startTime.substring(0,5) : '—' }}</span>
+            <span class="n">{{ s.className }}@if (s.topic) { <small class="muted"> · {{ s.topic }}</small> }</span>
+            @if (s.status === 'Cancelled') { <nz-tag nzColor="red">Hủy</nz-tag> }
+            @else if (s.status === 'Completed') { <nz-tag nzColor="green">Xong</nz-tag> }
+            @else { <nz-tag nzColor="blue">Lên lịch</nz-tag> }
+          </a>
+        } @empty { <p class="muted">Chưa có buổi học trong ngày.</p> }
+      </ng-container>
+    </nz-drawer>
+
+    <!-- Modal: tạo buổi học tại ngày đã chọn -->
+    <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo buổi học" [nzOkLoading]="busy()"
+      (nzOnOk)="createSession()" (nzOnCancel)="createOpen.set(false)">
+      <ng-container *nzModalContent>
+        <form nz-form nzLayout="vertical">
+          <nz-form-item><nz-form-label nzRequired>Lớp</nz-form-label>
+            <nz-form-control nzErrorTip="Chọn lớp">
+              <nz-select [(ngModel)]="newClassId" name="c" nzShowSearch nzPlaceHolder="Chọn lớp" class="full">
+                @for (c of classes(); track c.id) { <nz-option [nzValue]="c.id" [nzLabel]="c.name" /> }
+              </nz-select>
+            </nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Ngày</nz-form-label>
+            <nz-form-control><input nz-input [value]="dayTitle()" disabled /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Giờ (bắt đầu – kết thúc)</nz-form-label>
+            <nz-form-control>
+              <nz-time-picker [(ngModel)]="newStart" name="s" nzFormat="HH:mm" />
+              <nz-time-picker [(ngModel)]="newEnd" name="e" nzFormat="HH:mm" class="ml" />
+            </nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Chủ đề</nz-form-label>
+            <nz-form-control><input nz-input [(ngModel)]="newTopic" name="t" placeholder="VD: Unit 3 - Animals" /></nz-form-control></nz-form-item>
+        </form>
+      </ng-container>
+    </nz-modal>
   `,
   styles: `
-    .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
     .cell { display: flex; flex-direction: column; gap: 2px; }
-    .ev { font-size: 11px; padding: 1px 4px; background: #e6f4ff; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ev { font-size: 11px; padding: 1px 4px; background: var(--hs-primary-weak); color: var(--hs-primary); border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ev.cancelled, .day-ev.cancelled { text-decoration: line-through; opacity: 0.6; }
     .week-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
     .flip { transform: rotate(180deg); }
     .week-grid { display: grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap: 8px; overflow-x: auto; }
-    .day-col { background: #fafafa; border-radius: 6px; padding: 8px; min-height: 160px; }
-    .day-head { text-align: center; font-weight: 600; margin-bottom: 8px; }
-    .day-ev { display: flex; flex-direction: column; background: #e6f4ff; border-radius: 4px; padding: 4px 6px; margin-bottom: 6px; font-size: 12px; }
-    .day-ev small { color: rgba(0,0,0,0.45); }
-    .empty { text-align: center; color: rgba(0,0,0,0.25); }
-    .muted { color: rgba(0,0,0,0.45); }
+    .day-col { background: var(--hs-surface-2); border: 1px solid var(--hs-border); border-radius: 8px; padding: 8px; min-height: 160px; }
+    .day-head { text-align: center; font-weight: 600; margin-bottom: 8px; cursor: pointer; border-radius: 6px; }
+    .day-head:hover { background: var(--hs-primary-weak); }
+    .day-ev { display: flex; flex-direction: column; background: var(--hs-primary-weak); color: var(--hs-primary); border-radius: 6px; padding: 4px 6px; margin-bottom: 6px; font-size: 12px; }
+    .day-ev small { color: var(--hs-text-muted); }
+    .empty { text-align: center; color: var(--hs-text-muted); }
+    .muted { color: var(--hs-text-muted); }
+    .mb { margin-bottom: 16px; }
+    .ml { margin-left: 8px; }
+    .full { width: 100%; }
+    .day-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--hs-border); }
+    .day-row:last-child { border-bottom: none; }
+    .day-row .t { font-weight: 600; min-width: 44px; }
+    .day-row .n { flex: 1; min-width: 0; }
   `
 })
 export class SchedulePage {
   private readonly scheduleService = inject(ScheduleService);
+  private readonly classesService = inject(ClassesService);
+  private readonly message = inject(NzMessageService);
   protected readonly weekdays = WEEKDAY_LABELS;
 
   protected readonly mode = signal<'month' | 'week'>('month');
@@ -92,8 +154,30 @@ export class SchedulePage {
   protected readonly weekEnd = signal<Date>(addDays(startOfWeek(new Date()), 6));
   protected readonly weekDays = signal<{ date: Date; iso: string }[]>([]);
 
+  // Lịch trong ngày + tạo buổi
+  protected readonly classes = signal<ClassListItem[]>([]);
+  protected readonly dayOpen = signal(false);
+  protected readonly createOpen = signal(false);
+  protected readonly busy = signal(false);
+  protected readonly selectedDay = signal<Date | null>(null);
+  protected newClassId: string | null = null;
+  protected newStart: Date | null = null;
+  protected newEnd: Date | null = null;
+  protected newTopic = '';
+
+  protected readonly selectedDaySessions = computed<CalendarSession[]>(() => {
+    const d = this.selectedDay();
+    return d ? this.sessionsByDate()[iso(d)] ?? [] : [];
+  });
+
+  protected readonly dayTitle = computed(() => {
+    const d = this.selectedDay();
+    return d ? `Lịch ngày ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}` : '';
+  });
+
   constructor() {
     this.loadMonth(this.monthValue);
+    this.classesService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.classes.set(r.items));
   }
 
   protected onMode(value: 'month' | 'week'): void {
@@ -111,12 +195,53 @@ export class SchedulePage {
     this.loadMonth(change.date);
   }
 
+  protected openDay(date: Date): void {
+    this.selectedDay.set(date);
+    this.dayOpen.set(true);
+  }
+
+  protected openCreate(): void {
+    this.newClassId = null;
+    this.newStart = null;
+    this.newEnd = null;
+    this.newTopic = '';
+    this.createOpen.set(true);
+  }
+
+  protected createSession(): void {
+    const day = this.selectedDay();
+    if (!this.newClassId) { this.message.warning('Vui lòng chọn lớp.'); return; }
+    if (!day) return;
+    this.busy.set(true);
+    this.scheduleService.createSession({
+      classId: this.newClassId,
+      sessionDate: iso(day),
+      startTime: this.newStart ? time(this.newStart) : null,
+      endTime: this.newEnd ? time(this.newEnd) : null,
+      topic: this.newTopic || null,
+      sessionNumber: null
+    }).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.createOpen.set(false);
+        this.message.success('Đã tạo buổi học.');
+        this.reloadCurrent();
+      },
+      error: () => { this.busy.set(false); this.message.error('Tạo buổi học thất bại.'); }
+    });
+  }
+
   protected sessionsOn(date: Date): CalendarSession[] {
     return this.sessionsByDate()[iso(date)] ?? [];
   }
 
   protected daySessions(isoDate: string): CalendarSession[] {
     return this.sessionsByDate()[isoDate] ?? [];
+  }
+
+  private reloadCurrent(): void {
+    if (this.mode() === 'week') this.rebuildWeek(this.anchor());
+    else this.loadMonth(this.monthValue);
   }
 
   private loadMonth(date: Date): void {
@@ -167,6 +292,12 @@ function addDays(d: Date, n: number): Date {
   x.setDate(x.getDate() + n);
   return x;
 }
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
 function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function time(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }

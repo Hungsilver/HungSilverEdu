@@ -3,8 +3,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzGridModule } from 'ng-zorro-antd/grid';
@@ -18,11 +20,19 @@ import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTimePickerModule } from 'ng-zorro-antd/time-picker';
+import { NzUploadModule, NzUploadFile } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { ClassesService } from '../../core/classes.service';
-import { CalendarSession, ClassDetail, RosterItem, ScheduleSlot, Student, WEEKDAY_LABELS } from '../../core/models';
+import {
+  Assignment, CalendarSession, ClassDetail, ClassStudentOverview, CreateAssignmentRequest, Material,
+  RosterItem, ScheduleSlot, Student, StudentImportPreview, StudentImportResult, SubmissionStatus,
+  SubmissionStatusInfo, SUBMISSION_STATUS_LABELS, WEEKDAY_LABELS
+} from '../../core/models';
+import { AssignmentsService } from '../../core/assignments.service';
+import { MaterialsService } from '../../core/materials.service';
 import { ScheduleService } from '../../core/schedule.service';
 import { StudentsService } from '../../core/students.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-class-detail-page',
@@ -30,21 +40,22 @@ import { StudentsService } from '../../core/students.service';
     FormsModule, RouterLink, DatePipe,
     NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzButtonModule, NzIconModule,
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
-    NzPopconfirmModule, NzTimePickerModule
+    NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule, PageHeader
   ],
   template: `
     <a routerLink="/classes" class="back"><nz-icon nzType="arrow-left" /> Danh sách lớp</a>
 
     @if (detail(); as c) {
-      <div class="page-header">
-        <h2>{{ c.name }}</h2>
+      <app-page-header [title]="c.name" subtitle="Chi tiết lớp học" icon="book">
         <div class="actions">
+          <a nz-button routerLink="/evaluations"><nz-icon nzType="audit" /> Đánh giá tháng</a>
           <button nz-button nzType="primary" (click)="openCreateSession()"><nz-icon nzType="plus" /> Tạo buổi học</button>
           @if (auth.isAdmin()) {
             <button nz-button (click)="generateOpen.set(true)"><nz-icon nzType="calendar" /> Sinh buổi theo lịch</button>
+            <button nz-button (click)="openImport()"><nz-icon nzType="file-text" /> Nhập Excel</button>
           }
         </div>
-      </div>
+      </app-page-header>
 
       <nz-row [nzGutter]="[16, 16]">
         <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.currentSize" [nzSuffix]="'/' + c.maxCapacity" nzTitle="Sĩ số" /></nz-card></nz-col>
@@ -66,14 +77,24 @@ import { StudentsService } from '../../core/students.service';
                 <button nz-button nzType="primary" [disabled]="!enrollStudentId" (click)="enroll()">Thêm vào lớp</button>
               </div>
             }
-            <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '480px' }">
-              <thead><tr><th nzLeft>Họ tên</th><th>SĐT phụ huynh</th><th>Ngày ghi danh</th>@if (auth.isAdmin()) {<th nzRight></th>}</tr></thead>
+            <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '620px' }">
+              <thead><tr>
+                <th nzLeft>Họ tên</th><th>SĐT phụ huynh</th>
+                <th>Điểm thưởng</th><th>Chuyên cần</th><th>BTVN</th>
+                @if (auth.isAdmin()) {<th nzRight></th>}
+              </tr></thead>
               <tbody>
                 @for (r of rt.data; track r.studentId) {
                   <tr>
                     <td nzLeft><a [routerLink]="['/students', r.studentId]">{{ r.fullName }}</a></td>
                     <td>{{ r.parentPhone || '—' }}</td>
-                    <td>{{ r.enrolledOn | date: 'dd/MM/yyyy' }}</td>
+                    <td>
+                      @if (ov(r.studentId); as o) {
+                        <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
+                      } @else { <span class="muted">—</span> }
+                    </td>
+                    <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
+                    <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
                     @if (auth.isAdmin()) {
                       <td nzRight>
                         <button nz-button nzType="link" nzSize="small" nzDanger
@@ -119,7 +140,124 @@ import { StudentsService } from '../../core/students.service';
           }
         </nz-col>
       </nz-row>
+
+      <nz-card nzTitle="Bài tập" class="mt">
+        <button nz-button nzType="primary" class="mb" (click)="openAssignment()"><nz-icon nzType="plus" /> Giao bài</button>
+        <nz-table #at [nzData]="assignments()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '560px' }">
+          <thead><tr><th nzLeft>Tiêu đề</th><th>Học liệu</th><th>Hạn nộp</th><th>Đã nộp</th><th nzRight></th></tr></thead>
+          <tbody>
+            @for (a of at.data; track a.id) {
+              <tr>
+                <td nzLeft>{{ a.title }}</td>
+                <td>{{ a.materialTitle || '—' }}</td>
+                <td>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
+                <td nzRight>
+                  <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
+                  <button nz-button nzType="link" nzSize="small" nzDanger
+                          nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
+                </td>
+              </tr>
+            } @empty { <tr><td colspan="5"><span class="muted">Chưa giao bài nào.</span></td></tr> }
+          </tbody>
+        </nz-table>
+      </nz-card>
     }
+
+    <!-- Giao bài tập -->
+    <nz-modal [nzVisible]="assignOpen()" nzTitle="Giao bài tập" [nzOkLoading]="assignBusy()"
+      (nzOnOk)="createAssignment()" (nzOnCancel)="assignOpen.set(false)">
+      <ng-container *nzModalContent>
+        <form nz-form nzLayout="vertical">
+          <nz-form-item><nz-form-label nzRequired>Tiêu đề</nz-form-label>
+            <nz-form-control><input nz-input [(ngModel)]="aTitle" name="t" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Học liệu (nguồn bài)</nz-form-label>
+            <nz-form-control>
+              <nz-select [(ngModel)]="aMaterialId" name="m" nzAllowClear nzShowSearch nzPlaceHolder="Chọn học liệu" class="full">
+                @for (m of materials(); track m.id) { <nz-option [nzValue]="m.id" [nzLabel]="m.title" /> }
+              </nz-select>
+            </nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Buổi học (tùy chọn)</nz-form-label>
+            <nz-form-control>
+              <nz-select [(ngModel)]="aSessionId" name="s" nzAllowClear nzPlaceHolder="Gắn buổi học" class="full">
+                @for (s of sessions(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="'Buổi ' + s.sessionNumber" /> }
+              </nz-select>
+            </nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Hạn nộp</nz-form-label>
+            <nz-form-control><nz-date-picker [(ngModel)]="aDueDate" name="d" nzFormat="dd/MM/yyyy" class="full" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Hướng dẫn</nz-form-label>
+            <nz-form-control><textarea nz-input [(ngModel)]="aInstructions" name="i" rows="2"></textarea></nz-form-control></nz-form-item>
+        </form>
+      </ng-container>
+    </nz-modal>
+
+    <!-- Tình hình nộp bài -->
+    <nz-modal [nzVisible]="subsOpen()" [nzTitle]="'Tình hình nộp: ' + (currentAssignment()?.title || '')"
+      [nzFooter]="null" (nzOnCancel)="subsOpen.set(false)" [nzWidth]="560">
+      <ng-container *nzModalContent>
+        <nz-table [nzData]="submissions()" [nzFrontPagination]="false" nzSize="small">
+          <thead><tr><th>Học sinh</th><th>Trạng thái</th><th>Ngày nộp</th></tr></thead>
+          <tbody>
+            @for (s of submissions(); track s.studentId) {
+              <tr>
+                <td>{{ s.fullName }} @if (s.link) { <a [href]="s.link" target="_blank" class="muted">(link)</a> }</td>
+                <td>
+                  <nz-select [ngModel]="s.status" (ngModelChange)="setStatus(s, $event)" nzSize="small" class="st">
+                    @for (st of statuses; track st) { <nz-option [nzValue]="st" [nzLabel]="statusLabels[st]" /> }
+                  </nz-select>
+                </td>
+                <td>{{ s.submittedOn ? (s.submittedOn | date: 'dd/MM') : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </nz-table>
+      </ng-container>
+    </nz-modal>
+
+    <!-- Nhập học viên từ Excel -->
+    <nz-modal [nzVisible]="importOpen()" nzTitle="Nhập học viên từ Excel" [nzWidth]="680" [nzFooter]="null" (nzOnCancel)="importOpen.set(false)">
+      <ng-container *nzModalContent>
+        <div class="imp-bar">
+          <button nz-button (click)="downloadTemplate()"><nz-icon nzType="file-text" /> Tải file mẫu</button>
+          <nz-upload [nzBeforeUpload]="beforeUpload" [nzShowUploadList]="false" nzAccept=".xlsx">
+            <button nz-button nzType="primary"><nz-icon nzType="link" /> Chọn file Excel</button>
+          </nz-upload>
+          <label nz-checkbox [(ngModel)]="createAccounts">Tạo tài khoản đăng nhập cho HS</label>
+        </div>
+
+        @if (importPreview(); as p) {
+          <p class="muted">Hợp lệ: <strong>{{ p.validCount }}</strong> · Lỗi: <strong>{{ p.invalidCount }}</strong></p>
+          <nz-table [nzData]="p.rows" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ y: '240px' }">
+            <thead><tr><th>Dòng</th><th>Họ tên</th><th>SĐT PH</th><th>Trạng thái</th></tr></thead>
+            <tbody>
+              @for (r of p.rows; track r.rowNumber) {
+                <tr>
+                  <td>{{ r.rowNumber }}</td>
+                  <td>{{ r.fullName || '—' }}</td>
+                  <td>{{ r.parentPhone || '—' }}</td>
+                  <td>
+                    @if (r.isValid) { <nz-tag nzColor="green">OK</nz-tag> }
+                    @else { <nz-tag nzColor="red">{{ r.error }}</nz-tag> }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </nz-table>
+          <div class="imp-actions">
+            <button nz-button nzType="primary" [nzLoading]="importBusy()" [disabled]="p.validCount === 0" (click)="doImport()">
+              Nhập {{ p.validCount }} học viên
+            </button>
+          </div>
+        }
+
+        @if (importResult(); as res) {
+          <nz-alert nzType="success" class="mt"
+            [nzMessage]="'Đã nhập ' + res.created + ' học viên'
+              + (res.accountsCreated ? (' · tạo ' + res.accountsCreated + ' tài khoản') : '')
+              + (res.skipped ? (' · bỏ qua ' + res.skipped + ' dòng lỗi') : '') + '.'" />
+        }
+      </ng-container>
+    </nz-modal>
 
     <!-- Tạo buổi học -->
     <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo buổi học" [nzOkLoading]="busy()" (nzOnOk)="createSession()" (nzOnCancel)="createOpen.set(false)">
@@ -143,17 +281,20 @@ import { StudentsService } from '../../core/students.service';
   `,
   styles: `
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
-    .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .mt { margin-top: 16px; }
     .enroll-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .enroll-select { min-width: 220px; flex: 1; }
-    .row-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+    .row-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--hs-border); }
     .row-item:last-child { border-bottom: none; }
     .slot-add { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
     .wk { min-width: 110px; }
     .full { width: 100%; }
-    .muted { color: rgba(0,0,0,0.45); }
+    .mb { margin-bottom: 12px; }
+    .st { min-width: 110px; }
+    .muted { color: var(--hs-text-muted); }
+    .imp-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .imp-actions { margin-top: 12px; text-align: right; }
   `
 })
 export class ClassDetailPage implements OnInit {
@@ -163,17 +304,49 @@ export class ClassDetailPage implements OnInit {
   private readonly classesService = inject(ClassesService);
   private readonly scheduleService = inject(ScheduleService);
   private readonly studentsService = inject(StudentsService);
+  private readonly assignmentsService = inject(AssignmentsService);
+  private readonly materialsService = inject(MaterialsService);
   private readonly message = inject(NzMessageService);
   private readonly router = inject(Router);
 
   protected readonly weekdays = WEEKDAY_LABELS;
+  protected readonly statuses = [SubmissionStatus.NotSubmitted, SubmissionStatus.Submitted, SubmissionStatus.Late];
+  protected readonly statusLabels = SUBMISSION_STATUS_LABELS;
 
   protected readonly detail = signal<ClassDetail | null>(null);
   protected readonly roster = signal<RosterItem[]>([]);
+  protected readonly overview = signal<ClassStudentOverview[]>([]);
   protected readonly sessions = signal<CalendarSession[]>([]);
   protected readonly slots = signal<ScheduleSlot[]>([]);
   protected readonly allStudents = signal<Student[]>([]);
   protected readonly busy = signal(false);
+
+  private readonly overviewMap = computed(() => new Map(this.overview().map(o => [o.studentId, o])));
+  protected ov(studentId: string): ClassStudentOverview | undefined {
+    return this.overviewMap().get(studentId);
+  }
+
+  // Bài tập & nộp bài
+  protected readonly assignments = signal<Assignment[]>([]);
+  protected readonly materials = signal<Material[]>([]);
+  protected readonly submissions = signal<SubmissionStatusInfo[]>([]);
+  protected readonly currentAssignment = signal<Assignment | null>(null);
+  protected readonly assignOpen = signal(false);
+  protected readonly assignBusy = signal(false);
+  protected readonly subsOpen = signal(false);
+  protected aTitle = '';
+  protected aMaterialId: string | null = null;
+  protected aSessionId: string | null = null;
+  protected aDueDate: Date | null = null;
+  protected aInstructions = '';
+
+  // Import Excel học viên
+  protected readonly importOpen = signal(false);
+  protected readonly importBusy = signal(false);
+  protected readonly importPreview = signal<StudentImportPreview | null>(null);
+  protected readonly importResult = signal<StudentImportResult | null>(null);
+  protected createAccounts = false;
+  private importFile: File | null = null;
 
   protected readonly enrollableStudents = computed(() => {
     const enrolled = new Set(this.roster().map(r => r.studentId));
@@ -201,10 +374,129 @@ export class ClassDetailPage implements OnInit {
     const id = this.id();
     this.classesService.getById(id).subscribe(c => this.detail.set(c));
     this.classesService.getRoster(id).subscribe(r => this.roster.set(r));
+    this.classesService.getOverview(id).subscribe(o => this.overview.set(o));
     const from = new Date(); from.setDate(from.getDate() - 30);
     const to = new Date(); to.setDate(to.getDate() + 60);
     this.scheduleService.getRange(iso(from), iso(to), id).subscribe(s => this.sessions.set(s));
     if (this.auth.isAdmin()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
+    this.loadAssignments();
+    this.loadMaterials();
+  }
+
+  private loadAssignments(): void {
+    this.assignmentsService.getByClass(this.id()).subscribe(a => this.assignments.set(a));
+  }
+
+  /** Học liệu chọn được khi giao bài = học liệu của lớp + thư viện chung. */
+  private loadMaterials(): void {
+    this.materialsService.getByClass(this.id()).subscribe(cls => {
+      this.materialsService.getLibrary().subscribe(lib => this.materials.set([...cls, ...lib]));
+    });
+  }
+
+  protected openAssignment(): void {
+    this.aTitle = '';
+    this.aMaterialId = null;
+    this.aSessionId = null;
+    this.aDueDate = null;
+    this.aInstructions = '';
+    this.assignOpen.set(true);
+  }
+
+  protected createAssignment(): void {
+    if (!this.aTitle.trim()) { this.message.warning('Nhập tiêu đề bài tập.'); return; }
+    const request: CreateAssignmentRequest = {
+      classId: this.id(),
+      classSessionId: this.aSessionId,
+      materialId: this.aMaterialId,
+      title: this.aTitle.trim(),
+      instructions: this.aInstructions || null,
+      dueDate: this.aDueDate ? iso(this.aDueDate) : null
+    };
+    this.assignBusy.set(true);
+    this.assignmentsService.create(request).subscribe({
+      next: () => { this.assignBusy.set(false); this.assignOpen.set(false); this.message.success('Đã giao bài.'); this.loadAssignments(); },
+      error: (e: HttpErrorResponse) => { this.assignBusy.set(false); this.message.error(e.error?.detail ?? 'Giao bài thất bại.'); }
+    });
+  }
+
+  protected deleteAssignment(a: Assignment): void {
+    this.assignmentsService.delete(a.id).subscribe({
+      next: () => { this.message.success('Đã xóa bài tập.'); this.loadAssignments(); },
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Xóa thất bại.')
+    });
+  }
+
+  protected openSubmissions(a: Assignment): void {
+    this.currentAssignment.set(a);
+    this.submissions.set([]);
+    this.assignmentsService.getSubmissions(a.id).subscribe(s => this.submissions.set(s));
+    this.subsOpen.set(true);
+  }
+
+  protected setStatus(s: SubmissionStatusInfo, status: SubmissionStatus): void {
+    const a = this.currentAssignment();
+    if (!a) return;
+    this.assignmentsService.setStatus(a.id, s.studentId, status).subscribe({
+      next: () => {
+        this.submissions.set(this.submissions().map(x => x.studentId === s.studentId ? { ...x, status } : x));
+        this.loadAssignments();
+      },
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Cập nhật thất bại.')
+    });
+  }
+
+  // ---- Import Excel ----
+  protected openImport(): void {
+    this.importFile = null;
+    this.importPreview.set(null);
+    this.importResult.set(null);
+    this.createAccounts = false;
+    this.importOpen.set(true);
+  }
+
+  protected downloadTemplate(): void {
+    this.classesService.downloadImportTemplate().subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mau-hoc-vien.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  /** Chọn file → xem trước (không upload tự động). */
+  protected beforeUpload = (file: NzUploadFile): boolean => {
+    this.importFile = file as unknown as File;
+    this.importResult.set(null);
+    this.classesService.importPreview(this.id(), this.importFile).subscribe({
+      next: p => this.importPreview.set(p),
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Đọc file thất bại.')
+    });
+    return false;
+  };
+
+  protected doImport(): void {
+    if (!this.importFile) return;
+    this.importBusy.set(true);
+    this.classesService.importCommit(this.id(), this.importFile, this.createAccounts).subscribe({
+      next: res => {
+        this.importBusy.set(false);
+        this.importResult.set(res);
+        this.importPreview.set(null);
+        this.message.success(`Đã nhập ${res.created} học viên.`);
+        this.reloadPublic();
+      },
+      error: (e: HttpErrorResponse) => { this.importBusy.set(false); this.message.error(e.error?.detail ?? 'Nhập thất bại.'); }
+    });
+  }
+
+  private reloadPublic(): void {
+    // làm mới roster + tình hình sau khi nhập
+    const id = this.id();
+    this.classesService.getRoster(id).subscribe(r => this.roster.set(r));
+    this.classesService.getOverview(id).subscribe(o => this.overview.set(o));
   }
 
   protected enroll(): void {

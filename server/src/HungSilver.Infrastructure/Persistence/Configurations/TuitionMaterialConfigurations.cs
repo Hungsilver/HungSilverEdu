@@ -23,6 +23,17 @@ public sealed class LearningMaterialConfiguration : IEntityTypeConfiguration<Lea
         e.Property(x => x.Url).HasMaxLength(1000);
         e.Property(x => x.Description).HasMaxLength(2000);
         e.HasIndex(x => x.ClassId);
+        e.HasIndex(x => x.CategoryId);
+    }
+}
+
+public sealed class MaterialCategoryConfiguration : IEntityTypeConfiguration<MaterialCategory>
+{
+    public void Configure(EntityTypeBuilder<MaterialCategory> e)
+    {
+        e.Property(x => x.Name).HasMaxLength(150);
+        e.Property(x => x.Description).HasMaxLength(500);
+        e.HasIndex(x => x.SortOrder);
     }
 }
 

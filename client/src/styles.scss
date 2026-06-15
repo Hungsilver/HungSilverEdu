@@ -1,22 +1,545 @@
-/* Global styles */
+/* ============================================================================
+   HungSilver — Design system "Indigo học thuật"
+   Token --hs-* dùng chung; light + dark (body.theme-dark). Toàn bộ vẫn ng-zorro.
+   ========================================================================== */
+
 html,
 body {
   height: 100%;
   margin: 0;
 }
 
-.auth-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0f2f5;
+/* ---------- Design tokens (light) ---------- */
+:root {
+  --hs-bg: #f5f6fa;
+  --hs-surface: #ffffff;
+  --hs-surface-2: #f7f8fc;
+  --hs-border: #ecedf3;
+  --hs-text: #1f2430;
+  --hs-text-muted: rgba(31, 36, 48, 0.55);
+  --hs-heading: #14182b;
 
-  .auth-card {
-    width: 380px;
+  --hs-primary: #4f46e5;
+  --hs-primary-weak: #eef0ff;
+  --hs-link: #4f46e5;
+
+  --hs-radius: 12px;
+  --hs-radius-sm: 8px;
+  --hs-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 18px rgba(16, 24, 40, 0.06);
+  --hs-shadow-hover: 0 8px 28px rgba(79, 70, 229, 0.14);
+
+  --hs-sidebar-bg: #ffffff;
+  --hs-sidebar-text: #5a6072;
+  --hs-sidebar-active-bg: #eef0ff;
+  --hs-sidebar-active-text: #4f46e5;
+  --hs-header-bg: #ffffff;
+
+  --hs-font: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --ant-font-family: var(--hs-font);
+}
+
+/* ---------- Design tokens (dark) ---------- */
+body.theme-dark {
+  --hs-bg: #14121f;
+  --hs-surface: #1e1b2e;
+  --hs-surface-2: #262236;
+  --hs-border: #312d44;
+  --hs-text: #e7e7ee;
+  --hs-text-muted: rgba(231, 231, 238, 0.55);
+  --hs-heading: #f4f4f8;
+
+  --hs-primary-weak: #2a2550;
+  --hs-link: #b9b4ff;
+
+  --hs-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 18px rgba(0, 0, 0, 0.45);
+  --hs-shadow-hover: 0 8px 28px rgba(0, 0, 0, 0.55);
+
+  --hs-sidebar-bg: #1a1726;
+  --hs-sidebar-text: #b4b2c4;
+  --hs-sidebar-active-bg: #2a2550;
+  --hs-sidebar-active-text: #b9b4ff;
+  --hs-header-bg: #1a1726;
+}
+
+/* ---------- Base ---------- */
+body {
+  font-family: var(--hs-font);
+  background: var(--hs-bg);
+  color: var(--hs-text);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  color: var(--hs-heading);
+  font-weight: 600;
+}
+
+a {
+  color: var(--hs-link);
+}
+
+/* Thanh cuộn mảnh, tông trung tính */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hs-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--hs-border);
+  border-radius: 8px;
+}
+
+/* ============================================================================
+   Surfaces dùng chung (token-driven — tự đổi theo light/dark)
+   ========================================================================== */
+.ant-card {
+  background: var(--hs-surface);
+  border: 1px solid var(--hs-border);
+  border-radius: var(--hs-radius);
+  box-shadow: var(--hs-shadow);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.ant-card-head {
+  background: transparent;
+  border-bottom-color: var(--hs-border);
+  color: var(--hs-heading);
+  font-weight: 600;
+}
+.ant-card-bordered {
+  border-color: var(--hs-border);
+}
+
+/* Bảng */
+.ant-table {
+  background: var(--hs-surface);
+  border-radius: var(--hs-radius-sm);
+}
+.ant-table-thead > tr > th {
+  background: var(--hs-surface-2);
+  color: var(--hs-text-muted);
+  font-weight: 600;
+  border-bottom-color: var(--hs-border);
+}
+.ant-table-tbody > tr > td {
+  border-bottom-color: var(--hs-border);
+}
+.ant-table-tbody > tr.ant-table-row:hover > td {
+  background: var(--hs-primary-weak);
+}
+
+/* Tag bo tròn (pill) */
+.ant-tag {
+  border-radius: 999px;
+  padding-inline: 10px;
+  font-weight: 500;
+}
+
+/* Modal */
+.ant-modal-content {
+  border-radius: var(--hs-radius);
+  background: var(--hs-surface);
+  box-shadow: var(--hs-shadow-hover);
+}
+.ant-modal-header {
+  background: transparent;
+  border-bottom-color: var(--hs-border);
+  border-radius: var(--hs-radius) var(--hs-radius) 0 0;
+}
+.ant-modal-title {
+  color: var(--hs-heading);
+}
+.ant-modal-footer {
+  border-top-color: var(--hs-border);
+}
+
+/* List / Statistic / Divider / Drawer */
+.ant-list-item {
+  border-bottom-color: var(--hs-border);
+}
+.ant-statistic-title {
+  color: var(--hs-text-muted);
+}
+.ant-statistic-content {
+  color: var(--hs-heading);
+  font-weight: 600;
+}
+.ant-divider {
+  border-color: var(--hs-border);
+}
+.ant-drawer-body {
+  background: var(--hs-surface);
+}
+
+/* Màu chữ theo token — ng-zorro hardcode rgba(0,0,0,.85), phải đọc được ở dark mode.
+   Giá trị light của --hs-text ≈ mặc định nên không đổi giao diện sáng. */
+.ant-card,
+.ant-table,
+.ant-list,
+.ant-modal,
+.ant-form,
+.ant-typography,
+.ant-statistic,
+.ant-descriptions-item-content,
+.ant-tabs,
+.ant-radio-wrapper,
+.ant-checkbox-wrapper,
+.ant-empty,
+.ant-form-item-label > label {
+  color: var(--hs-text);
+}
+
+/* Nút bo tròn nhẹ, bỏ shadow mặc định cho phẳng-hiện-đại */
+.ant-btn {
+  border-radius: var(--hs-radius-sm);
+}
+.ant-btn-primary {
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.24);
+}
+
+/* Input/Select/Picker bo tròn nhẹ */
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-picker,
+.ant-select-selector {
+  border-radius: var(--hs-radius-sm) !important;
+}
+
+/* ============================================================================
+   Layout & Navigation
+   ========================================================================== */
+.app-layout {
+  min-height: 100vh;
+  background: var(--hs-bg);
+}
+.ant-layout {
+  background: var(--hs-bg);
+}
+
+.app-sider.ant-layout-sider {
+  background: var(--hs-sidebar-bg);
+  border-inline-end: 1px solid var(--hs-border);
+}
+.app-sider .ant-layout-sider-trigger {
+  background: var(--hs-surface-2);
+  color: var(--hs-text-muted);
+}
+
+.app-header {
+  background: var(--hs-header-bg);
+  border-bottom: 1px solid var(--hs-border);
+}
+
+.app-content {
+  background: var(--hs-surface);
+  border: 1px solid var(--hs-border);
+  border-radius: var(--hs-radius);
+}
+
+/* Menu điều hướng (scope .app-nav để không ảnh hưởng dropdown user) */
+.app-nav.ant-menu {
+  background: transparent;
+  border-inline-end: 0;
+  color: var(--hs-sidebar-text);
+}
+.app-nav.ant-menu-inline {
+  border-inline-end: 0;
+}
+.app-nav .ant-menu-item {
+  position: relative;
+  width: calc(100% - 16px);
+  margin: 4px 8px;
+  border-radius: var(--hs-radius-sm);
+  color: var(--hs-sidebar-text);
+}
+.app-nav .ant-menu-item:hover {
+  color: var(--hs-sidebar-active-text);
+  background: var(--hs-sidebar-active-bg);
+}
+.app-nav .ant-menu-item-selected {
+  background: var(--hs-sidebar-active-bg);
+  color: var(--hs-sidebar-active-text);
+  font-weight: 600;
+}
+.app-nav .ant-menu-item-selected::after {
+  display: none; /* bỏ gạch phải mặc định */
+}
+.app-nav .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--hs-sidebar-active-text);
+}
+
+/* ============================================================================
+   Dark mode — vá các component có nền/chữ cố định
+   ========================================================================== */
+body.theme-dark {
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-input-number,
+  .ant-input-number-input,
+  textarea.ant-input,
+  .ant-picker,
+  .ant-select-selector {
+    background: var(--hs-surface-2);
+    border-color: var(--hs-border);
+    color: var(--hs-text);
+  }
+  .ant-input::placeholder,
+  textarea.ant-input::placeholder {
+    color: var(--hs-text-muted);
+  }
+  .ant-input-prefix,
+  .ant-input-suffix,
+  .ant-select-arrow,
+  .ant-picker-suffix {
+    color: var(--hs-text-muted);
+  }
+
+  /* Dropdown/panel nổi */
+  .ant-select-dropdown,
+  .ant-picker-dropdown .ant-picker-panel-container,
+  .ant-dropdown-menu {
+    background: var(--hs-surface);
+    box-shadow: var(--hs-shadow-hover);
+  }
+  .ant-select-item,
+  .ant-dropdown-menu-item {
+    color: var(--hs-text);
+  }
+  .ant-select-item-option-selected {
+    background: var(--hs-primary-weak);
+  }
+
+  /* Cột bảng cố định (sticky) phải khớp nền tối */
+  .ant-table-cell-fix-left,
+  .ant-table-cell-fix-right {
+    background: var(--hs-surface);
+  }
+  .ant-table-tbody > tr.ant-table-row:hover .ant-table-cell-fix-left,
+  .ant-table-tbody > tr.ant-table-row:hover .ant-table-cell-fix-right {
+    background: var(--hs-primary-weak);
+  }
+
+  .ant-empty-description,
+  .ant-statistic-title {
+    color: var(--hs-text-muted);
+  }
+  .ant-modal-close,
+  .ant-card-extra a {
+    color: var(--hs-text-muted);
+  }
+  /* Calendar (lịch học) */
+  .ant-picker-calendar,
+  .ant-picker-calendar .ant-picker-panel {
+    background: var(--hs-surface);
+  }
+  .ant-picker-calendar-date {
+    border-top-color: var(--hs-border);
+  }
+
+  /* Nút default/dashed (ng-zorro nền trắng) */
+  .ant-btn-default,
+  .ant-btn-dashed {
+    background: var(--hs-surface-2);
+    border-color: var(--hs-border);
+    color: var(--hs-text);
+  }
+
+  /* Radio-button (toggle Tháng/Tuần, điểm danh) & ô chọn/picker chưa đổi nền */
+  .ant-radio-button-wrapper {
+    background: var(--hs-surface-2);
+    border-color: var(--hs-border);
+    color: var(--hs-text);
+  }
+  .ant-select-selection-item,
+  .ant-picker-input > input,
+  .ant-input-number-input {
+    color: var(--hs-text);
+  }
+  .ant-select-selection-placeholder,
+  .ant-picker-input > input::placeholder {
+    color: var(--hs-text-muted);
+  }
+
+  /* Descriptions có viền (hồ sơ học sinh) */
+  .ant-descriptions-bordered .ant-descriptions-item-label {
+    background: var(--hs-surface-2);
+    color: var(--hs-text);
+  }
+  .ant-descriptions-bordered .ant-descriptions-view,
+  .ant-descriptions-bordered .ant-descriptions-row,
+  .ant-descriptions-bordered .ant-descriptions-item-label,
+  .ant-descriptions-bordered .ant-descriptions-item-content {
+    border-color: var(--hs-border);
+  }
+
+  /* Bảng: viền ngoài + phân trang */
+  .ant-table,
+  .ant-table-cell {
+    border-color: var(--hs-border);
+  }
+  .ant-pagination-item a {
+    color: var(--hs-text);
+  }
+  .ant-pagination-item-active {
+    background: var(--hs-primary-weak);
+  }
+
+  /* Popover/popconfirm/tooltip nội dung */
+  .ant-popover-inner,
+  .ant-modal-confirm .ant-modal-content {
+    background: var(--hs-surface);
   }
 }
 
+/* ============================================================================
+   Auth — Login/Register split-screen
+   ========================================================================== */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  background: var(--hs-bg);
+}
+
+/* Cột branding bên trái */
+.auth-brand {
+  flex: 1 1 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px;
+  color: #fff;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 55%, #312e81 100%);
+  overflow: hidden;
+}
+.auth-brand::after {
+  /* hoạ tiết bong bóng nhẹ */
+  content: '';
+  position: absolute;
+  right: -80px;
+  bottom: -80px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.auth-brand .brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.auth-brand .brand-logo .brand-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 22px;
+}
+.auth-brand .brand-title {
+  margin-top: 28px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 460px;
+}
+.auth-brand .brand-sub {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: 440px;
+  opacity: 0.92;
+}
+.auth-brand .brand-points {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 14px;
+}
+.auth-brand .brand-points span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.95;
+}
+
+/* Cột form bên phải */
+.auth-form-col {
+  flex: 0 0 480px;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--hs-surface);
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.auth-card .ant-card {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.auth-heading {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+}
+.auth-subheading {
+  margin: 0 0 24px;
+  color: var(--hs-text-muted);
+}
+
+.error-alert {
+  display: block;
+  margin-bottom: 16px;
+}
+.register-link {
+  text-align: center;
+  margin: 16px 0 0;
+}
+
+@media (max-width: 767px) {
+  .auth-brand {
+    display: none;
+  }
+  .auth-form-col {
+    flex: 1 1 auto;
+    max-width: none;
+    background: var(--hs-bg);
+  }
+  .auth-card {
+    max-width: 400px;
+  }
+}
+
+/* ============================================================================
+   Tiện ích & class cũ (giữ tương thích)
+   ========================================================================== */
 .page-header {
   display: flex;
   align-items: center;
@@ -28,5 +551,15 @@ body {
 
 .text-deleted {
   text-decoration: line-through;
-  color: rgba(0, 0, 0, 0.35);
+  color: var(--hs-text-muted);
+}
+
+.hs-muted {
+  color: var(--hs-text-muted);
+}
+.mt-16 {
+  margin-top: 16px;
+}
+.mt-24 {
+  margin-top: 24px;
 }

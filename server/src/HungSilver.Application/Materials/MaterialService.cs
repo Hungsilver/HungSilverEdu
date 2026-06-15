@@ -10,6 +10,7 @@ namespace HungSilver.Application.Materials;
 public interface IMaterialService
 {
     Task<Result<List<MaterialDto>>> GetByClassAsync(Guid classId, CancellationToken ct = default);
+    Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, CancellationToken ct = default);
     Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default);
     Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
@@ -17,6 +18,7 @@ public interface IMaterialService
 
 public sealed class MaterialService(
     IRepository<LearningMaterial> materials,
+    IRepository<MaterialCategory> categories,
     IClassAccessGuard accessGuard,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
@@ -32,7 +34,19 @@ public sealed class MaterialService(
             return Result.Failure<List<MaterialDto>>(access.Error);
 
         var items = await materials.FindAsync(m => m.ClassId == classId, ct);
-        return items.OrderByDescending(m => m.CreatedAtUtc).Select(ToDto).ToList();
+        var names = await LoadCategoryNamesAsync(items, ct);
+        return items.OrderByDescending(m => m.CreatedAtUtc).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
+    }
+
+    /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại.</summary>
+    public async Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, CancellationToken ct = default)
+    {
+        var items = await materials.FindAsync(
+            m => m.ClassId == null
+                 && (categoryId == null || m.CategoryId == categoryId)
+                 && (type == null || m.Type == type), ct);
+        var names = await LoadCategoryNamesAsync(items, ct);
+        return items.OrderByDescending(m => m.CreatedAtUtc).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
     }
 
     public async Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default)
@@ -41,13 +55,18 @@ public sealed class MaterialService(
         if (!validation.IsValid)
             return Result.Failure<MaterialDto>(validation.ToError("Material.Validation"));
 
-        var access = await accessGuard.EnsureCanAccessClassAsync(request.ClassId, ct);
-        if (access.IsFailure)
-            return Result.Failure<MaterialDto>(access.Error);
+        var classId = Normalize(request.ClassId);
+        if (classId is not null)
+        {
+            var access = await accessGuard.EnsureCanAccessClassAsync(classId.Value, ct);
+            if (access.IsFailure)
+                return Result.Failure<MaterialDto>(access.Error);
+        }
 
         var material = new LearningMaterial
         {
-            ClassId = request.ClassId,
+            ClassId = classId,
+            CategoryId = Normalize(request.CategoryId),
             Title = request.Title.Trim(),
             Type = request.Type,
             Source = request.Source,
@@ -59,7 +78,7 @@ public sealed class MaterialService(
 
         await materials.AddAsync(material, ct);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(material);
+        return ToDto(material, await CategoryNameAsync(material.CategoryId, ct));
     }
 
     public async Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default)
@@ -72,10 +91,20 @@ public sealed class MaterialService(
         if (material is null)
             return Result.Failure<MaterialDto>(NotFoundError);
 
-        var access = await accessGuard.EnsureCanAccessClassAsync(material.ClassId, ct);
-        if (access.IsFailure)
-            return Result.Failure<MaterialDto>(access.Error);
+        // Học liệu gắn lớp ⇒ kiểm quyền lớp; học liệu thư viện ⇒ TeacherOrAdmin (đã ở controller).
+        if (material.ClassId is not null)
+        {
+            var access = await accessGuard.EnsureCanAccessClassAsync(material.ClassId.Value, ct);
+            if (access.IsFailure)
+                return Result.Failure<MaterialDto>(access.Error);
+        }
+        else if (Normalize(request.CategoryId) is null)
+        {
+            // Học liệu thư viện (không thuộc lớp) bắt buộc giữ danh mục, tránh "mồ côi".
+            return Result.Failure<MaterialDto>(Error.Validation("Material.CategoryRequired", "Học liệu thư viện cần thuộc một danh mục."));
+        }
 
+        material.CategoryId = Normalize(request.CategoryId);
         material.Title = request.Title.Trim();
         material.Type = request.Type;
         material.Source = request.Source;
@@ -85,7 +114,7 @@ public sealed class MaterialService(
 
         materials.Update(material);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(material);
+        return ToDto(material, await CategoryNameAsync(material.CategoryId, ct));
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
@@ -94,20 +123,40 @@ public sealed class MaterialService(
         if (material is null)
             return Result.Failure(NotFoundError);
 
-        var access = await accessGuard.EnsureCanAccessClassAsync(material.ClassId, ct);
-        if (access.IsFailure)
-            return access;
+        if (material.ClassId is not null)
+        {
+            var access = await accessGuard.EnsureCanAccessClassAsync(material.ClassId.Value, ct);
+            if (access.IsFailure)
+                return access;
+        }
 
         materials.SoftDelete(material);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success();
     }
 
-    private static MaterialDto ToDto(LearningMaterial m)
+    private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
+
+    private async Task<Dictionary<Guid, string>> LoadCategoryNamesAsync(IEnumerable<LearningMaterial> items, CancellationToken ct)
+    {
+        var ids = items.Where(m => m.CategoryId.HasValue).Select(m => m.CategoryId!.Value).Distinct().ToList();
+        if (ids.Count == 0) return [];
+        var cats = await categories.FindAsync(c => ids.Contains(c.Id), ct);
+        return cats.ToDictionary(c => c.Id, c => c.Name);
+    }
+
+    private async Task<string?> CategoryNameAsync(Guid? categoryId, CancellationToken ct) =>
+        categoryId is null ? null : (await categories.GetByIdAsync(categoryId.Value, ct: ct))?.Name;
+
+    private static string? Lookup(Dictionary<Guid, string> map, Guid? id) =>
+        id.HasValue && map.TryGetValue(id.Value, out var name) ? name : null;
+
+    private static MaterialDto ToDto(LearningMaterial m, string? categoryName)
     {
         var downloadUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
-        return new MaterialDto(m.Id, m.ClassId, m.Title, m.Type, m.Source, m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAtUtc);
+        return new MaterialDto(m.Id, m.ClassId, m.CategoryId, categoryName, m.Title, m.Type, m.Source,
+            m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAtUtc);
     }
 }

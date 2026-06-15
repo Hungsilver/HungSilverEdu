@@ -31,7 +31,7 @@ declare global {
   `,
   styles: `
     .hint {
-      color: rgba(0, 0, 0, 0.45);
+      color: var(--hs-text-muted);
       font-size: 12px;
       text-align: center;
       margin: 0;
