@@ -20,16 +20,17 @@ import {
 } from '../../core/models';
 import { NotificationsService } from '../../core/notifications.service';
 import { StudentsService } from '../../core/students.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-notifications-page',
   imports: [
     FormsModule,
     NzCardModule, NzFormModule, NzInputModule, NzSelectModule, NzCheckboxModule, NzRadioModule,
-    NzButtonModule, NzTableModule, NzTagModule, NzIconModule
+    NzButtonModule, NzTableModule, NzTagModule, NzIconModule, PageHeader
   ],
   template: `
-    <h2>Thông báo</h2>
+    <app-page-header title="Thông báo" subtitle="Soạn & gửi cho phụ huynh/học sinh" icon="bell" />
     <nz-card nzTitle="Soạn thông báo">
       <form nz-form nzLayout="vertical">
         <nz-form-item><nz-form-label nzRequired>Tiêu đề</nz-form-label>
@@ -101,7 +102,7 @@ import { StudentsService } from '../../core/students.service';
     .w240 { width: 240px; max-width: 70vw; }
     .ml { margin-left: 12px; }
     .mt { margin-top: 16px; }
-    .muted { color: rgba(0,0,0,0.45); margin-left: 8px; font-size: 12px; }
+    .muted { color: var(--hs-text-muted); margin-left: 8px; font-size: 12px; }
   `
 })
 export class NotificationsPage {

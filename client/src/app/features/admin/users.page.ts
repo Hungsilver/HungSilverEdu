@@ -13,20 +13,20 @@ import { NzTagModule } from 'ng-zorro-antd/tag';
 import { ApiProblem, ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserListItem } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
 import { UsersService } from '../../core/users.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-users-page',
   imports: [
     FormsModule, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
-    NzTagModule, NzSelectModule, NzPopconfirmModule
+    NzTagModule, NzSelectModule, NzPopconfirmModule, PageHeader
   ],
   template: `
-    <div class="page-header">
-      <h2>Quản lý người dùng</h2>
+    <app-page-header title="Quản lý người dùng" subtitle="Tài khoản & phân quyền" icon="team">
       <input nz-input placeholder="Tìm theo email hoặc tên..." class="search"
              [ngModel]="search()" (ngModelChange)="onSearch($event)" />
-    </div>
+    </app-page-header>
 
     <nz-table
       #table

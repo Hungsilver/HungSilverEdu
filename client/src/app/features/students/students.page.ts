@@ -19,6 +19,7 @@ import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
 import { ApiProblem, Student, StudentRequest } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-students-page',
@@ -26,11 +27,10 @@ import { StudentsService } from '../../core/students.service';
     FormsModule, ReactiveFormsModule, RouterLink,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule, NzTagModule, NzGridModule,
     NzModalModule, NzFormModule, NzInputNumberModule, NzSwitchModule, NzDatePickerModule,
-    NzPopconfirmModule, NzCheckboxModule
+    NzPopconfirmModule, NzCheckboxModule, PageHeader
   ],
   template: `
-    <div class="page-header">
-      <h2>Học viên</h2>
+    <app-page-header title="Học viên" subtitle="Hồ sơ & tiến độ học sinh" icon="idcard">
       <div class="actions">
         <input nz-input placeholder="Tìm theo tên / SĐT..." class="search"
                [ngModel]="search()" (ngModelChange)="onSearch($event)" />
@@ -39,7 +39,7 @@ import { StudentsService } from '../../core/students.service';
           <button nz-button nzType="primary" (click)="openCreate()"><nz-icon nzType="plus" /> Thêm học viên</button>
         }
       </div>
-    </div>
+    </app-page-header>
 
     <nz-table #table [nzData]="students()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"

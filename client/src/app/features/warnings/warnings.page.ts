@@ -11,17 +11,17 @@ import { NzTagModule } from 'ng-zorro-antd/tag';
 import { ClassesService } from '../../core/classes.service';
 import { ClassListItem, Warnings } from '../../core/models';
 import { WarningsService } from '../../core/warnings.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-warnings-page',
-  imports: [NgTemplateOutlet, FormsModule, RouterLink, NzCardModule, NzGridModule, NzIconModule, NzTagModule, NzSelectModule, NzEmptyModule],
+  imports: [NgTemplateOutlet, FormsModule, RouterLink, NzCardModule, NzGridModule, NzIconModule, NzTagModule, NzSelectModule, NzEmptyModule, PageHeader],
   template: `
-    <div class="page-header">
-      <h2>Cảnh báo</h2>
+    <app-page-header title="Cảnh báo" subtitle="Học sinh cần chú ý sớm" icon="warning">
       <nz-select class="cls" nzAllowClear nzShowSearch nzPlaceHolder="Tất cả lớp" [(ngModel)]="classId" (ngModelChange)="load()">
         @for (c of classes(); track c.id) { <nz-option [nzValue]="c.id" [nzLabel]="c.name" /> }
       </nz-select>
-    </div>
+    </app-page-header>
 
     <nz-row [nzGutter]="[16, 16]">
       <nz-col [nzXs]="24" [nzLg]="12">
@@ -56,9 +56,8 @@ import { WarningsService } from '../../core/warnings.service';
     </ng-template>
   `,
   styles: `
-    .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
     .cls { min-width: 200px; }
-    .row-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; }
+    .row-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--hs-border); }
     .row-item:last-child { border-bottom: none; }
   `
 })

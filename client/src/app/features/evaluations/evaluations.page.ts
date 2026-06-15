@@ -20,6 +20,7 @@ import {
   ApiProblem, ClassListItem, EVAL_RANK_COLORS, EVAL_RANK_LABELS, Leaderboard,
   MonthlyEvaluation, RosterItem
 } from '../../core/models';
+import { PageHeader } from '../../shared/page-header';
 
 interface EvalRow { studentId: string; fullName: string; eval: MonthlyEvaluation | null; }
 
@@ -28,10 +29,10 @@ interface EvalRow { studentId: string; fullName: string; eval: MonthlyEvaluation
   imports: [
     FormsModule, ReactiveFormsModule,
     NzTableModule, NzButtonModule, NzIconModule, NzTagModule, NzSelectModule, NzDatePickerModule,
-    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzCardModule, NzGridModule
+    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzCardModule, NzGridModule, PageHeader
   ],
   template: `
-    <h2>Đánh giá hàng tháng</h2>
+    <app-page-header title="Đánh giá hàng tháng" subtitle="Chấm điểm tháng & bảng vàng" icon="audit" />
 
     <nz-card nzTitle="🏆 Bảng vàng tuần này" class="mb">
       <nz-row [nzGutter]="[16, 16]">
@@ -109,7 +110,7 @@ interface EvalRow { studentId: string; fullName: string; eval: MonthlyEvaluation
     .cls { min-width: 200px; }
     .row-item { display: flex; justify-content: space-between; padding: 4px 0; }
     .full { width: 100%; }
-    .muted { color: rgba(0,0,0,0.45); }
+    .muted { color: var(--hs-text-muted); }
   `
 })
 export class EvaluationsPage {

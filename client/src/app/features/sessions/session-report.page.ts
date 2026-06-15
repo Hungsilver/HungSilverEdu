@@ -8,13 +8,14 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { ApiProblem } from '../../core/models';
 import { SessionsService } from '../../core/sessions.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-session-report-page',
-  imports: [RouterLink, NzCardModule, NzButtonModule, NzIconModule, NzAlertModule],
+  imports: [RouterLink, NzCardModule, NzButtonModule, NzIconModule, NzAlertModule, PageHeader],
   template: `
     <a [routerLink]="['/sessions', id()]" class="back"><nz-icon nzType="arrow-left" /> Về buổi học</a>
-    <h2>Báo cáo buổi học</h2>
+    <app-page-header title="Báo cáo buổi học" subtitle="Sinh báo cáo tự động để gửi phụ huynh" icon="file-text" />
 
     <button nz-button nzType="primary" [nzLoading]="loading()" (click)="generate()">
       <nz-icon nzType="file-text" /> Tạo báo cáo buổi học
@@ -35,7 +36,7 @@ import { SessionsService } from '../../core/sessions.service';
   styles: `
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .mt { margin-top: 16px; }
-    .report { white-space: pre-wrap; font-family: inherit; background: #fafafa; padding: 16px; border-radius: 6px; }
+    .report { white-space: pre-wrap; font-family: inherit; background: var(--hs-surface-2); border: 1px solid var(--hs-border); padding: 16px; border-radius: 8px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   `
 })

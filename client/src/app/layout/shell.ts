@@ -9,6 +9,7 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzLayoutModule } from 'ng-zorro-antd/layout';
 import { NzMenuModule } from 'ng-zorro-antd/menu';
 import { AuthService } from '../core/auth.service';
+import { ThemeService } from '../core/theme.service';
 
 @Component({
   selector: 'app-shell',
@@ -18,9 +19,16 @@ import { AuthService } from '../core/auth.service';
     NzDrawerModule, NzButtonModule
   ],
   template: `
+    <ng-template #brand>
+      <div class="brand">
+        <span class="brand-badge"><nz-icon nzType="read" /></span>
+        <span class="brand-name">H-edu</span>
+      </div>
+    </ng-template>
+
     <ng-template #menu>
-      <ul nz-menu nzTheme="dark" nzMode="inline">
-        @if (auth.isAdmin() || auth.isTeacher()) {
+      <ul nz-menu nzMode="inline" class="app-nav">
+        @if (auth.isAdmin()) {
           <li nz-menu-item routerLink="/dashboard" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="dashboard" /><span>Tổng quan</span>
           </li>
@@ -48,14 +56,19 @@ import { AuthService } from '../core/auth.service';
           <li nz-menu-item routerLink="/warnings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="warning" /><span>Cảnh báo</span>
           </li>
-          @if (auth.isAdmin()) {
-            <li nz-menu-item routerLink="/admin/users" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-              <nz-icon nzType="team" /><span>Quản lý người dùng</span>
-            </li>
-            <li nz-menu-item routerLink="/settings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-              <nz-icon nzType="setting" /><span>Cấu hình hệ thống</span>
-            </li>
-          }
+          <li nz-menu-item routerLink="/admin/users" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="team" /><span>Quản lý người dùng</span>
+          </li>
+          <li nz-menu-item routerLink="/settings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="setting" /><span>Cấu hình hệ thống</span>
+          </li>
+        } @else if (auth.isTeacher()) {
+          <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="book" /><span>Lớp học</span>
+          </li>
+          <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="link" /><span>Kho tài liệu</span>
+          </li>
         }
         @if (auth.isStudent()) {
           <li nz-menu-item routerLink="/portal" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
@@ -65,15 +78,15 @@ import { AuthService } from '../core/auth.service';
       </ul>
     </ng-template>
 
-    <nz-layout class="shell">
+    <nz-layout class="app-layout">
       @if (!isMobile()) {
-        <nz-sider nzCollapsible [nzWidth]="220">
-          <div class="logo">H-edu</div>
+        <nz-sider class="app-sider" nzCollapsible [nzWidth]="220">
+          <ng-container [ngTemplateOutlet]="brand" />
           <ng-container [ngTemplateOutlet]="menu" />
         </nz-sider>
       }
       <nz-layout>
-        <nz-header class="header">
+        <nz-header class="app-header header">
           @if (isMobile()) {
             <button nz-button nzType="text" class="hamburger" (click)="drawerOpen.set(true)">
               <nz-icon nzType="menu" />
@@ -81,11 +94,20 @@ import { AuthService } from '../core/auth.service';
           } @else {
             <span></span>
           }
-          <span class="user" nz-dropdown [nzDropdownMenu]="userMenu" nzTrigger="click">
-            <nz-avatar [nzSrc]="auth.currentUser()?.avatarUrl ?? undefined" nzIcon="user" nzSize="small" />
-            <span class="user-name">{{ auth.currentUser()?.fullName || auth.currentUser()?.email }}</span>
-            <nz-icon nzType="down" />
-          </span>
+          <div class="header-right">
+            <button
+              nz-button nzType="text" class="theme-toggle"
+              [class.active]="theme.isDark()"
+              (click)="theme.toggle()"
+              [attr.aria-label]="theme.isDark() ? 'Chuyển chế độ sáng' : 'Chuyển chế độ tối'">
+              <nz-icon nzType="bulb" />
+            </button>
+            <span class="user" nz-dropdown [nzDropdownMenu]="userMenu" nzTrigger="click">
+              <nz-avatar [nzSrc]="auth.currentUser()?.avatarUrl ?? undefined" nzIcon="user" nzSize="small" />
+              <span class="user-name">{{ auth.currentUser()?.fullName || auth.currentUser()?.email }}</span>
+              <nz-icon nzType="down" />
+            </span>
+          </div>
           <nz-dropdown-menu #userMenu="nzDropdownMenu">
             <ul nz-menu>
               <li nz-menu-item (click)="auth.logout()">
@@ -95,7 +117,7 @@ import { AuthService } from '../core/auth.service';
             </ul>
           </nz-dropdown-menu>
         </nz-header>
-        <nz-content class="content">
+        <nz-content class="app-content content">
           <router-outlet />
         </nz-content>
       </nz-layout>
@@ -109,33 +131,50 @@ import { AuthService } from '../core/auth.service';
       nzWrapClassName="nav-drawer"
       (nzOnClose)="drawerOpen.set(false)">
       <ng-container *nzDrawerContent>
-        <div class="logo logo-drawer">H-edu</div>
+        <ng-container [ngTemplateOutlet]="brand" />
         <ng-container [ngTemplateOutlet]="menu" />
       </ng-container>
     </nz-drawer>
   `,
   styles: `
-    .shell { min-height: 100vh; }
-    .logo {
-      height: 64px; display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 18px; font-weight: 600; letter-spacing: 1px;
+    .app-layout { min-height: 100vh; }
+
+    .brand {
+      height: 64px; display: flex; align-items: center; gap: 10px;
+      padding: 0 20px; color: var(--hs-heading); font-weight: 700;
+      font-size: 18px; letter-spacing: 0.3px;
     }
-    .logo-drawer { background: #001529; }
+    .brand-badge {
+      width: 34px; height: 34px; border-radius: 10px; flex: 0 0 34px;
+      display: grid; place-items: center; font-size: 18px;
+      color: #fff; background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    }
+    /* Khi sider thu gọn (80px): ẩn tên, căn giữa badge */
+    :host ::ng-deep .ant-layout-sider-collapsed .brand { padding: 0; justify-content: center; }
+    :host ::ng-deep .ant-layout-sider-collapsed .brand-name { display: none; }
+
     .header {
-      background: #fff; padding: 0 16px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; display: flex; align-items: center; justify-content: space-between;
     }
+    .header-right { display: flex; align-items: center; gap: 8px; }
     .hamburger { font-size: 20px; }
-    .user { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-    .content { margin: 16px; padding: 16px; background: #fff; border-radius: 8px; }
+    .theme-toggle { font-size: 18px; color: var(--hs-text-muted); }
+    .theme-toggle.active { color: #f59e0b; }
+    .user { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; color: var(--hs-text); }
+
+    .content { margin: 16px; padding: 20px; }
+
     @media (max-width: 575px) {
       .user-name { display: none; }
-      .content { margin: 8px; padding: 12px; }
+      .content { margin: 8px; padding: 14px; }
     }
-    :host ::ng-deep .nav-drawer .ant-drawer-body { padding: 0; background: #001529; }
+
+    :host ::ng-deep .nav-drawer .ant-drawer-body { padding: 0; background: var(--hs-sidebar-bg); }
   `
 })
 export class Shell {
   protected readonly auth = inject(AuthService);
+  protected readonly theme = inject(ThemeService);
   protected readonly isMobile = signal(false);
   protected readonly drawerOpen = signal(false);
 

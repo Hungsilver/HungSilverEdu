@@ -13,6 +13,7 @@ public interface IClassService
     Task<Result> RestoreAsync(Guid id, CancellationToken ct = default);
     Task<Result> AssignTeacherAsync(Guid classId, AssignTeacherRequest request, CancellationToken ct = default);
     Task<Result<List<RosterItemDto>>> GetRosterAsync(Guid classId, CancellationToken ct = default);
+    Task<Result<List<ClassStudentOverviewDto>>> GetOverviewAsync(Guid classId, CancellationToken ct = default);
     Task<Result> EnrollAsync(Guid classId, EnrollStudentRequest request, CancellationToken ct = default);
     Task<Result> WithdrawAsync(Guid classId, Guid studentId, CancellationToken ct = default);
 }

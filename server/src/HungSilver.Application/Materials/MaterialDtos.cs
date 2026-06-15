@@ -4,7 +4,9 @@ namespace HungSilver.Application.Materials;
 
 public sealed record MaterialDto(
     Guid Id,
-    Guid ClassId,
+    Guid? ClassId,
+    Guid? CategoryId,
+    string? CategoryName,
     string Title,
     MaterialType Type,
     MaterialSource Source,
@@ -15,7 +17,8 @@ public sealed record MaterialDto(
     DateTime CreatedAtUtc);
 
 public sealed record CreateMaterialRequest(
-    Guid ClassId,
+    Guid? ClassId,
+    Guid? CategoryId,
     string Title,
     MaterialType Type,
     MaterialSource Source,
@@ -24,9 +27,18 @@ public sealed record CreateMaterialRequest(
     string? Description);
 
 public sealed record UpdateMaterialRequest(
+    Guid? CategoryId,
     string Title,
     MaterialType Type,
     MaterialSource Source,
     string? Url,
     Guid? StoredFileId,
     string? Description);
+
+// ----------------- Danh mục học liệu (thư viện) -----------------
+
+public sealed record MaterialCategoryDto(Guid Id, string Name, string? Description, int SortOrder);
+
+public sealed record CreateMaterialCategoryRequest(string Name, string? Description, int SortOrder);
+
+public sealed record UpdateMaterialCategoryRequest(string Name, string? Description, int SortOrder);

@@ -25,7 +25,8 @@ export const roleGuard: CanActivateFn = route => {
 
   if (allowedRoles.some(role => userRoles.includes(role))) return true;
 
-  // Học sinh (chỉ role User) → về portal; còn lại → dashboard. Tránh vòng lặp redirect.
-  const target = auth.isStudent() && !auth.isAdmin() && !auth.isTeacher() ? '/portal' : '/dashboard';
+  // Điều hướng về trang đích an toàn theo vai trò (tránh vòng lặp redirect):
+  // Admin → tổng quan; Giáo viên → lớp học (menu GV chỉ có Lớp học + Học liệu); Học sinh → portal.
+  const target = auth.isAdmin() ? '/dashboard' : auth.isTeacher() ? '/classes' : '/portal';
   return router.createUrlTree([target]);
 };

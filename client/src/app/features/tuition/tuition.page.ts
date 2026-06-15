@@ -21,21 +21,21 @@ import {
 } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
 import { TuitionService } from '../../core/tuition.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-tuition-page',
   imports: [
     FormsModule, ReactiveFormsModule, CurrencyPipe, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzTagModule, NzSelectModule,
-    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzDatePickerModule, NzPopconfirmModule
+    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzDatePickerModule, NzPopconfirmModule, PageHeader
   ],
   template: `
-    <div class="page-header">
-      <h2>Học phí</h2>
+    <app-page-header title="Học phí" subtitle="Hóa đơn theo tháng & trạng thái đóng" icon="dollar">
       @if (auth.isAdmin()) {
         <button nz-button nzType="primary" (click)="openCreate()"><nz-icon nzType="plus" /> Tạo hóa đơn</button>
       }
-    </div>
+    </app-page-header>
 
     <nz-table #table [nzData]="invoices()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"
@@ -99,7 +99,6 @@ import { TuitionService } from '../../core/tuition.service';
     </nz-modal>
   `,
   styles: `
-    .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
     .full { width: 100%; }
     .ml { margin-left: 8px; }
   `

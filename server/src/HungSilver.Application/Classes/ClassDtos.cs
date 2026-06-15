@@ -58,3 +58,15 @@ public sealed record RosterItemDto(
     string? Phone,
     string? ParentPhone,
     DateOnly EnrolledOn);
+
+/// <summary>Tình hình học tập từng học sinh trong lớp (điểm thưởng/phạt, chuyên cần, BTVN).</summary>
+public sealed record ClassStudentOverviewDto(
+    Guid StudentId,
+    string FullName,
+    int RewardBalance,
+    int AttendedSessions,
+    int TotalRecords,
+    decimal AttendanceRate,
+    int HomeworkCompleted,
+    int HomeworkAssigned,
+    decimal HomeworkRate);

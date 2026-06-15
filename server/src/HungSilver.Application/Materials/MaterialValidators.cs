@@ -7,7 +7,10 @@ public sealed class CreateMaterialRequestValidator : AbstractValidator<CreateMat
 {
     public CreateMaterialRequestValidator()
     {
-        RuleFor(x => x.ClassId).NotEmpty();
+        // Học liệu phải thuộc 1 lớp HOẶC 1 danh mục thư viện.
+        RuleFor(x => x)
+            .Must(r => (r.ClassId.HasValue && r.ClassId != Guid.Empty) || (r.CategoryId.HasValue && r.CategoryId != Guid.Empty))
+            .WithMessage("Chọn lớp hoặc danh mục cho học liệu.");
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Url).NotEmpty().MaximumLength(1000).When(x => x.Source == MaterialSource.ExternalUrl);
         RuleFor(x => x.StoredFileId).NotEmpty().When(x => x.Source == MaterialSource.ServerFile);

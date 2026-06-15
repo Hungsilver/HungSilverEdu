@@ -1,6 +1,7 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Portal;
 using HungSilver.Domain.Common.Results;
+using HungSilver.Domain.Entities;
 using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -48,5 +49,106 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
 
         return new PortalProfileDto(student.Id, student.FullName, student.EnglishLevel, student.LearningGoal,
             total, attended, hwDone, balance, upcoming);
+    }
+
+    public async Task<Result<List<PortalAssignmentDto>>> GetMyAssignmentsAsync(CancellationToken ct = default)
+    {
+        var studentResult = await GetLinkedStudentAsync(ct);
+        if (studentResult.IsFailure)
+            return Result.Failure<List<PortalAssignmentDto>>(studentResult.Error);
+        var student = studentResult.Value;
+
+        var classIds = await context.Enrollments.AsNoTracking()
+            .Where(e => e.StudentId == student.Id && e.IsActive)
+            .Select(e => e.ClassId).ToListAsync(ct);
+        if (classIds.Count == 0)
+            return new List<PortalAssignmentDto>();
+
+        var assignments = await (
+            from a in context.Assignments.AsNoTracking()
+            join c in context.Classes.AsNoTracking() on a.ClassId equals c.Id
+            where classIds.Contains(a.ClassId)
+            orderby a.DueDate descending, a.CreatedAtUtc descending
+            select new { a, c.Name }).ToListAsync(ct);
+        if (assignments.Count == 0)
+            return new List<PortalAssignmentDto>();
+
+        var assignmentIds = assignments.Select(x => x.a.Id).ToList();
+        var subList = await context.Submissions.AsNoTracking()
+            .Where(s => s.StudentId == student.Id && assignmentIds.Contains(s.AssignmentId))
+            .ToListAsync(ct);
+        var subs = subList.GroupBy(s => s.AssignmentId).ToDictionary(g => g.Key, g => g.First());
+
+        var materialIds = assignments.Where(x => x.a.MaterialId.HasValue).Select(x => x.a.MaterialId!.Value).Distinct().ToList();
+        var materials = materialIds.Count == 0
+            ? new Dictionary<Guid, LearningMaterial>()
+            : await context.LearningMaterials.AsNoTracking()
+                .Where(m => materialIds.Contains(m.Id))
+                .ToDictionaryAsync(m => m.Id, m => m, ct);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        return assignments.Select(x =>
+        {
+            subs.TryGetValue(x.a.Id, out var sub);
+            var status = sub is not null && sub.Status != SubmissionStatus.NotSubmitted
+                ? sub.Status
+                : (x.a.DueDate is not null && today > x.a.DueDate ? SubmissionStatus.Late : SubmissionStatus.NotSubmitted);
+
+            string? matTitle = null, matUrl = null;
+            if (x.a.MaterialId.HasValue && materials.TryGetValue(x.a.MaterialId.Value, out var m))
+            {
+                matTitle = m.Title;
+                matUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null ? $"/api/files/{m.StoredFileId}" : m.Url;
+            }
+
+            return new PortalAssignmentDto(x.a.Id, x.Name, x.a.Title, x.a.Instructions, matTitle, matUrl,
+                x.a.DueDate, status, sub?.SubmittedOn, sub?.Link);
+        }).ToList();
+    }
+
+    public async Task<Result> SubmitAssignmentAsync(Guid assignmentId, SubmitAssignmentRequest request, CancellationToken ct = default)
+    {
+        var studentResult = await GetLinkedStudentAsync(ct);
+        if (studentResult.IsFailure)
+            return Result.Failure(studentResult.Error);
+        var student = studentResult.Value;
+
+        var assignment = await context.Assignments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == assignmentId, ct);
+        if (assignment is null)
+            return Result.Failure(Error.NotFound("Assignment.NotFound", "Không tìm thấy bài tập."));
+
+        var enrolled = await context.Enrollments.AnyAsync(
+            e => e.ClassId == assignment.ClassId && e.StudentId == student.Id && e.IsActive, ct);
+        if (!enrolled)
+            return Result.Failure(Error.Forbidden("Assignment.NotInClass", "Bài tập không thuộc lớp của bạn."));
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var sub = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == student.Id, ct);
+        if (sub is null)
+        {
+            sub = new Submission { AssignmentId = assignmentId, StudentId = student.Id };
+            context.Submissions.Add(sub);
+        }
+
+        sub.Status = assignment.DueDate is not null && today > assignment.DueDate ? SubmissionStatus.Late : SubmissionStatus.Submitted;
+        sub.SubmittedOn = today;
+        sub.Link = request.Link?.Trim();
+        sub.Note = request.Note?.Trim();
+
+        await context.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    private async Task<Result<Student>> GetLinkedStudentAsync(CancellationToken ct)
+    {
+        var userId = currentUser.UserId;
+        if (userId is null)
+            return Result.Failure<Student>(Error.Unauthorized("Portal.Unauthorized", "Chưa đăng nhập."));
+
+        var student = await context.Students.FirstOrDefaultAsync(s => s.UserId == userId, ct);
+        if (student is null)
+            return Result.Failure<Student>(Error.NotFound("Portal.NotLinked", "Tài khoản chưa được liên kết với hồ sơ học sinh."));
+
+        return student;
     }
 }

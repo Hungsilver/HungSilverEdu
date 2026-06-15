@@ -10,13 +10,14 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { ApiProblem, UpsertJournalRequest } from '../../core/models';
 import { SessionsService } from '../../core/sessions.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-session-journal-page',
-  imports: [FormsModule, RouterLink, NzCardModule, NzFormModule, NzInputModule, NzButtonModule, NzIconModule],
+  imports: [FormsModule, RouterLink, NzCardModule, NzFormModule, NzInputModule, NzButtonModule, NzIconModule, PageHeader],
   template: `
     <a [routerLink]="['/sessions', id()]" class="back"><nz-icon nzType="arrow-left" /> Về buổi học</a>
-    <h2>Nhật ký giảng dạy</h2>
+    <app-page-header title="Nhật ký giảng dạy" subtitle="Ghi lại nội dung & hoạt động buổi học" icon="file-text" />
     <nz-card>
       <form nz-form nzLayout="vertical">
         <nz-form-item><nz-form-label>Nội dung đã dạy</nz-form-label>

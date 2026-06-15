@@ -20,6 +20,7 @@ import { AuthService } from '../../core/auth.service';
 import { ClassesService } from '../../core/classes.service';
 import { ApiProblem, ClassListItem, ClassRequest, ROLE_ADMIN, ROLE_TEACHER, UserListItem } from '../../core/models';
 import { UsersService } from '../../core/users.service';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-classes-page',
@@ -27,11 +28,10 @@ import { UsersService } from '../../core/users.service';
     FormsModule, ReactiveFormsModule, RouterLink,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule, NzTagModule, NzSelectModule,
     NzModalModule, NzFormModule, NzInputNumberModule, NzSwitchModule, NzDatePickerModule,
-    NzPopconfirmModule, NzCheckboxModule
+    NzPopconfirmModule, NzCheckboxModule, PageHeader
   ],
   template: `
-    <div class="page-header">
-      <h2>Lớp học</h2>
+    <app-page-header title="Lớp học" subtitle="Danh sách lớp & phân công giáo viên" icon="book">
       <div class="actions">
         <input nz-input placeholder="Tìm theo tên lớp..." class="search"
                [ngModel]="search()" (ngModelChange)="onSearch($event)" />
@@ -40,7 +40,7 @@ import { UsersService } from '../../core/users.service';
           <button nz-button nzType="primary" (click)="openCreate()"><nz-icon nzType="plus" /> Thêm lớp</button>
         }
       </div>
-    </div>
+    </app-page-header>
 
     <nz-table #table [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"

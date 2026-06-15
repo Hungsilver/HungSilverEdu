@@ -6,7 +6,12 @@ namespace HungSilver.Domain.Entities;
 /// <summary>Tài liệu học tập theo lớp (Module 11). Lưu link ngoài hoặc tham chiếu file đã upload.</summary>
 public class LearningMaterial : BaseEntity
 {
-    public Guid ClassId { get; set; }
+    /// <summary>Học liệu gắn 1 lớp; null = học liệu thư viện chung (phân loại theo <see cref="CategoryId"/>).</summary>
+    public Guid? ClassId { get; set; }
+
+    /// <summary>Danh mục/khối học liệu (thư viện). Tùy chọn.</summary>
+    public Guid? CategoryId { get; set; }
+
     public string Title { get; set; } = string.Empty;
     public MaterialType Type { get; set; }
     public MaterialSource Source { get; set; } = MaterialSource.ExternalUrl;

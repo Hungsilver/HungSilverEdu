@@ -18,26 +18,29 @@ import {
   PointType, SaveAttendanceRow, SessionSheet, SessionStudentRow
 } from '../../core/models';
 import { SessionsService } from '../../core/sessions.service';
+import { SettingsService } from '../../core/settings.service';
+import { PageHeader } from '../../shared/page-header';
+
+interface PointReason { label: string; points: number; }
 
 @Component({
   selector: 'app-session-page',
   imports: [
     FormsModule, RouterLink, DatePipe,
     NzTableModule, NzRadioModule, NzSelectModule, NzInputModule, NzButtonModule, NzIconModule,
-    NzTagModule, NzModalModule, NzInputNumberModule
+    NzTagModule, NzModalModule, NzInputNumberModule, PageHeader
   ],
   template: `
     @if (sheet(); as s) {
-      <div class="page-header">
-        <div>
-          <h2>{{ s.className }} · Buổi {{ s.sessionNumber }}</h2>
-          <span class="muted">{{ s.sessionDate | date: 'EEEE, dd/MM/yyyy' }} {{ s.topic ? '· ' + s.topic : '' }}</span>
-        </div>
+      <app-page-header
+        [title]="s.className + ' · Buổi ' + s.sessionNumber"
+        [subtitle]="(s.sessionDate | date: 'EEEE, dd/MM/yyyy') + (s.topic ? ' · ' + s.topic : '')"
+        icon="schedule">
         <div class="links">
           <a nz-button nzType="default" [routerLink]="['/sessions', s.sessionId, 'journal']"><nz-icon nzType="read" /> Nhật ký</a>
           <a nz-button nzType="default" [routerLink]="['/sessions', s.sessionId, 'report']"><nz-icon nzType="file-text" /> Báo cáo</a>
         </div>
-      </div>
+      </app-page-header>
 
       <div class="bulk-actions">
         <button nz-button nzSize="small" (click)="markAllPresent()">Tất cả Có mặt</button>
@@ -45,14 +48,14 @@ import { SessionsService } from '../../core/sessions.service';
         <span class="muted counter">Có mặt: {{ presentCount() }}/{{ rows().length }}</span>
       </div>
 
-      <nz-table [nzData]="rows()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '900px' }">
+      <nz-table [nzData]="rows()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '1240px' }">
         <thead>
           <tr>
             <th nzLeft nzWidth="160px">Học viên</th>
             <th nzWidth="300px">Điểm danh</th>
             <th nzWidth="150px">BTVN</th>
             <th nzWidth="140px">Thái độ</th>
-            <th nzWidth="150px">Điểm thưởng</th>
+            <th nzWidth="290px">Điểm thưởng/phạt</th>
             <th nzWidth="200px">Ghi chú</th>
           </tr>
         </thead>
@@ -85,9 +88,19 @@ import { SessionsService } from '../../core/sessions.service';
               </td>
               <td>
                 <div class="points">
-                  <button nz-button nzSize="small" nzShape="circle" (click)="openPoint(row, PointType.Penalty)"><nz-icon nzType="minus" /></button>
-                  <nz-tag [nzColor]="row.rewardBalance >= 0 ? 'gold' : 'red'">{{ row.rewardBalance }}</nz-tag>
-                  <button nz-button nzSize="small" nzShape="circle" nzType="primary" (click)="openPoint(row, PointType.Reward)"><nz-icon nzType="plus" /></button>
+                  <div class="bal">
+                    <button nz-button nzSize="small" nzShape="circle" (click)="openPoint(row, PointType.Penalty)"><nz-icon nzType="minus" /></button>
+                    <nz-tag [nzColor]="row.rewardBalance >= 0 ? 'gold' : 'red'">{{ row.rewardBalance }}</nz-tag>
+                    <button nz-button nzSize="small" nzShape="circle" nzType="primary" (click)="openPoint(row, PointType.Reward)"><nz-icon nzType="plus" /></button>
+                  </div>
+                  <div class="quick">
+                    @for (r of rewardReasons(); track r.label) {
+                      <button nz-button nzSize="small" class="chip reward" (click)="quickAdd(row, PointType.Reward, r)">+{{ r.points }} {{ r.label }}</button>
+                    }
+                    @for (r of penaltyReasons(); track r.label) {
+                      <button nz-button nzSize="small" nzDanger class="chip" (click)="quickAdd(row, PointType.Penalty, r)">−{{ r.points }} {{ r.label }}</button>
+                    }
+                  </div>
                 </div>
               </td>
               <td><input nz-input nzSize="small" [(ngModel)]="row.personalNote" placeholder="Ghi chú..." /></td>
@@ -118,16 +131,19 @@ import { SessionsService } from '../../core/sessions.service';
     </nz-modal>
   `,
   styles: `
-    .page-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
     .links { display: flex; gap: 8px; flex-wrap: wrap; }
     .bulk-actions { display: flex; gap: 8px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
     .counter { margin-left: auto; }
     .full { width: 100%; }
     .mt { margin-top: 8px; }
-    .points { display: flex; align-items: center; gap: 6px; }
+    .points { display: flex; flex-direction: column; gap: 6px; }
+    .bal { display: flex; align-items: center; gap: 6px; }
+    .quick { display: flex; flex-wrap: wrap; gap: 4px; }
+    .quick .chip { font-size: 11px; padding: 0 8px; height: 22px; line-height: 20px; }
+    .quick .chip.reward { color: #16a34a; border-color: #16a34a; }
     .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-    .save-bar { position: sticky; bottom: 0; background: #fff; padding: 12px 0; margin-top: 12px; border-top: 1px solid #f0f0f0; text-align: right; }
-    .muted { color: rgba(0,0,0,0.45); }
+    .save-bar { position: sticky; bottom: 0; background: var(--hs-surface); padding: 12px 0; margin-top: 12px; border-top: 1px solid var(--hs-border); text-align: right; }
+    .muted { color: var(--hs-text-muted); }
   `
 })
 export class SessionPage implements OnInit {
@@ -141,11 +157,16 @@ export class SessionPage implements OnInit {
   protected readonly attitudeLabels = ATTITUDE_LABELS;
 
   private readonly sessionsService = inject(SessionsService);
+  private readonly settingsService = inject(SettingsService);
   private readonly message = inject(NzMessageService);
 
   protected readonly sheet = signal<SessionSheet | null>(null);
   protected readonly rows = signal<SessionStudentRow[]>([]);
   protected readonly saving = signal(false);
+
+  // Lý do cộng/trừ điểm cấu hình sẵn (Settings) → nút bấm nhanh 1 chạm.
+  protected readonly rewardReasons = signal<PointReason[]>(DEFAULT_REWARD_REASONS);
+  protected readonly penaltyReasons = signal<PointReason[]>(DEFAULT_PENALTY_REASONS);
   // Là method (không phải computed) để cập nhật ngay khi sửa từng dòng (row được mutate tại chỗ).
   protected presentCount(): number {
     return this.rows().filter(r => r.attendance === AttendanceStatus.Present || r.attendance === AttendanceStatus.Late).length;
@@ -158,12 +179,35 @@ export class SessionPage implements OnInit {
   protected pointValue = 1;
   protected pointReason = '';
 
-  protected readonly presets = computed(() => this.pointType() === PointType.Reward
-    ? ['Trả lời đúng', 'Hoạt động nhóm', 'Thành tích xuất sắc']
-    : ['Nói chuyện riêng', 'Không làm bài', 'Vi phạm nội quy']);
+  protected readonly presets = computed(() =>
+    (this.pointType() === PointType.Reward ? this.rewardReasons() : this.penaltyReasons()).map(r => r.label));
 
   ngOnInit(): void {
     this.reload();
+    this.loadReasons();
+  }
+
+  private loadReasons(): void {
+    this.settingsService.getEffective().subscribe(s => {
+      const reward = parseReasons(s.values['Points.RewardReasons']);
+      const penalty = parseReasons(s.values['Points.PenaltyReasons']);
+      if (reward.length) this.rewardReasons.set(reward);
+      if (penalty.length) this.penaltyReasons.set(penalty);
+    });
+  }
+
+  /** Cộng/trừ điểm 1 chạm theo lý do cấu hình sẵn (cập nhật số dư cục bộ, không mất chỉnh sửa điểm danh chưa lưu). */
+  protected quickAdd(row: SessionStudentRow, type: PointType, r: PointReason): void {
+    this.sessionsService.addPoint(this.id(), { studentId: row.studentId, type, points: r.points, reason: r.label }).subscribe({
+      next: entry => {
+        const delta = entry.type === PointType.Reward ? entry.points : -entry.points;
+        this.rows.set(this.rows().map(x => x.studentId === row.studentId
+          ? { ...x, rewardBalance: x.rewardBalance + delta, points: [...x.points, entry] }
+          : x));
+        this.message.success(`${type === PointType.Reward ? '+' : '−'}${r.points} ${r.label}`);
+      },
+      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Ghi điểm thất bại.')
+    });
   }
 
   private reload(): void {
@@ -221,4 +265,31 @@ export class SessionPage implements OnInit {
       error: (err: HttpErrorResponse) => { this.busy.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Ghi điểm thất bại.'); }
     });
   }
+}
+
+const DEFAULT_REWARD_REASONS: PointReason[] = [
+  { label: 'Trả lời đúng', points: 1 },
+  { label: 'Hoạt động nhóm', points: 1 },
+  { label: 'Thành tích xuất sắc', points: 2 }
+];
+const DEFAULT_PENALTY_REASONS: PointReason[] = [
+  { label: 'Nói chuyện riêng', points: 1 },
+  { label: 'Không làm bài', points: 1 },
+  { label: 'Vi phạm nội quy', points: 2 }
+];
+
+/** Phân tích cấu hình lý do: mỗi dòng "Nhãn=điểm" (thiếu điểm ⇒ mặc định 1). */
+function parseReasons(raw: string | undefined): PointReason[] {
+  if (!raw) return [];
+  return raw.split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => {
+      const idx = line.lastIndexOf('=');
+      if (idx < 0) return { label: line, points: 1 };
+      const label = line.slice(0, idx).trim();
+      const points = parseInt(line.slice(idx + 1).trim(), 10);
+      return { label: label || line, points: Number.isFinite(points) && points > 0 ? points : 1 };
+    })
+    .filter(r => r.label.length > 0);
 }

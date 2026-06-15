@@ -196,6 +196,81 @@ public sealed class ClassService(
         return roster;
     }
 
+    public async Task<Result<List<ClassStudentOverviewDto>>> GetOverviewAsync(Guid classId, CancellationToken ct = default)
+    {
+        var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
+        if (access.IsFailure)
+            return Result.Failure<List<ClassStudentOverviewDto>>(access.Error);
+
+        var roster = await (
+            from e in context.Enrollments
+            join s in context.Students on e.StudentId equals s.Id
+            where e.ClassId == classId && e.IsActive
+            orderby s.FullName
+            select new { s.Id, s.FullName })
+            .ToListAsync(ct);
+
+        if (roster.Count == 0)
+            return new List<ClassStudentOverviewDto>();
+
+        var studentIds = roster.Select(r => r.Id).ToList();
+
+        // Số dư điểm = thưởng − phạt − đã quy đổi (đồng bộ công thức DashboardService).
+        var pointAgg = await context.PointEntries.AsNoTracking()
+            .Where(p => studentIds.Contains(p.StudentId))
+            .GroupBy(p => p.StudentId)
+            .Select(g => new
+            {
+                StudentId = g.Key,
+                Reward = g.Where(x => x.Type == PointType.Reward).Sum(x => x.Points),
+                Penalty = g.Where(x => x.Type == PointType.Penalty).Sum(x => x.Points)
+            })
+            .ToListAsync(ct);
+
+        var redeemed = await context.RewardRedemptions.AsNoTracking()
+            .Where(r => studentIds.Contains(r.StudentId))
+            .GroupBy(r => r.StudentId)
+            .Select(g => new { StudentId = g.Key, Spent = g.Sum(x => x.PointsSpent) })
+            .ToDictionaryAsync(x => x.StudentId, x => x.Spent, ct);
+
+        // Chuyên cần + BTVN từ bản ghi buổi học của lớp này.
+        var sessionIds = await context.ClassSessions.AsNoTracking()
+            .Where(s => s.ClassId == classId)
+            .Select(s => s.Id)
+            .ToListAsync(ct);
+
+        var recAgg = await context.StudentSessionRecords.AsNoTracking()
+            .Where(r => sessionIds.Contains(r.ClassSessionId) && studentIds.Contains(r.StudentId))
+            .GroupBy(r => r.StudentId)
+            .Select(g => new
+            {
+                StudentId = g.Key,
+                Total = g.Count(),
+                Present = g.Count(x => x.Attendance == AttendanceStatus.Present || x.Attendance == AttendanceStatus.Late),
+                HwAssigned = g.Count(x => x.Homework != HomeworkStatus.NotAssigned),
+                HwDone = g.Count(x => x.Homework == HomeworkStatus.Completed || x.Homework == HomeworkStatus.CompletedWell)
+            })
+            .ToListAsync(ct);
+
+        var result = roster.Select(s =>
+        {
+            var agg = pointAgg.FirstOrDefault(x => x.StudentId == s.Id);
+            var balance = (agg?.Reward ?? 0) - (agg?.Penalty ?? 0) - redeemed.GetValueOrDefault(s.Id);
+
+            var rec = recAgg.FirstOrDefault(x => x.StudentId == s.Id);
+            var total = rec?.Total ?? 0;
+            var present = rec?.Present ?? 0;
+            var hwAssigned = rec?.HwAssigned ?? 0;
+            var hwDone = rec?.HwDone ?? 0;
+            var attRate = total > 0 ? Math.Round((decimal)present / total * 100, 1) : 0m;
+            var hwRate = hwAssigned > 0 ? Math.Round((decimal)hwDone / hwAssigned * 100, 1) : 0m;
+
+            return new ClassStudentOverviewDto(s.Id, s.FullName, balance, present, total, attRate, hwDone, hwAssigned, hwRate);
+        }).ToList();
+
+        return result;
+    }
+
     public async Task<Result> EnrollAsync(Guid classId, EnrollStudentRequest request, CancellationToken ct = default)
     {
         var cls = await context.Classes.FirstOrDefaultAsync(c => c.Id == classId, ct);

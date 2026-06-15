@@ -20,19 +20,20 @@ import { ApiProblem, ROLE_USER, RewardTier, REWARD_TIER_LABELS, SKILLS, Student,
 import { StudentsService } from '../../core/students.service';
 import { UsersService } from '../../core/users.service';
 import { Chart } from '../../shared/chart';
+import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-student-detail-page',
   imports: [
     RouterLink, DatePipe, FormsModule,
     NzCardModule, NzGridModule, NzStatisticModule, NzDescriptionsModule, NzButtonModule, NzIconModule,
-    NzModalModule, NzDatePickerModule, NzSelectModule, NzTagModule, Chart
+    NzModalModule, NzDatePickerModule, NzSelectModule, NzTagModule, Chart, PageHeader
   ],
   template: `
     <a routerLink="/students" class="back"><nz-icon nzType="arrow-left" /> Danh sách học viên</a>
 
     @if (student(); as s) {
-      <h2>{{ s.fullName }}</h2>
+      <app-page-header [title]="s.fullName" subtitle="Hồ sơ & tiến độ học tập" icon="idcard" />
       <nz-row [nzGutter]="[16, 16]">
         <nz-col [nzXs]="24" [nzLg]="12">
           <nz-card nzTitle="Hồ sơ">
@@ -113,10 +114,10 @@ import { Chart } from '../../shared/chart';
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .mt { margin-top: 16px; }
     .redeem-btn { margin: 0 8px 8px 0; }
-    .muted { color: rgba(0,0,0,0.45); }
+    .muted { color: var(--hs-text-muted); }
     .report-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .link-select { min-width: 220px; flex: 1; }
-    .report { white-space: pre-wrap; font-family: inherit; background: #fafafa; padding: 12px; border-radius: 6px; }
+    .report { white-space: pre-wrap; font-family: inherit; background: var(--hs-surface-2); border: 1px solid var(--hs-border); padding: 12px; border-radius: 8px; }
   `
 })
 export class StudentDetailPage implements OnInit {
@@ -161,7 +162,7 @@ export class StudentDetailPage implements OnInit {
       grid: { left: 40, right: 16, top: 24, bottom: 28 },
       xAxis: { type: 'category', data: trend.map(t => t.takenOn) },
       yAxis: { type: 'value' },
-      series: [{ type: 'line', smooth: true, data: trend.map(t => t.overall ?? 0), itemStyle: { color: '#1890ff' } }]
+      series: [{ type: 'line', smooth: true, data: trend.map(t => t.overall ?? 0), itemStyle: { color: '#4f46e5' } }]
     };
   });
 
