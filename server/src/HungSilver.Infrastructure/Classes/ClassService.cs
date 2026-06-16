@@ -190,7 +190,7 @@ public sealed class ClassService(
             join s in context.Students on e.StudentId equals s.Id
             where e.ClassId == classId && e.IsActive
             orderby s.FullName
-            select new RosterItemDto(e.Id, s.Id, s.FullName, s.Phone, s.ParentPhone, e.EnrolledOn))
+            select new RosterItemDto(e.Id, s.Id, s.FullName, s.Phone, s.ParentPhone, e.EnrolledOn, s.UserId))
             .ToListAsync(ct);
 
         return roster;

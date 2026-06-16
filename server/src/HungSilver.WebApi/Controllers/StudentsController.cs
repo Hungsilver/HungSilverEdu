@@ -10,7 +10,9 @@ namespace HungSilver.WebApi.Controllers;
 [ApiController]
 [Route("api/students")]
 [Authorize(Policy = "TeacherOrAdmin")]
-public class StudentsController(IStudentService studentService) : ControllerBase
+public class StudentsController(
+    IStudentService studentService,
+    IStudentAccountService studentAccountService) : ControllerBase
 {
     /// <summary>Admin: tất cả học sinh; Teacher: chỉ học sinh trong lớp của mình.</summary>
     [HttpGet]
@@ -52,4 +54,9 @@ public class StudentsController(IStudentService studentService) : ControllerBase
     [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> LinkUser(Guid id, LinkUserRequest request, CancellationToken ct) =>
         (await studentService.LinkUserAsync(id, request.UserId, ct)).ToActionResult();
+
+    /// <summary>Giáo viên/Admin đặt lại mật khẩu tài khoản học sinh (giáo viên chỉ trong lớp của mình).</summary>
+    [HttpPut("{id:guid}/password")]
+    public async Task<ActionResult> ResetPassword(Guid id, ResetStudentPasswordRequest request, CancellationToken ct) =>
+        (await studentAccountService.ResetPasswordAsync(id, request.NewPassword, ct)).ToActionResult();
 }

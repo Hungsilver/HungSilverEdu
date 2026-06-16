@@ -51,6 +51,7 @@ public sealed class UserAdminService(
 
         var items = users.Select(u => new UserListItemDto(
             u.Id,
+            u.UserName!,
             u.Email!,
             u.FullName,
             roleMap.TryGetValue(u.Id, out var roles) ? roles : [],
@@ -64,6 +65,53 @@ public sealed class UserAdminService(
             PageSize = request.PageSize,
             TotalCount = totalCount
         };
+    }
+
+    public async Task<Result<UserListItemDto>> CreateUserAsync(CreateUserRequest request, CancellationToken ct = default)
+    {
+        // Admin chỉ tạo Admin/Giáo viên; học sinh do giáo viên tạo trong lớp.
+        var role = request.Role?.Trim();
+        if (role != AppRoles.Admin && role != AppRoles.Teacher)
+            return Result.Failure<UserListItemDto>(Error.Validation(
+                "Users.InvalidRole", "Vai trò chỉ được là Quản trị viên hoặc Giáo viên."));
+
+        var userName = request.UserName?.Trim();
+        if (string.IsNullOrWhiteSpace(userName))
+            return Result.Failure<UserListItemDto>(Error.Validation("Users.UserNameRequired", "Vui lòng nhập tên đăng nhập."));
+        if (string.IsNullOrWhiteSpace(request.Password))
+            return Result.Failure<UserListItemDto>(Error.Validation("Users.PasswordRequired", "Vui lòng nhập mật khẩu."));
+
+        var email = string.IsNullOrWhiteSpace(request.Email)
+            ? (userName.Contains('@') ? userName : $"{userName}@hedu.local")
+            : request.Email.Trim();
+
+        // Kiểm tra trùng username/email kể cả tài khoản đã xóa mềm (unique index của Identity giữ chỗ).
+        if (await context.Users.IgnoreQueryFilters()
+                .AnyAsync(u => u.NormalizedUserName == userManager.NormalizeName(userName), ct))
+            return Result.Failure<UserListItemDto>(Error.Conflict("Users.UserNameTaken", "Tên đăng nhập đã tồn tại."));
+        if (await context.Users.IgnoreQueryFilters()
+                .AnyAsync(u => u.NormalizedEmail == userManager.NormalizeEmail(email), ct))
+            return Result.Failure<UserListItemDto>(Error.Conflict("Users.EmailTaken", "Email đã được sử dụng."));
+
+        var user = new AppUser
+        {
+            UserName = userName,
+            Email = email,
+            EmailConfirmed = true,
+            FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim()
+        };
+
+        var created = await userManager.CreateAsync(user, request.Password);
+        if (!created.Succeeded)
+            return Result.Failure<UserListItemDto>(Error.Validation(
+                "Users.CreateFailed", string.Join(" | ", created.Errors.Select(e => e.Description))));
+
+        var addRole = await userManager.AddToRoleAsync(user, role);
+        if (!addRole.Succeeded)
+            return Result.Failure<UserListItemDto>(Error.Failure(
+                "Users.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
+
+        return new UserListItemDto(user.Id, user.UserName!, user.Email!, user.FullName, [role], user.IsDeleted, user.CreatedAtUtc);
     }
 
     public async Task<Result> AssignRolesAsync(Guid userId, AssignRolesRequest request, CancellationToken ct = default)

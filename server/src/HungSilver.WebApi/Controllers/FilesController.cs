@@ -19,10 +19,16 @@ public class FilesController(IFileService fileService) : ControllerBase
             return BadRequest(new ProblemDetails { Title = "Files.Empty", Detail = "Chưa chọn file." });
 
         await using var stream = file.OpenReadStream();
-        var result = await fileService.UploadAsync(stream, file.FileName, file.ContentType, file.Length, ct);
+        var result = await fileService.UploadAsync(stream, file.FileName, file.ContentType, file.Length, ct: ct);
         return result.ToActionResult();
     }
 
+    /// <summary>
+    /// Tải/hiển thị file theo id. Cho phép ẩn danh để thẻ &lt;img&gt;/nz-avatar tải được ảnh đại diện
+    /// (access token nằm trong bộ nhớ, không gắn được vào thẻ img). Id là GUID không đoán được;
+    /// upload vẫn yêu cầu quyền Teacher/Admin.
+    /// </summary>
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> Download(Guid id, CancellationToken ct)
     {

@@ -18,13 +18,16 @@ public sealed class FileService(
 {
     private readonly FileStorageOptions _options = options.Value;
 
-    public async Task<Result<StoredFileDto>> UploadAsync(Stream content, string fileName, string contentType, long length, CancellationToken ct = default)
+    public async Task<Result<StoredFileDto>> UploadAsync(Stream content, string fileName, string contentType, long length, bool enforceStorageMode = true, CancellationToken ct = default)
     {
-        var mode = await settings.GetEffectiveValueAsync(SettingKeys.FileStorageMode, ct: ct);
-        if (!string.Equals(mode, nameof(FileStorageMode.Server), StringComparison.OrdinalIgnoreCase))
-            return Result.Failure<StoredFileDto>(Error.Validation(
-                "Files.UploadDisabled",
-                "Hệ thống đang ở chế độ lưu link ngoài. Vui lòng dùng đường dẫn URL thay vì upload file."));
+        if (enforceStorageMode)
+        {
+            var mode = await settings.GetEffectiveValueAsync(SettingKeys.FileStorageMode, ct: ct);
+            if (!string.Equals(mode, nameof(FileStorageMode.Server), StringComparison.OrdinalIgnoreCase))
+                return Result.Failure<StoredFileDto>(Error.Validation(
+                    "Files.UploadDisabled",
+                    "Hệ thống đang ở chế độ lưu link ngoài. Vui lòng dùng đường dẫn URL thay vì upload file."));
+        }
 
         if (length <= 0)
             return Result.Failure<StoredFileDto>(Error.Validation("Files.Empty", "File rỗng."));

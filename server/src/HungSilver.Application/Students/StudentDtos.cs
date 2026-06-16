@@ -39,6 +39,29 @@ public sealed record CreateStudentRequest(
 
 public sealed record LinkUserRequest(Guid UserId);
 
+/// <summary>Giáo viên tạo học sinh trong lớp của mình, kèm tùy chọn tạo tài khoản đăng nhập.</summary>
+public sealed record CreateClassStudentRequest(
+    string FullName,
+    DateOnly? DateOfBirth,
+    string? School,
+    string? GradeLevel,
+    string? Phone,
+    string? ParentName,
+    string? ParentPhone,
+    string? EnglishLevel,
+    string? LearningGoal,
+    bool CreateAccount = false,
+    string? UserName = null,
+    string? Password = null);
+
+public sealed record CreateClassStudentResultDto(
+    Guid StudentId,
+    string FullName,
+    bool AccountCreated,
+    string? UserName);
+
+public sealed record ResetStudentPasswordRequest(string NewPassword);
+
 public sealed record UpdateStudentRequest(
     string FullName,
     DateOnly? DateOfBirth,

@@ -59,4 +59,9 @@ export class StudentsService {
   linkUser(studentId: string, userId: string): Observable<void> {
     return this.http.put<void>(`${this.apiUrl}/${studentId}/link-user`, { userId });
   }
+
+  /** Giáo viên/Admin đặt lại mật khẩu tài khoản học sinh. */
+  resetPassword(studentId: string, newPassword: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${studentId}/password`, { newPassword });
+  }
 }

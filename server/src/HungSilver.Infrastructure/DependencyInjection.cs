@@ -1,4 +1,5 @@
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Account;
 using HungSilver.Application.Assignments;
 using HungSilver.Application.Auth;
 using HungSilver.Application.Files;
@@ -21,6 +22,7 @@ using HungSilver.Infrastructure.Classes;
 using HungSilver.Infrastructure.Dashboard;
 using HungSilver.Infrastructure.Evaluations;
 using HungSilver.Infrastructure.Identity;
+using HungSilver.Infrastructure.Account;
 using HungSilver.Infrastructure.Notifications;
 using HungSilver.Infrastructure.Reports;
 using HungSilver.Infrastructure.Portal;
@@ -49,6 +51,7 @@ public static class DependencyInjection
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<GoogleOptions>(configuration.GetSection(GoogleOptions.SectionName));
+        services.Configure<AuthFeatureOptions>(configuration.GetSection(AuthFeatureOptions.SectionName));
         services.Configure<SeedOptions>(configuration.GetSection(SeedOptions.SectionName));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
@@ -87,6 +90,7 @@ public static class DependencyInjection
         // File storage + cấu hình phân tầng
         services.AddScoped<IFileStorage, LocalDiskFileStorage>();
         services.AddScoped<IFileService, FileService>();
+        services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
         services.AddScoped<ISettingsResolver>(sp => sp.GetRequiredService<SettingsService>());
@@ -105,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<IPortalService, PortalService>();
         services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<IStudentImportService, StudentImportService>();
+        services.AddScoped<IStudentAccountService, StudentAccountService>();
 
         // Thông báo: Email gửi thật (MailKit); Zalo/Messenger stub (gửi tay).
         services.AddScoped<INotificationSender, EmailNotificationSender>();

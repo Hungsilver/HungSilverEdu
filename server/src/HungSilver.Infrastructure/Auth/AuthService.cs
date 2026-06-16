@@ -20,19 +20,26 @@ public sealed class AuthService(
     IJwtTokenService tokenService,
     IGoogleAuthVerifier googleVerifier,
     IOptions<JwtOptions> jwtOptions,
+    IOptions<AuthFeatureOptions> authFeatures,
     IValidator<RegisterRequest> registerValidator,
     IValidator<LoginRequest> loginValidator) : IAuthService
 {
     private const string GoogleProvider = "Google";
 
     private static readonly Error InvalidCredentials =
-        Error.Unauthorized("Auth.InvalidCredentials", "Email hoặc mật khẩu không đúng.");
+        Error.Unauthorized("Auth.InvalidCredentials", "Tài khoản hoặc mật khẩu không đúng.");
+
+    private static readonly Error RegistrationDisabled =
+        Error.Forbidden("Auth.RegistrationDisabled", "Chức năng đăng ký đang tạm khóa. Vui lòng liên hệ quản trị viên để được cấp tài khoản.");
 
     private static readonly Error InvalidRefreshToken =
         Error.Unauthorized("Auth.InvalidRefreshToken", "Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại.");
 
     public async Task<Result<AuthTokens>> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
     {
+        if (!authFeatures.Value.AllowRegistration)
+            return Result.Failure<AuthTokens>(RegistrationDisabled);
+
         var validation = await registerValidator.ValidateAsync(request, ct);
         if (!validation.IsValid)
             return Result.Failure<AuthTokens>(validation.ToError("Auth.Validation"));
@@ -67,8 +74,11 @@ public sealed class AuthService(
         if (!validation.IsValid)
             return Result.Failure<AuthTokens>(validation.ToError("Auth.Validation"));
 
-        // FindByEmailAsync đi qua query filter nên user đã xóa mềm coi như không tồn tại.
-        var user = await userManager.FindByEmailAsync(request.Email);
+        // Cho đăng nhập bằng username (vd "admin", tài khoản học sinh do GV cấp) HOẶC email.
+        // FindBy* đi qua query filter nên user đã xóa mềm coi như không tồn tại.
+        var identifier = request.Email.Trim();
+        var user = await userManager.FindByNameAsync(identifier)
+                   ?? await userManager.FindByEmailAsync(identifier);
         if (user is null)
             return Result.Failure<AuthTokens>(InvalidCredentials);
 
@@ -96,6 +106,11 @@ public sealed class AuthService(
             user = await userManager.FindByEmailAsync(info.Email);
             if (user is null)
             {
+                // Đăng ký đang khóa ⇒ không tự tạo tài khoản mới qua Google.
+                // (Tài khoản Google đã có từ trước vẫn đăng nhập được.)
+                if (!authFeatures.Value.AllowRegistration)
+                    return Result.Failure<AuthTokens>(RegistrationDisabled);
+
                 user = new AppUser
                 {
                     UserName = info.Email,
@@ -174,7 +189,9 @@ public sealed class AuthService(
     private async Task<Result<AuthTokens>> IssueTokensAsync(AppUser user, CancellationToken ct)
     {
         var roles = await userManager.GetRolesAsync(user);
-        var access = tokenService.CreateAccessToken(user.Id, user.Email!, user.FullName, roles);
+        // Tài khoản chỉ có username (vd học sinh do GV cấp) thì Email có thể null ⇒ dùng UserName.
+        var identity = user.Email ?? user.UserName!;
+        var access = tokenService.CreateAccessToken(user.Id, identity, user.FullName, roles);
 
         var refreshRaw = tokenService.CreateRefreshToken();
         var refreshExpiresAtUtc = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenDays);
@@ -187,13 +204,13 @@ public sealed class AuthService(
         });
         await context.SaveChangesAsync(ct);
 
-        var userDto = new UserDto(user.Id, user.Email!, user.FullName, user.AvatarUrl, [.. roles]);
+        var userDto = new UserDto(user.Id, identity, user.FullName, user.AvatarUrl, [.. roles]);
         return new AuthTokens(access.Token, access.ExpiresAtUtc, refreshRaw, refreshExpiresAtUtc, userDto);
     }
 
     private async Task<UserDto> ToUserDtoAsync(AppUser user)
     {
         var roles = await userManager.GetRolesAsync(user);
-        return new UserDto(user.Id, user.Email!, user.FullName, user.AvatarUrl, [.. roles]);
+        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.AvatarUrl, [.. roles]);
     }
 }

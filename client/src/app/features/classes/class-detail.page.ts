@@ -66,22 +66,25 @@ import { PageHeader } from '../../shared/page-header';
       <nz-row [nzGutter]="[16, 16]" class="mt">
         <nz-col [nzXs]="24" [nzLg]="14">
           <nz-card nzTitle="Danh sách học viên">
-            @if (auth.isAdmin()) {
-              <div class="enroll-row">
+            <div class="enroll-row">
+              <button nz-button nzType="primary" (click)="openCreateStudent()">
+                <nz-icon nzType="user-add" /> Tạo học sinh
+              </button>
+              @if (auth.isAdmin()) {
                 <nz-select class="enroll-select" nzShowSearch nzPlaceHolder="Chọn học viên để thêm"
                   [(ngModel)]="enrollStudentId">
                   @for (s of enrollableStudents(); track s.id) {
                     <nz-option [nzValue]="s.id" [nzLabel]="s.fullName" />
                   }
                 </nz-select>
-                <button nz-button nzType="primary" [disabled]="!enrollStudentId" (click)="enroll()">Thêm vào lớp</button>
-              </div>
-            }
+                <button nz-button [disabled]="!enrollStudentId" (click)="enroll()">Thêm vào lớp</button>
+              }
+            </div>
             <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '620px' }">
               <thead><tr>
                 <th nzLeft>Họ tên</th><th>SĐT phụ huynh</th>
                 <th>Điểm thưởng</th><th>Chuyên cần</th><th>BTVN</th>
-                @if (auth.isAdmin()) {<th nzRight></th>}
+                <th nzRight>Thao tác</th>
               </tr></thead>
               <tbody>
                 @for (r of rt.data; track r.studentId) {
@@ -95,12 +98,19 @@ import { PageHeader } from '../../shared/page-header';
                     </td>
                     <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
                     <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
-                    @if (auth.isAdmin()) {
-                      <td nzRight>
+                    <td nzRight>
+                      @if (r.userId) {
+                        <button nz-button nzType="link" nzSize="small" (click)="openResetPassword(r)">
+                          <nz-icon nzType="key" /> Đổi MK
+                        </button>
+                      } @else {
+                        <span class="muted no-acc">Chưa có TK</span>
+                      }
+                      @if (auth.isAdmin()) {
                         <button nz-button nzType="link" nzSize="small" nzDanger
                                 nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
-                      </td>
-                    }
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -259,6 +269,56 @@ import { PageHeader } from '../../shared/page-header';
       </ng-container>
     </nz-modal>
 
+    <!-- Tạo học sinh (+ tài khoản) -->
+    <nz-modal [nzVisible]="studentOpen()" nzTitle="Tạo học sinh trong lớp" [nzOkLoading]="studentBusy()"
+      nzOkText="Tạo" (nzOnOk)="createStudent()" (nzOnCancel)="studentOpen.set(false)">
+      <ng-container *nzModalContent>
+        <form nz-form nzLayout="vertical">
+          <nz-form-item><nz-form-label nzRequired>Họ tên học sinh</nz-form-label>
+            <nz-form-control><input nz-input [(ngModel)]="sFullName" name="sn" /></nz-form-control></nz-form-item>
+          <div nz-row [nzGutter]="12">
+            <div nz-col [nzSpan]="12">
+              <nz-form-item><nz-form-label>Phụ huynh</nz-form-label>
+                <nz-form-control><input nz-input [(ngModel)]="sParentName" name="spn" /></nz-form-control></nz-form-item>
+            </div>
+            <div nz-col [nzSpan]="12">
+              <nz-form-item><nz-form-label>SĐT phụ huynh</nz-form-label>
+                <nz-form-control><input nz-input [(ngModel)]="sParentPhone" name="spp" /></nz-form-control></nz-form-item>
+            </div>
+          </div>
+          <nz-form-item>
+            <label nz-checkbox [(ngModel)]="sCreateAccount" name="sca">Tạo tài khoản đăng nhập cho học sinh</label>
+          </nz-form-item>
+          @if (sCreateAccount) {
+            <div nz-row [nzGutter]="12">
+              <div nz-col [nzSpan]="12">
+                <nz-form-item><nz-form-label nzRequired>Tên đăng nhập</nz-form-label>
+                  <nz-form-control><input nz-input [(ngModel)]="sUserName" name="su" placeholder="vd: hs_an" autocomplete="off" /></nz-form-control></nz-form-item>
+              </div>
+              <div nz-col [nzSpan]="12">
+                <nz-form-item><nz-form-label nzRequired>Mật khẩu</nz-form-label>
+                  <nz-form-control><input nz-input [(ngModel)]="sPassword" name="sp" type="text" placeholder="tối thiểu 8 ký tự" autocomplete="new-password" /></nz-form-control></nz-form-item>
+              </div>
+            </div>
+          }
+        </form>
+      </ng-container>
+    </nz-modal>
+
+    <!-- Đổi mật khẩu học sinh -->
+    <nz-modal [nzVisible]="resetOpen()" [nzTitle]="'Đổi mật khẩu: ' + (resetTarget()?.fullName || '')"
+      [nzOkLoading]="resetBusy()" nzOkText="Đổi mật khẩu" (nzOnOk)="resetPassword()" (nzOnCancel)="resetOpen.set(false)">
+      <ng-container *nzModalContent>
+        <form nz-form nzLayout="vertical">
+          <nz-form-item><nz-form-label nzRequired>Mật khẩu mới</nz-form-label>
+            <nz-form-control>
+              <input nz-input [(ngModel)]="newPassword" name="np" type="text" placeholder="tối thiểu 8 ký tự" autocomplete="new-password" />
+            </nz-form-control></nz-form-item>
+          <p class="muted">Cung cấp mật khẩu mới này cho học sinh để đăng nhập.</p>
+        </form>
+      </ng-container>
+    </nz-modal>
+
     <!-- Tạo buổi học -->
     <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo buổi học" [nzOkLoading]="busy()" (nzOnOk)="createSession()" (nzOnCancel)="createOpen.set(false)">
       <ng-container *nzModalContent>
@@ -295,6 +355,7 @@ import { PageHeader } from '../../shared/page-header';
     .muted { color: var(--hs-text-muted); }
     .imp-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
     .imp-actions { margin-top: 12px; text-align: right; }
+    .no-acc { font-size: 12px; }
   `
 })
 export class ClassDetailPage implements OnInit {
@@ -347,6 +408,22 @@ export class ClassDetailPage implements OnInit {
   protected readonly importResult = signal<StudentImportResult | null>(null);
   protected createAccounts = false;
   private importFile: File | null = null;
+
+  // Tạo học sinh (+ tài khoản) trong lớp
+  protected readonly studentOpen = signal(false);
+  protected readonly studentBusy = signal(false);
+  protected sFullName = '';
+  protected sParentName = '';
+  protected sParentPhone = '';
+  protected sCreateAccount = false;
+  protected sUserName = '';
+  protected sPassword = '';
+
+  // Đổi mật khẩu học sinh
+  protected readonly resetOpen = signal(false);
+  protected readonly resetBusy = signal(false);
+  protected readonly resetTarget = signal<RosterItem | null>(null);
+  protected newPassword = '';
 
   protected readonly enrollableStudents = computed(() => {
     const enrolled = new Set(this.roster().map(r => r.studentId));
@@ -497,6 +574,62 @@ export class ClassDetailPage implements OnInit {
     const id = this.id();
     this.classesService.getRoster(id).subscribe(r => this.roster.set(r));
     this.classesService.getOverview(id).subscribe(o => this.overview.set(o));
+  }
+
+  // ---- Tạo học sinh + tài khoản ----
+  protected openCreateStudent(): void {
+    this.sFullName = '';
+    this.sParentName = '';
+    this.sParentPhone = '';
+    this.sCreateAccount = false;
+    this.sUserName = '';
+    this.sPassword = '';
+    this.studentOpen.set(true);
+  }
+
+  protected createStudent(): void {
+    if (!this.sFullName.trim()) { this.message.warning('Nhập họ tên học sinh.'); return; }
+    if (this.sCreateAccount) {
+      if (!this.sUserName.trim()) { this.message.warning('Nhập tên đăng nhập.'); return; }
+      if (!this.sPassword) { this.message.warning('Nhập mật khẩu.'); return; }
+    }
+    this.studentBusy.set(true);
+    this.classesService.createStudent(this.id(), {
+      fullName: this.sFullName.trim(),
+      parentName: this.sParentName.trim() || null,
+      parentPhone: this.sParentPhone.trim() || null,
+      createAccount: this.sCreateAccount,
+      userName: this.sCreateAccount ? this.sUserName.trim() : null,
+      password: this.sCreateAccount ? this.sPassword : null
+    }).subscribe({
+      next: res => {
+        this.studentBusy.set(false);
+        this.studentOpen.set(false);
+        this.message.success(res.accountCreated
+          ? `Đã tạo học sinh + tài khoản "${res.userName}".`
+          : 'Đã tạo học sinh.');
+        this.reloadPublic();
+      },
+      error: (e: HttpErrorResponse) => { this.studentBusy.set(false); this.message.error(e.error?.detail ?? 'Tạo học sinh thất bại.'); }
+    });
+  }
+
+  // ---- Đổi mật khẩu học sinh ----
+  protected openResetPassword(r: RosterItem): void {
+    this.resetTarget.set(r);
+    this.newPassword = '';
+    this.resetOpen.set(true);
+  }
+
+  protected resetPassword(): void {
+    const r = this.resetTarget();
+    if (!r) return;
+    if (!this.newPassword) { this.message.warning('Nhập mật khẩu mới.'); return; }
+    this.resetBusy.set(true);
+    this.studentsService.resetPassword(r.studentId, this.newPassword).subscribe({
+      next: () => { this.resetBusy.set(false); this.resetOpen.set(false); this.message.success('Đã đổi mật khẩu học sinh.'); },
+      error: (e: HttpErrorResponse) => { this.resetBusy.set(false); this.message.error(e.error?.detail ?? 'Đổi mật khẩu thất bại.'); }
+    });
   }
 
   protected enroll(): void {

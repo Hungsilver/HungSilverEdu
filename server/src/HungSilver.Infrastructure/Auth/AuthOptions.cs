@@ -18,15 +18,22 @@ public sealed class GoogleOptions
     public string ClientId { get; set; } = string.Empty;
 }
 
+/// <summary>Cờ bật/tắt tính năng xác thực. Mặc định KHÓA đăng ký — chỉ Admin tạo tài khoản.</summary>
+public sealed class AuthFeatureOptions
+{
+    public const string SectionName = "Auth";
+
+    /// <summary>Cho phép tự đăng ký (register + Google tự tạo tài khoản). Mặc định false.</summary>
+    public bool AllowRegistration { get; set; }
+}
+
 public sealed class SeedOptions
 {
     public const string SectionName = "Seed";
 
-    public string AdminEmail { get; set; } = "admin@hungsilver.local";
-    public string AdminPassword { get; set; } = "Admin@12345";
-    public string AdminFullName { get; set; } = "System Administrator";
-
-    public string TeacherEmail { get; set; } = "teacher@hungsilver.local";
-    public string TeacherPassword { get; set; } = "Teacher@12345";
-    public string TeacherFullName { get; set; } = "Giáo viên Demo";
+    /// <summary>Tên đăng nhập admin (đăng nhập bằng username, không cần email).</summary>
+    public string AdminUserName { get; set; } = "admin";
+    public string AdminEmail { get; set; } = "admin@gmail.com";
+    public string AdminPassword { get; set; } = "Admin@1a";
+    public string AdminFullName { get; set; } = "Quản trị viên";
 }

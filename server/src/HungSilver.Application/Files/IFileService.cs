@@ -8,7 +8,11 @@ namespace HungSilver.Application.Files;
 /// </summary>
 public interface IFileService
 {
-    Task<Result<StoredFileDto>> UploadAsync(Stream content, string fileName, string contentType, long length, CancellationToken ct = default);
+    /// <param name="enforceStorageMode">
+    /// true (mặc định): chỉ cho upload khi FileStorage.Mode = Server. false: luôn lưu server
+    /// (dùng cho ảnh đại diện — không phụ thuộc cấu hình lưu link ngoài).
+    /// </param>
+    Task<Result<StoredFileDto>> UploadAsync(Stream content, string fileName, string contentType, long length, bool enforceStorageMode = true, CancellationToken ct = default);
 
     Task<Result<StoredFileDownload>> GetForDownloadAsync(Guid id, CancellationToken ct = default);
 }

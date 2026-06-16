@@ -71,6 +71,11 @@ export class AuthService {
     this.currentUser.set(null);
   }
 
+  /** Cập nhật thông tin user hiện tại (vd sau khi đổi ảnh đại diện ở trang cá nhân). */
+  updateCurrentUser(user: UserDto): void {
+    this.currentUser.set(user);
+  }
+
   private setSession(res: AuthResponse): void {
     this.accessToken.set(res.accessToken);
     this.currentUser.set(res.user);
