@@ -42,11 +42,21 @@ export interface ProductRequest {
 
 export interface UserListItem {
   id: string;
+  userName: string;
   email: string;
   fullName: string | null;
   roles: string[];
   isDeleted: boolean;
   createdAtUtc: string;
+}
+
+/** Admin tạo tài khoản Admin/Giáo viên. */
+export interface CreateUserRequest {
+  userName: string;
+  email?: string | null;
+  password: string;
+  fullName?: string | null;
+  role: string;
 }
 
 /** Body lỗi chuẩn ProblemDetails từ backend (Result pattern). */
@@ -263,6 +273,30 @@ export interface RosterItem {
   phone: string | null;
   parentPhone: string | null;
   enrolledOn: string;
+  userId: string | null;
+}
+
+/** Giáo viên tạo học sinh trong lớp (kèm tùy chọn tài khoản đăng nhập). */
+export interface CreateClassStudentRequest {
+  fullName: string;
+  dateOfBirth?: string | null;
+  school?: string | null;
+  gradeLevel?: string | null;
+  phone?: string | null;
+  parentName?: string | null;
+  parentPhone?: string | null;
+  englishLevel?: string | null;
+  learningGoal?: string | null;
+  createAccount: boolean;
+  userName?: string | null;
+  password?: string | null;
+}
+
+export interface CreateClassStudentResult {
+  studentId: string;
+  fullName: string;
+  accountCreated: boolean;
+  userName: string | null;
 }
 
 export interface ClassStudentOverview {

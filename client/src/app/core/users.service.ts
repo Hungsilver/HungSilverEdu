@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { PagedResult, UserListItem } from './models';
+import { CreateUserRequest, PagedResult, UserListItem } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class UsersService {
@@ -13,6 +13,10 @@ export class UsersService {
     let params = new HttpParams().set('page', page).set('pageSize', pageSize);
     if (search) params = params.set('search', search);
     return this.http.get<PagedResult<UserListItem>>(this.apiUrl, { params });
+  }
+
+  create(request: CreateUserRequest): Observable<UserListItem> {
+    return this.http.post<UserListItem>(this.apiUrl, request);
   }
 
   assignRoles(id: string, roles: string[]): Observable<void> {

@@ -3,8 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  ClassDetail, ClassListItem, ClassRequest, ClassStudentOverview, PagedResult, RosterItem,
-  StudentImportPreview, StudentImportResult
+  ClassDetail, ClassListItem, ClassRequest, ClassStudentOverview, CreateClassStudentRequest,
+  CreateClassStudentResult, PagedResult, RosterItem, StudentImportPreview, StudentImportResult
 } from './models';
 
 export interface ClassQuery {
@@ -60,6 +60,11 @@ export class ClassesService {
 
   enroll(id: string, studentId: string): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/${id}/enroll`, { studentId });
+  }
+
+  /** Giáo viên/Admin tạo 1 học sinh trong lớp (kèm tài khoản đăng nhập nếu chọn). */
+  createStudent(id: string, request: CreateClassStudentRequest): Observable<CreateClassStudentResult> {
+    return this.http.post<CreateClassStudentResult>(`${this.apiUrl}/${id}/students`, request);
   }
 
   withdraw(id: string, studentId: string): Observable<void> {

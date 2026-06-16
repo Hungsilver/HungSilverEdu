@@ -57,7 +57,8 @@ public sealed record RosterItemDto(
     string FullName,
     string? Phone,
     string? ParentPhone,
-    DateOnly EnrolledOn);
+    DateOnly EnrolledOn,
+    Guid? UserId);
 
 /// <summary>Tình hình học tập từng học sinh trong lớp (điểm thưởng/phạt, chuyên cần, BTVN).</summary>
 public sealed record ClassStudentOverviewDto(

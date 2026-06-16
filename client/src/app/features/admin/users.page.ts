@@ -3,9 +3,11 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
+import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
@@ -20,12 +22,15 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
-    NzTagModule, NzSelectModule, NzPopconfirmModule, PageHeader
+    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, PageHeader
   ],
   template: `
     <app-page-header title="Quản lý người dùng" subtitle="Tài khoản & phân quyền" icon="team">
       <input nz-input placeholder="Tìm theo email hoặc tên..." class="search"
              [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+      <button nz-button nzType="primary" (click)="openCreate()">
+        <nz-icon nzType="user-add" /> Tạo tài khoản
+      </button>
     </app-page-header>
 
     <nz-table
@@ -40,6 +45,7 @@ import { PageHeader } from '../../shared/page-header';
       [nzScroll]="{ x: '760px' }">
       <thead>
         <tr>
+          <th>Tài khoản</th>
           <th>Email</th>
           <th>Họ tên</th>
           <th>Quyền</th>
@@ -51,7 +57,8 @@ import { PageHeader } from '../../shared/page-header';
       <tbody>
         @for (user of table.data; track user.id) {
           <tr>
-            <td [class.text-deleted]="user.isDeleted">{{ user.email }}</td>
+            <td [class.text-deleted]="user.isDeleted"><strong>{{ user.userName }}</strong></td>
+            <td>{{ user.email }}</td>
             <td>{{ user.fullName }}</td>
             <td>
               <nz-select
@@ -94,6 +101,44 @@ import { PageHeader } from '../../shared/page-header';
         }
       </tbody>
     </nz-table>
+
+    <!-- Tạo tài khoản Admin/Giáo viên -->
+    <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo tài khoản" [nzOkLoading]="createBusy()"
+      nzOkText="Tạo" (nzOnOk)="submitCreate()" (nzOnCancel)="createOpen.set(false)">
+      <ng-container *nzModalContent>
+        <form nz-form nzLayout="vertical">
+          <nz-form-item>
+            <nz-form-label nzRequired>Vai trò</nz-form-label>
+            <nz-form-control>
+              <nz-select [(ngModel)]="cRole" name="role" class="full">
+                <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
+                <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
+              </nz-select>
+            </nz-form-control>
+          </nz-form-item>
+          <nz-form-item>
+            <nz-form-label nzRequired>Tên đăng nhập</nz-form-label>
+            <nz-form-control>
+              <input nz-input [(ngModel)]="cUserName" name="u" placeholder="vd: gv_lan" autocomplete="off" />
+            </nz-form-control>
+          </nz-form-item>
+          <nz-form-item>
+            <nz-form-label>Họ tên</nz-form-label>
+            <nz-form-control><input nz-input [(ngModel)]="cFullName" name="f" /></nz-form-control>
+          </nz-form-item>
+          <nz-form-item>
+            <nz-form-label>Email (tùy chọn)</nz-form-label>
+            <nz-form-control><input nz-input [(ngModel)]="cEmail" name="e" type="email" placeholder="bỏ trống nếu không có" /></nz-form-control>
+          </nz-form-item>
+          <nz-form-item>
+            <nz-form-label nzRequired>Mật khẩu</nz-form-label>
+            <nz-form-control>
+              <input nz-input [(ngModel)]="cPassword" name="p" type="text" placeholder="tối thiểu 8 ký tự" autocomplete="new-password" />
+            </nz-form-control>
+          </nz-form-item>
+        </form>
+      </ng-container>
+    </nz-modal>
   `,
   styles: `
     .search {
@@ -103,6 +148,8 @@ import { PageHeader } from '../../shared/page-header';
     .roles-select {
       min-width: 160px;
     }
+
+    .full { width: 100%; }
   `
 })
 export class UsersPage {
@@ -123,10 +170,54 @@ export class UsersPage {
   protected readonly search = signal('');
   protected readonly loading = signal(false);
 
+  // Tạo tài khoản mới
+  protected readonly createOpen = signal(false);
+  protected readonly createBusy = signal(false);
+  protected cRole = ROLE_TEACHER;
+  protected cUserName = '';
+  protected cFullName = '';
+  protected cEmail = '';
+  protected cPassword = '';
+
   private searchDebounce?: ReturnType<typeof setTimeout>;
 
   constructor() {
     this.load();
+  }
+
+  protected openCreate(): void {
+    this.cRole = ROLE_TEACHER;
+    this.cUserName = '';
+    this.cFullName = '';
+    this.cEmail = '';
+    this.cPassword = '';
+    this.createOpen.set(true);
+  }
+
+  protected submitCreate(): void {
+    if (!this.cUserName.trim()) { this.message.warning('Nhập tên đăng nhập.'); return; }
+    if (!this.cPassword) { this.message.warning('Nhập mật khẩu.'); return; }
+
+    this.createBusy.set(true);
+    this.usersService.create({
+      userName: this.cUserName.trim(),
+      email: this.cEmail.trim() || null,
+      password: this.cPassword,
+      fullName: this.cFullName.trim() || null,
+      role: this.cRole
+    }).subscribe({
+      next: u => {
+        this.createBusy.set(false);
+        this.createOpen.set(false);
+        this.message.success(`Đã tạo tài khoản "${u.userName}".`);
+        this.page.set(1);
+        this.load();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.createBusy.set(false);
+        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Tạo tài khoản thất bại.');
+      }
+    });
   }
 
   protected load(): void {

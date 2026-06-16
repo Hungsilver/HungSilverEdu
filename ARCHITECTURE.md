@@ -97,13 +97,14 @@ E:\MyProject\
 - `Persistence/Repositories/Repository.cs` — hiện thực `IRepository<T>`. `Query(includeDeleted)` chọn có/không `IgnoreQueryFilters()`. `SoftDelete` = `Remove()` (interceptor sẽ đổi thành UPDATE). `ApplySort` build OrderBy động qua reflection theo `sortBy` (fallback `CreatedAtUtc desc`).
 - `Persistence/Interceptors/AuditSaveChangesInterceptor.cs` — **trái tim của audit + soft delete**: `Added→CreatedAtUtc`; `Modified→UpdatedAtUtc`; `Deleted + ISoftDeletable → chuyển state về Modified, set IsDeleted=true, DeletedAtUtc=now`. Đăng ký **Singleton**.
 - `Persistence/UnitOfWork.cs` — wrap `context.SaveChangesAsync`.
-- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`User`) + tài khoản admin (từ `SeedOptions`) + 3 sản phẩm demo. Gọi 1 lần lúc app khởi động.
+- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + **1 tài khoản admin** đăng nhập bằng username (từ `SeedOptions`: `admin`/`admin@gmail.com`/`Admin@1a`) + Settings mặc định (`FileStorage.Mode=Server`). **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
 - `Identity/AppUser.cs` — `IdentityUser<Guid>` + `FullName?, AvatarUrl?` + audit + soft delete.
 - `Identity/AppRole.cs` — `IdentityRole<Guid>`.
 - `Auth/AuthService.cs` — hiện thực `IAuthService` (cần `UserManager`/`SignInManager` nên ở Infrastructure). Xem [§5](#5-luồng-xác-thực-authentication).
 - `Auth/JwtTokenService.cs` — tạo JWT HS256 (claims `sub, email, name, jti, role[]`); refresh token = 64 byte random base64; hash = SHA-256 hex.
 - `Auth/GoogleAuthVerifier.cs` — verify Google ID token qua `Google.Apis.Auth` (`GoogleJsonWebSignature.ValidateAsync`, audience = ClientId). Chưa cấu hình ClientId → trả lỗi `Google.NotConfigured`.
-- `Auth/AuthOptions.cs` — `JwtOptions` (Issuer, Audience, Secret, AccessTokenMinutes=15, RefreshTokenDays=7), `GoogleOptions` (ClientId), `SeedOptions` (AdminEmail/Password/FullName).
+- `Auth/AuthOptions.cs` — `JwtOptions` (Issuer, Audience, Secret, AccessTokenMinutes=15, RefreshTokenDays=7), `GoogleOptions` (ClientId), `AuthFeatureOptions` (`AllowRegistration`, mặc định **false** — khóa đăng ký), `SeedOptions` (AdminUserName/Email/Password/FullName).
+- `Account/ProfileService.cs` — trang cá nhân: upload ảnh đại diện (qua `IFileService`, bỏ qua FileStorage.Mode) + tự đổi mật khẩu. `Students/StudentAccountService.cs` — GV tạo HS + tài khoản trong lớp (guard theo lớp) + đổi mật khẩu HS (guard theo HS).
 - `Services/CurrentUser.cs` — đọc claim từ `IHttpContextAccessor`.
 - `Users/UserAdminService.cs` — quản trị user: list (kèm user đã xóa để khôi phục), gán role, soft delete (kèm thu hồi refresh token), restore. **Guard "admin cuối cùng"** + **không tự xóa chính mình**.
 - `DependencyInjection.cs` — `AddInfrastructure(config)`: Options, `AppDbContext` (Npgsql + interceptor), IdentityCore (password ≥8, unique email, lockout 5 lần/5'), repo/UoW/các service.
@@ -160,16 +161,15 @@ Thứ tự trong `server/src/HungSilver.WebApi/Program.cs`:
 
 ## 6. Phân quyền (Authorization)
 
-- **Roles:** `Admin`, `User` (`AppRoles`). Seed sẵn 2 role + 1 admin.
+- **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role + **1 admin** (đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
 - **Server:**
-  - `[Authorize]` trên `ProductsController` (mọi action cần đăng nhập).
-  - `[Authorize(Policy="AdminOnly")]` trên các action ghi của Product và toàn bộ `UsersController`.
-  - `ProductsController.GetProducts`: `includeDeleted` chỉ có hiệu lực nếu `User.IsInRole(Admin)`.
+  - `[Authorize]` mặc định; `[Authorize(Policy="AdminOnly")]` cho `UsersController` (gồm `POST /api/users` tạo tài khoản); `TeacherOrAdmin` cho lớp/học sinh — thao tác theo phạm vi qua `IClassAccessGuard`.
+  - `ProfileController` (`api/profile`) `[Authorize]` mọi role; `FilesController.Download` `[AllowAnonymous]` (ảnh/tài liệu theo GUID), upload vẫn `TeacherOrAdmin`.
 - **Client (guards `core/guards.ts`):**
   - `authGuard` — chưa đăng nhập → `/login`.
-  - `guestGuard` — đã đăng nhập thì chặn vào lại `/login`,`/register`.
+  - `guestGuard` — đã đăng nhập thì chặn vào lại `/login`. (Route `/register` đã gỡ — đăng ký bị khóa.)
   - `roleGuard` — đọc `route.data.roles`, dùng cho `admin/users` (`{ roles: [ROLE_ADMIN] }`).
-  - Menu "Quản lý người dùng" và nút thao tác Product chỉ hiện khi `auth.isAdmin()`.
+  - `/profile` (trang cá nhân) mở cho mọi role đã đăng nhập; link trong dropdown user ở `shell.ts`.
 
 **Business guard quan trọng** (`UserAdminService`): không gỡ/không xóa **admin cuối cùng** (`EnsureNotLastAdminAsync`); **không tự xóa tài khoản của chính mình** (`CannotDeleteSelf`); xóa user ⇒ **thu hồi mọi refresh token** đang active của user đó.
 
@@ -197,12 +197,14 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 
 | Endpoint | Method | Quyền | Mô tả |
 |---|---|---|---|
-| `/api/auth/register` | POST | Public | Đăng ký → set cookie refresh, trả `{accessToken, accessTokenExpiresAtUtc, user}` |
-| `/api/auth/login` | POST | Public | Đăng nhập (có lockout) |
-| `/api/auth/google` | POST | Public | Đăng nhập Google (body `{idToken}`) |
+| `/api/auth/register` | POST | Public | **Bị khóa** mặc định (`AllowRegistration=false`) → 403; bật lại qua config |
+| `/api/auth/login` | POST | Public | Đăng nhập bằng **username hoặc email** (có lockout) |
+| `/api/auth/google` | POST | Public | Đăng nhập Google; chặn **tự tạo tài khoản mới** khi đăng ký khóa |
 | `/api/auth/refresh` | POST | Cookie | Refresh rotation (đọc cookie `hs_refresh`) |
 | `/api/auth/logout` | POST | Cookie | Thu hồi + xóa cookie → 204 |
 | `/api/auth/me` | GET | User | Thông tin user hiện tại |
+| `/api/profile/avatar` | POST | User | Upload ảnh đại diện (lưu server) → trả `UserDto` |
+| `/api/profile/password` | PUT | User | Tự đổi mật khẩu (`{currentPassword,newPassword}`) |
 | `/api/products` | GET | User | Phân trang/tìm kiếm; `includeDeleted` chỉ Admin |
 | `/api/products/{id}` | GET | User | Chi tiết |
 | `/api/products` | POST | **Admin** | Tạo (check trùng SKU) |
@@ -210,9 +212,12 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `/api/products/{id}` | DELETE | **Admin** | Xóa mềm |
 | `/api/products/{id}/restore` | POST | **Admin** | Khôi phục |
 | `/api/users` | GET | **Admin** | List user (kèm đã xóa), tìm theo email/tên |
+| `/api/users` | POST | **Admin** | Tạo tài khoản Admin/Giáo viên (`CreateUserRequest`) |
 | `/api/users/{id}/roles` | PUT | **Admin** | Gán role (body `{roles:[]}`) |
 | `/api/users/{id}` | DELETE | **Admin** | Xóa mềm (+ thu hồi token) |
 | `/api/users/{id}/restore` | POST | **Admin** | Khôi phục |
+| `/api/classes/{id}/students` | POST | Teacher/Admin | GV tạo HS trong lớp (+ tài khoản nếu chọn) |
+| `/api/students/{id}/password` | PUT | Teacher/Admin | Đổi mật khẩu HS (guard theo lớp) |
 | `/health` | GET | Public | Health check (kèm DbContext) |
 | `/scalar/v1` | GET | Dev only | UI tài liệu API |
 
@@ -394,3 +399,4 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **2026-06-15** — **Fix web Đợt 2 + Đợt 5**: Lịch học — bấm 1 ngày mở drawer liệt kê mọi buổi trong ngày + nút "Tạo buổi học tại ngày" (modal chọn lớp/giờ/chủ đề, dùng `POST /schedule/sessions`). Điểm thưởng/phạt — nút bấm nhanh theo **lý do cấu hình sẵn** trên bảng buổi học (1 chạm = cộng/trừ ngay); lý do lưu ở Settings (`Points.RewardReasons`/`Points.PenaltyReasons`, không cần đổi backend nhờ `GetEffectiveAllAsync` trả mọi key). — `client/src/app/features/{schedule/schedule.page.ts,sessions/session.page.ts,settings/settings.page.ts}`.
 - **2026-06-15** — **Fix web Đợt 1** (xem `docs/ROADMAP-fix-web.md`): menu FE giáo viên thu gọn còn **Lớp học + Học liệu** (route `dashboard/students/schedule/tuition/notifications/warnings` → AdminOnly; `roleGuard` đưa GV về `/classes`); chi tiết lớp hiển thị **tình hình học tập từng HS** (điểm thưởng/phạt + chuyên cần + BTVN) qua endpoint mới `GET /api/classes/{id}/overview` (`ClassStudentOverviewDto`); thêm lối "Đánh giá tháng" trong chi tiết lớp. — `server/.../Classes/*`, `client/src/app/{layout/shell.ts,core/guards.ts,app.routes.ts,features/classes/class-detail.page.ts}`.
 - **2026-06-15** — **Redesign giao diện "Indigo học thuật"** (xem §9): theme ng-zorro qua CSS-variable build + `provideNzConfig`; design system token `--hs-*` (light + **dark mode** lưu localStorage); font Be Vietnam Pro; **sidebar sáng** + brand + nút dark mode; **Login/Register split-screen**; shared `page-header`/`stat-card` áp cho toàn bộ trang; màu chart khớp palette. Build prod + test xanh. — `client/angular.json`, `client/src/index.html`, `client/src/app/{app.config.ts,layout/shell.ts,core/theme.service.ts,shared/*,features/**}`, `client/src/styles.scss`, `ARCHITECTURE.md`.
+- **2026-06-16** — **Chuẩn hóa tài khoản/phân quyền cho vận hành thật** (không migration mới): (1) **Đăng nhập bằng username** — `LoginAsync` tìm `FindByNameAsync` rồi fallback email; bỏ ràng buộc email ở `LoginRequestValidator`; token chịu được Email null (`Email ?? UserName`). (2) **Khóa đăng ký** qua cờ `AuthFeatureOptions.AllowRegistration=false` (section `Auth`) — `RegisterAsync` + Google tự-tạo-tài-khoản trả `Forbidden`; FE bỏ route `/register`, login bỏ link Đăng ký + nút Google. (3) **Admin tạo tài khoản Admin/Giáo viên** — `POST /api/users` (`CreateUserRequest`, AdminOnly) + UI modal trong `admin/users`. (4) **Giáo viên tạo học sinh + tài khoản theo lớp** — `POST /api/classes/{id}/students` (`IStudentAccountService`, TeacherOrAdmin + class guard) + UI trong chi tiết lớp; **đổi mật khẩu HS** `PUT /api/students/{id}/password` (guard `EnsureCanAccessStudentAsync`). (5) **Trang cá nhân** `/profile` — upload **ảnh đại diện** (`POST /api/profile/avatar`, lưu server bỏ qua FileStorage.Mode) + **tự đổi mật khẩu** (`PUT /api/profile/password`); `FilesController.Download` thêm `[AllowAnonymous]` để `<img>`/avatar tải được (id là GUID; upload vẫn cần quyền). (6) **Seed sạch dùng thật** — `DbSeeder` chỉ tạo 1 admin (`admin`/`admin@gmail.com`/`Admin@1a`) + Settings (`FileStorage.Mode=Server`), bỏ toàn bộ demo (GV/Products/lớp/HS). Build BE/FE sạch. — `server/src/**` (`Auth`, `Users`, `Account`, `Students/StudentAccountService`, `Controllers/{Users,Classes,Students,Profile,Files}`, `Persistence/DbSeeder`), `client/src/app/**` (`core/{auth,users,classes,students,profile}.service`, `features/{auth/login,admin/users,classes/class-detail,profile}`, `layout/shell`, `app.routes`), `ARCHITECTURE.md`.

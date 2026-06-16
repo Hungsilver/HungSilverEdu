@@ -10,8 +10,17 @@ namespace HungSilver.WebApi.Controllers;
 [ApiController]
 [Route("api/classes")]
 [Authorize(Policy = "TeacherOrAdmin")]
-public class ClassesController(IClassService classService, IStudentImportService importService) : ControllerBase
+public class ClassesController(
+    IClassService classService,
+    IStudentImportService importService,
+    IStudentAccountService studentAccountService) : ControllerBase
 {
+    /// <summary>Giáo viên/Admin tạo 1 học sinh trong lớp (kèm tài khoản đăng nhập nếu chọn).</summary>
+    [HttpPost("{id:guid}/students")]
+    public async Task<ActionResult<CreateClassStudentResultDto>> CreateStudent(
+        Guid id, CreateClassStudentRequest request, CancellationToken ct) =>
+        (await studentAccountService.CreateInClassAsync(id, request, ct)).ToActionResult();
+
     /// <summary>Tải file Excel mẫu để nhập học viên.</summary>
     [HttpGet("import-template")]
     public IActionResult ImportTemplate() =>

@@ -110,6 +110,11 @@ import { ThemeService } from '../core/theme.service';
           </div>
           <nz-dropdown-menu #userMenu="nzDropdownMenu">
             <ul nz-menu>
+              <li nz-menu-item routerLink="/profile">
+                <nz-icon nzType="user" />
+                Trang cá nhân
+              </li>
+              <li nz-menu-divider></li>
               <li nz-menu-item (click)="auth.logout()">
                 <nz-icon nzType="logout" />
                 Đăng xuất

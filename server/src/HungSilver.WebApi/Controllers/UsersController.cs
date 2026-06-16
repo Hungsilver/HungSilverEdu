@@ -15,6 +15,11 @@ public class UsersController(IUserAdminService userAdminService) : ControllerBas
     public async Task<ActionResult<PagedResult<UserListItemDto>>> GetUsers([FromQuery] PagedRequest request, CancellationToken ct) =>
         (await userAdminService.GetUsersAsync(request, ct)).ToActionResult();
 
+    /// <summary>Admin tạo tài khoản Admin/Giáo viên.</summary>
+    [HttpPost]
+    public async Task<ActionResult<UserListItemDto>> Create(CreateUserRequest request, CancellationToken ct) =>
+        (await userAdminService.CreateUserAsync(request, ct)).ToActionResult();
+
     [HttpPut("{id:guid}/roles")]
     public async Task<ActionResult> AssignRoles(Guid id, AssignRolesRequest request, CancellationToken ct) =>
         (await userAdminService.AssignRolesAsync(id, request, ct)).ToActionResult();

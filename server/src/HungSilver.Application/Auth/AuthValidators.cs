@@ -21,7 +21,9 @@ public sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
 {
     public LoginRequestValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        // Field Email mang ý nghĩa "tài khoản hoặc email" — không ép định dạng email
+        // để đăng nhập được bằng username (vd "admin", tài khoản học sinh do GV cấp).
+        RuleFor(x => x.Email).NotEmpty().WithMessage("Vui lòng nhập tài khoản.");
         RuleFor(x => x.Password).NotEmpty();
     }
 }

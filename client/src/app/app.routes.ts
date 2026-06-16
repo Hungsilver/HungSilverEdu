@@ -11,11 +11,7 @@ export const routes: Routes = [
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login.page').then(m => m.LoginPage)
   },
-  {
-    path: 'register',
-    canActivate: [guestGuard],
-    loadComponent: () => import('./features/auth/register.page').then(m => m.RegisterPage)
-  },
+  // Đăng ký đang tạm khóa — chỉ Admin tạo tài khoản. Giữ file register.page để bật lại sau.
   {
     path: '',
     canActivate: [authGuard],
@@ -23,6 +19,10 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
 
+      {
+        path: 'profile',
+        loadComponent: () => import('./features/profile/profile.page').then(m => m.ProfilePage)
+      },
       {
         path: 'dashboard',
         canActivate: [roleGuard],
