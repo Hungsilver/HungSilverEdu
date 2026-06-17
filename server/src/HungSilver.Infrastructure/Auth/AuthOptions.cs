@@ -26,14 +26,3 @@ public sealed class AuthFeatureOptions
     /// <summary>Cho phép tự đăng ký (register + Google tự tạo tài khoản). Mặc định false.</summary>
     public bool AllowRegistration { get; set; }
 }
-
-public sealed class SeedOptions
-{
-    public const string SectionName = "Seed";
-
-    /// <summary>Tên đăng nhập admin (đăng nhập bằng username, không cần email).</summary>
-    public string AdminUserName { get; set; } = "admin";
-    public string AdminEmail { get; set; } = "admin@gmail.com";
-    public string AdminPassword { get; set; } = "Admin@a1";
-    public string AdminFullName { get; set; } = "Quản trị viên";
-}

@@ -26,8 +26,6 @@ services:
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=hungsilver;Username=hungsilver;Password=${POSTGRES_PASSWORD}
       Jwt__Secret: ${JWT_SECRET:?Thiếu JWT_SECRET trong .env (tối thiểu 32 ký tự)}
       Google__ClientId: ${GOOGLE_CLIENT_ID:-}
-      Seed__AdminEmail: ${ADMIN_EMAIL:-admin@hungsilver.local}
-      Seed__AdminPassword: ${ADMIN_PASSWORD:-Admin@12345}
     depends_on:
       postgres:
         condition: service_healthy
