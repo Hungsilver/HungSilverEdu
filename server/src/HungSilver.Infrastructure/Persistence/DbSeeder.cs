@@ -14,8 +14,8 @@ public static class DbSeeder
 {
     /// <summary>
     /// Áp migrations + seed dữ liệu tối thiểu để vận hành thật: roles (Admin/Teacher/User)
-    /// và cấu hình hệ thống mặc định. KHÔNG tự tạo tài khoản admin (tạo thủ công bằng SQL —
-    /// xem <c>server/scripts/create-admin.sql</c>) và KHÔNG seed dữ liệu demo. Gọi khi app khởi động.
+    /// và cấu hình hệ thống mặc định. <b>TẠM THỜI</b> seed lại 1 tài khoản admin khi khởi chạy đầu
+    /// (bootstrap — sẽ gỡ ở commit kế). KHÔNG seed dữ liệu demo. Gọi khi app khởi động.
     /// </summary>
     public static async Task MigrateAndSeedAsync(IServiceProvider serviceProvider)
     {
@@ -33,6 +33,32 @@ public static class DbSeeder
             {
                 await roleManager.CreateAsync(new AppRole(roleName));
                 logger.LogInformation("Seeded role {Role}", roleName);
+            }
+        }
+
+        // ⚠️ TẠM THỜI — seed tài khoản admin lần đầu (bootstrap). XÓA KHỐI NÀY Ở COMMIT KẾ TIẾP
+        // sau khi admin đã được tạo. Idempotent: chỉ tạo nếu 'admin' chưa tồn tại.
+        // Đổi mật khẩu ngay sau lần đăng nhập đầu (trang Cá nhân).
+        var userManager = services.GetRequiredService<UserManager<AppUser>>();
+        if (await userManager.FindByNameAsync("admin") is null)
+        {
+            var admin = new AppUser
+            {
+                UserName = "admin",
+                Email = "admin@gmail.com",
+                EmailConfirmed = true,
+                FullName = "Quản trị viên"
+            };
+            var created = await userManager.CreateAsync(admin, "Admin@a1");
+            if (created.Succeeded)
+            {
+                await userManager.AddToRoleAsync(admin, AppRoles.Admin);
+                logger.LogInformation("Seeded admin account (TẠM THỜI - bootstrap)");
+            }
+            else
+            {
+                logger.LogError("Seed admin failed: {Errors}",
+                    string.Join(" | ", created.Errors.Select(e => e.Description)));
             }
         }
 
