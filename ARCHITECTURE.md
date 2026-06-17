@@ -97,13 +97,13 @@ E:\MyProject\
 - `Persistence/Repositories/Repository.cs` — hiện thực `IRepository<T>`. `Query(includeDeleted)` chọn có/không `IgnoreQueryFilters()`. `SoftDelete` = `Remove()` (interceptor sẽ đổi thành UPDATE). `ApplySort` build OrderBy động qua reflection theo `sortBy` (fallback `CreatedAtUtc desc`).
 - `Persistence/Interceptors/AuditSaveChangesInterceptor.cs` — **trái tim của audit + soft delete**: `Added→CreatedAtUtc`; `Modified→UpdatedAtUtc`; `Deleted + ISoftDeletable → chuyển state về Modified, set IsDeleted=true, DeletedAtUtc=now`. Đăng ký **Singleton**.
 - `Persistence/UnitOfWork.cs` — wrap `context.SaveChangesAsync`.
-- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + **1 tài khoản admin** đăng nhập bằng username (từ `SeedOptions`: `admin`/`admin@gmail.com`/`Admin@a1`) + Settings mặc định (`FileStorage.Mode=Server`). **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
+- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + Settings mặc định (`FileStorage.Mode=Server`). **KHÔNG tự tạo tài khoản admin** — tạo thủ công bằng SQL (`server/scripts/create-admin.sql`). **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
 - `Identity/AppUser.cs` — `IdentityUser<Guid>` + `FullName?, AvatarUrl?` + audit + soft delete.
 - `Identity/AppRole.cs` — `IdentityRole<Guid>`.
 - `Auth/AuthService.cs` — hiện thực `IAuthService` (cần `UserManager`/`SignInManager` nên ở Infrastructure). Xem [§5](#5-luồng-xác-thực-authentication).
 - `Auth/JwtTokenService.cs` — tạo JWT HS256 (claims `sub, email, name, jti, role[]`); refresh token = 64 byte random base64; hash = SHA-256 hex.
 - `Auth/GoogleAuthVerifier.cs` — verify Google ID token qua `Google.Apis.Auth` (`GoogleJsonWebSignature.ValidateAsync`, audience = ClientId). Chưa cấu hình ClientId → trả lỗi `Google.NotConfigured`.
-- `Auth/AuthOptions.cs` — `JwtOptions` (Issuer, Audience, Secret, AccessTokenMinutes=15, RefreshTokenDays=7), `GoogleOptions` (ClientId), `AuthFeatureOptions` (`AllowRegistration`, mặc định **false** — khóa đăng ký), `SeedOptions` (AdminUserName/Email/Password/FullName).
+- `Auth/AuthOptions.cs` — `JwtOptions` (Issuer, Audience, Secret, AccessTokenMinutes=15, RefreshTokenDays=7), `GoogleOptions` (ClientId), `AuthFeatureOptions` (`AllowRegistration`, mặc định **false** — khóa đăng ký).
 - `Account/ProfileService.cs` — trang cá nhân: upload ảnh đại diện (qua `IFileService`, bỏ qua FileStorage.Mode) + tự đổi mật khẩu. `Students/StudentAccountService.cs` — GV tạo HS + tài khoản trong lớp (guard theo lớp) + đổi mật khẩu HS (guard theo HS).
 - `Services/CurrentUser.cs` — đọc claim từ `IHttpContextAccessor`.
 - `Users/UserAdminService.cs` — quản trị user: list (kèm user đã xóa để khôi phục), gán role, soft delete (kèm thu hồi refresh token), restore. **Guard "admin cuối cùng"** + **không tự xóa chính mình**.
@@ -161,7 +161,7 @@ Thứ tự trong `server/src/HungSilver.WebApi/Program.cs`:
 
 ## 6. Phân quyền (Authorization)
 
-- **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role + **1 admin** (đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
+- **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role; **tài khoản admin tạo thủ công bằng SQL** (`server/scripts/create-admin.sql`, đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
 - **Server:**
   - `[Authorize]` mặc định; `[Authorize(Policy="AdminOnly")]` cho `UsersController` (gồm `POST /api/users` tạo tài khoản); `TeacherOrAdmin` cho lớp/học sinh — thao tác theo phạm vi qua `IClassAccessGuard`.
   - `ProfileController` (`api/profile`) `[Authorize]` mọi role; `FilesController.Download` `[AllowAnonymous]` (ảnh/tài liệu theo GUID), upload vẫn `TeacherOrAdmin`.
@@ -262,7 +262,6 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `Jwt:Secret` | `Jwt__Secret` | `JWT_SECRET` | **Bắt buộc ≥32 ký tự**, app ném nếu thiếu |
 | `Jwt:AccessTokenMinutes` / `RefreshTokenDays` | — | — | 15' / 7 ngày |
 | `Google:ClientId` | `Google__ClientId` | `GOOGLE_CLIENT_ID` | Trống ⇒ ẩn Google Login |
-| `Seed:AdminEmail/Password` | `Seed__Admin*` | `ADMIN_EMAIL/PASSWORD` | Mặc định `admin@hungsilver.local` / `Admin@12345` |
 | `Cors:Origins` | `Cors__Origins__0` | — | Dev: `http://localhost:4200` |
 | — | `HTTP_PORT` | `HTTP_PORT` | cổng public client (nginx), mặc định 80 |
 | — | `GHCR_OWNER`, `IMAGE_TAG` | — | chỉ cho `docker-compose.prod.yml` |
@@ -285,7 +284,7 @@ cd server/src/HungSilver.WebApi ; dotnet run --launch-profile http
 # 3. Frontend → http://localhost:4200 (proxy /api → :5000)
 cd client ; npm start
 ```
-Admin dev mặc định: `admin@hungsilver.local` / `Admin@12345`.
+Tài khoản admin: **tạo thủ công** bằng `server/scripts/create-admin.sql` (mặc định `admin` / `Admin@a1` — đổi ngay sau lần đăng nhập đầu). DbSeeder chỉ seed role + settings, không tạo admin.
 
 **Test:** server `dotnet test server/HungSilver.slnx`; client `npm test -- --watch=false` (Vitest + jsdom).
 
@@ -401,3 +400,4 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **2026-06-15** — **Redesign giao diện "Indigo học thuật"** (xem §9): theme ng-zorro qua CSS-variable build + `provideNzConfig`; design system token `--hs-*` (light + **dark mode** lưu localStorage); font Be Vietnam Pro; **sidebar sáng** + brand + nút dark mode; **Login/Register split-screen**; shared `page-header`/`stat-card` áp cho toàn bộ trang; màu chart khớp palette. Build prod + test xanh. — `client/angular.json`, `client/src/index.html`, `client/src/app/{app.config.ts,layout/shell.ts,core/theme.service.ts,shared/*,features/**}`, `client/src/styles.scss`, `ARCHITECTURE.md`.
 - **2026-06-16** — **Chuẩn hóa tài khoản/phân quyền cho vận hành thật** (không migration mới): (1) **Đăng nhập bằng username** — `LoginAsync` tìm `FindByNameAsync` rồi fallback email; bỏ ràng buộc email ở `LoginRequestValidator`; token chịu được Email null (`Email ?? UserName`). (2) **Khóa đăng ký** qua cờ `AuthFeatureOptions.AllowRegistration=false` (section `Auth`) — `RegisterAsync` + Google tự-tạo-tài-khoản trả `Forbidden`; FE bỏ route `/register`, login bỏ link Đăng ký + nút Google. (3) **Admin tạo tài khoản Admin/Giáo viên** — `POST /api/users` (`CreateUserRequest`, AdminOnly) + UI modal trong `admin/users`. (4) **Giáo viên tạo học sinh + tài khoản theo lớp** — `POST /api/classes/{id}/students` (`IStudentAccountService`, TeacherOrAdmin + class guard) + UI trong chi tiết lớp; **đổi mật khẩu HS** `PUT /api/students/{id}/password` (guard `EnsureCanAccessStudentAsync`). (5) **Trang cá nhân** `/profile` — upload **ảnh đại diện** (`POST /api/profile/avatar`, lưu server bỏ qua FileStorage.Mode) + **tự đổi mật khẩu** (`PUT /api/profile/password`); `FilesController.Download` thêm `[AllowAnonymous]` để `<img>`/avatar tải được (id là GUID; upload vẫn cần quyền). (6) **Seed sạch dùng thật** — `DbSeeder` chỉ tạo 1 admin (`admin`/`admin@gmail.com`/`Admin@1a`) + Settings (`FileStorage.Mode=Server`), bỏ toàn bộ demo (GV/Products/lớp/HS). Build BE/FE sạch. — `server/src/**` (`Auth`, `Users`, `Account`, `Students/StudentAccountService`, `Controllers/{Users,Classes,Students,Profile,Files}`, `Persistence/DbSeeder`), `client/src/app/**` (`core/{auth,users,classes,students,profile}.service`, `features/{auth/login,admin/users,classes/class-detail,profile}`, `layout/shell`, `app.routes`), `ARCHITECTURE.md`.
 - **2026-06-17** — Đổi **mật khẩu admin mặc định** khi seed: `Admin@1a` → `Admin@a1` (chỉ áp dụng cho DB seed mới; DB đã có admin thì seeder không ghi đè — phải reset thủ công). — `server/src/HungSilver.WebApi/appsettings.json`, `server/src/HungSilver.Infrastructure/Auth/AuthOptions.cs`, `ARCHITECTURE.md`.
+- **2026-06-17** — **Bỏ tự tạo tài khoản admin khi khởi động.** `DbSeeder` chỉ còn seed role + settings; admin tạo **thủ công bằng SQL** (`server/scripts/create-admin.sql` — idempotent, hash PBKDF2 của `Admin@a1`). Gỡ `SeedOptions` (class + đăng ký DI + section `Seed` trong appsettings) và biến `Seed__Admin*`/`ADMIN_*` rác trong `docker-compose*.yml` + `.env.example`. Build BE sạch. — `server/src/HungSilver.Infrastructure/{Persistence/DbSeeder,Auth/AuthOptions,DependencyInjection}.cs`, `server/src/HungSilver.WebApi/appsettings.json`, `server/scripts/create-admin.sql`, `docker-compose.yml`, `docker-compose.prod.yml`, `.env.example`, `ARCHITECTURE.md`.
