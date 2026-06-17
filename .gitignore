@@ -19,3 +19,6 @@ dist/
 # Claude Code agent tooling (local)
 .agents/
 skills-lock.json
+
+# SQL tạo tài khoản admin (chạy tay trên VPS) — không commit để tránh lộ mật khẩu
+server/scripts/create-admin.sql
