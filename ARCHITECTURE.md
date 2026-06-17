@@ -97,7 +97,7 @@ E:\MyProject\
 - `Persistence/Repositories/Repository.cs` — hiện thực `IRepository<T>`. `Query(includeDeleted)` chọn có/không `IgnoreQueryFilters()`. `SoftDelete` = `Remove()` (interceptor sẽ đổi thành UPDATE). `ApplySort` build OrderBy động qua reflection theo `sortBy` (fallback `CreatedAtUtc desc`).
 - `Persistence/Interceptors/AuditSaveChangesInterceptor.cs` — **trái tim của audit + soft delete**: `Added→CreatedAtUtc`; `Modified→UpdatedAtUtc`; `Deleted + ISoftDeletable → chuyển state về Modified, set IsDeleted=true, DeletedAtUtc=now`. Đăng ký **Singleton**.
 - `Persistence/UnitOfWork.cs` — wrap `context.SaveChangesAsync`.
-- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + Settings mặc định (`FileStorage.Mode=Server`). **TẠM THỜI tự seed lại 1 admin khi khởi chạy đầu** (`admin`/`Admin@a1`, hardcode, idempotent — bootstrap, **sẽ gỡ ở commit kế**). Bình thường admin tạo thủ công bằng SQL (`server/scripts/create-admin.sql`, file local gitignored). **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
+- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + Settings mặc định (`FileStorage.Mode=Server`). **KHÔNG tự tạo tài khoản admin** — tạo thủ công khi cần. **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
 - `Identity/AppUser.cs` — `IdentityUser<Guid>` + `FullName?, AvatarUrl?` + audit + soft delete.
 - `Identity/AppRole.cs` — `IdentityRole<Guid>`.
 - `Auth/AuthService.cs` — hiện thực `IAuthService` (cần `UserManager`/`SignInManager` nên ở Infrastructure). Xem [§5](#5-luồng-xác-thực-authentication).
@@ -161,7 +161,7 @@ Thứ tự trong `server/src/HungSilver.WebApi/Program.cs`:
 
 ## 6. Phân quyền (Authorization)
 
-- **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role; **tài khoản admin tạo thủ công bằng SQL** (`server/scripts/create-admin.sql`, đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
+- **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role; **tài khoản admin tạo thủ công** (đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
 - **Server:**
   - `[Authorize]` mặc định; `[Authorize(Policy="AdminOnly")]` cho `UsersController` (gồm `POST /api/users` tạo tài khoản); `TeacherOrAdmin` cho lớp/học sinh — thao tác theo phạm vi qua `IClassAccessGuard`.
   - `ProfileController` (`api/profile`) `[Authorize]` mọi role; `FilesController.Download` `[AllowAnonymous]` (ảnh/tài liệu theo GUID), upload vẫn `TeacherOrAdmin`.
@@ -284,7 +284,7 @@ cd server/src/HungSilver.WebApi ; dotnet run --launch-profile http
 # 3. Frontend → http://localhost:4200 (proxy /api → :5000)
 cd client ; npm start
 ```
-Tài khoản admin: **tạo thủ công** bằng `server/scripts/create-admin.sql` (mặc định `admin` / `Admin@a1` — đổi ngay sau lần đăng nhập đầu). File này **gitignored** (không commit để tránh lộ tài khoản) ⇒ chỉ có trên máy/VPS. DbSeeder chỉ seed role + settings, không tạo admin. **Xóa sạch DB**: `server/scripts/reset-db.sql` (`DROP SCHEMA public CASCADE` → khởi động lại API để migrate + seed lại).
+Tài khoản admin: **tạo thủ công** khi cần (mặc định `admin` / `Admin@a1` — đổi ngay sau lần đăng nhập đầu). DbSeeder chỉ seed role + settings, không tạo admin.
 
 **Test:** server `dotnet test server/HungSilver.slnx`; client `npm test -- --watch=false` (Vitest + jsdom).
 
@@ -403,3 +403,4 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **2026-06-17** — **Bỏ tự tạo tài khoản admin khi khởi động.** `DbSeeder` chỉ còn seed role + settings; admin tạo **thủ công bằng SQL** (`server/scripts/create-admin.sql` — idempotent, hash PBKDF2 của `Admin@a1`). Gỡ `SeedOptions` (class + đăng ký DI + section `Seed` trong appsettings) và biến `Seed__Admin*`/`ADMIN_*` rác trong `docker-compose*.yml` + `.env.example`. Build BE sạch. — `server/src/HungSilver.Infrastructure/{Persistence/DbSeeder,Auth/AuthOptions,DependencyInjection}.cs`, `server/src/HungSilver.WebApi/appsettings.json`, `server/scripts/create-admin.sql`, `docker-compose.yml`, `docker-compose.prod.yml`, `.env.example`, `ARCHITECTURE.md`.
 - **2026-06-17** — **Gỡ `create-admin.sql` khỏi git** (`git rm --cached` + `.gitignore`) để không lộ tài khoản admin trên repo — file giữ local, chạy tay trên VPS. Thêm `server/scripts/reset-db.sql` (xóa sạch DB: `DROP SCHEMA public CASCADE`). Lịch sử cũ giữ nguyên (không force-push) ⇒ đổi mật khẩu admin sau lần đăng nhập đầu. — `.gitignore`, `server/scripts/reset-db.sql`, `ARCHITECTURE.md`.
 - **2026-06-17** — **(TẠM THỜI) seed lại admin khi khởi chạy đầu** để bootstrap sau khi wipe DB: `DbSeeder` tạo `admin`/`Admin@a1` (hardcode, chỉ khi chưa có). **Sẽ gỡ ở commit kế** sau khi đã tạo xong; nhớ đổi mật khẩu sau đăng nhập đầu. — `server/src/HungSilver.Infrastructure/Persistence/DbSeeder.cs`, `ARCHITECTURE.md`.
+- **2026-06-17** — **Dọn dẹp sau bootstrap**: gỡ khối seed admin tạm trong `DbSeeder` (về lại chỉ seed role + settings); xóa script SQL dư thừa `server/scripts/reset-db.sql` + gỡ mục `.gitignore`/ghi chú `.env.example` trỏ tới `create-admin.sql`. Admin đã tạo xong từ bước bootstrap; tạo lại thủ công khi cần. — `server/src/HungSilver.Infrastructure/Persistence/DbSeeder.cs`, `.gitignore`, `.env.example`, `ARCHITECTURE.md`.
