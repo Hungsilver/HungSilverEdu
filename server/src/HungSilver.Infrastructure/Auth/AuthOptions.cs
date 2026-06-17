@@ -34,6 +34,6 @@ public sealed class SeedOptions
     /// <summary>Tên đăng nhập admin (đăng nhập bằng username, không cần email).</summary>
     public string AdminUserName { get; set; } = "admin";
     public string AdminEmail { get; set; } = "admin@gmail.com";
-    public string AdminPassword { get; set; } = "Admin@1a";
+    public string AdminPassword { get; set; } = "Admin@a1";
     public string AdminFullName { get; set; } = "Quản trị viên";
 }
