@@ -693,3 +693,75 @@ body.theme-dark {
 .mt-24 {
   margin-top: 24px;
 }
+
+/* ============================================================================
+   Mobile card-list — thay thế nz-table trên màn hình < 768px
+   ========================================================================== */
+.mobile-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .ant-card {
+    margin: 0;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .card-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--hs-heading);
+  }
+
+  .card-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--hs-border);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      color: var(--hs-text-muted);
+      flex-shrink: 0;
+      margin-right: 8px;
+    }
+  }
+
+  .card-field-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--hs-border);
+
+    .label {
+      color: var(--hs-text-muted);
+      font-size: 12px;
+    }
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+.mobile-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
