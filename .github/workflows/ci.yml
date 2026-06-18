@@ -1,9 +1,10 @@
 name: CI
 
 on:
-  push:
-    branches: [dev, master]
-  pull_request:
+  # --- TẠM TẮT auto-run để tránh mail thông báo; build/test tay khi cần ---
+  # push:
+  #   branches: [dev, master]
+  # pull_request:
   workflow_dispatch:
 
 # Hủy run cũ khi có push mới trên cùng nhánh/PR

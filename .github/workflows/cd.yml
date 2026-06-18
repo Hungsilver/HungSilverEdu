@@ -1,8 +1,9 @@
 name: CD
 
 on:
-  push:
-    branches: [master]
+  # --- TẠM TẮT auto-deploy để tránh mail thông báo; bấm chạy tay khi cần deploy ---
+  # push:
+  #   branches: [master]
   workflow_dispatch:
 
 # Không deploy chồng nhau
