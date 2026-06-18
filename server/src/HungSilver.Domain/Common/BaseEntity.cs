@@ -7,9 +7,9 @@ public abstract class BaseEntity : IAuditable, ISoftDeletable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public DateTime CreatedAtUtc { get; set; }
-    public DateTime? UpdatedAtUtc { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 
     public bool IsDeleted { get; set; }
-    public DateTime? DeletedAtUtc { get; set; }
+    public DateTime? DeletedAt { get; set; }
 }

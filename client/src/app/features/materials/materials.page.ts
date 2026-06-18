@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
@@ -20,9 +21,10 @@ import { ClassesService } from '../../core/classes.service';
 import { FilesService } from '../../core/files.service';
 import { MaterialsService } from '../../core/materials.service';
 import {
-  ApiProblem, ClassListItem, CreateMaterialRequest, FileStorageMode, Material, MaterialCategory, MaterialSource,
+  ClassListItem, CreateMaterialRequest, FileStorageMode, Material, MaterialCategory, MaterialSource,
   MaterialType, MATERIAL_TYPE_LABELS
 } from '../../core/models';
+import { ScreenService } from '../../core/screen.service';
 import { SettingsService } from '../../core/settings.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -30,7 +32,7 @@ import { PageHeader } from '../../shared/page-header';
   selector: 'app-materials-page',
   imports: [
     FormsModule, ReactiveFormsModule,
-    NzTableModule, NzButtonModule, NzIconModule, NzTagModule, NzSelectModule, NzRadioModule, NzInputNumberModule,
+    NzTableModule, NzButtonModule, NzCardModule, NzIconModule, NzTagModule, NzSelectModule, NzRadioModule, NzInputNumberModule,
     NzModalModule, NzFormModule, NzInputModule, NzPopconfirmModule, NzUploadModule, PageHeader
   ],
   template: `
@@ -65,25 +67,45 @@ import { PageHeader } from '../../shared/page-header';
     </div>
 
     @if (mode === 'library' || classId) {
-      <nz-table #table [nzData]="materials()" [nzLoading]="loading()" [nzFrontPagination]="false" [nzScroll]="{ x: '640px' }">
-        <thead><tr><th nzLeft>Tiêu đề</th><th>Loại</th><th>Danh mục</th><th>Mô tả</th><th nzRight>Thao tác</th></tr></thead>
-        <tbody>
-          @for (m of table.data; track m.id) {
-            <tr>
-              <td nzLeft>{{ m.title }}</td>
-              <td><nz-tag>{{ typeLabels[m.type] }}</nz-tag></td>
-              <td>{{ m.categoryName || '—' }}</td>
-              <td>{{ m.description || '—' }}</td>
-              <td nzRight>
-                <a nz-button nzType="link" nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
-                <button nz-button nzType="link" nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
-                <button nz-button nzType="link" nzSize="small" nzDanger
-                        nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
-              </td>
-            </tr>
+      @if (screen.isMobile()) {
+        <div class="mobile-card-list">
+          @for (m of materials(); track m.id) {
+            <nz-card>
+              <div class="card-header">
+                <span class="card-title">{{ m.title }}</span>
+                <nz-tag>{{ typeLabels[m.type] }}</nz-tag>
+              </div>
+              <div class="card-field"><span class="label">Danh mục</span><span>{{ m.categoryName || '—' }}</span></div>
+              <div class="card-field"><span class="label">Mô tả</span><span>{{ m.description || '—' }}</span></div>
+              <div class="card-actions">
+                <a nz-button nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
+                <button nz-button nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /> Sửa</button>
+                <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /> Xóa</button>
+              </div>
+            </nz-card>
           }
-        </tbody>
-      </nz-table>
+        </div>
+      } @else {
+        <nz-table #table [nzData]="materials()" [nzLoading]="loading()" [nzFrontPagination]="false" [nzScroll]="{ x: '640px' }">
+          <thead><tr><th nzLeft>Tiêu đề</th><th>Loại</th><th>Danh mục</th><th>Mô tả</th><th nzRight>Thao tác</th></tr></thead>
+          <tbody>
+            @for (m of table.data; track m.id) {
+              <tr>
+                <td nzLeft>{{ m.title }}</td>
+                <td><nz-tag>{{ typeLabels[m.type] }}</nz-tag></td>
+                <td>{{ m.categoryName || '—' }}</td>
+                <td>{{ m.description || '—' }}</td>
+                <td nzRight>
+                  <a nz-button nzType="link" nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
+                  <button nz-button nzType="link" nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
+                  <button nz-button nzType="link" nzSize="small" nzDanger
+                          nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </nz-table>
+      }
     } @else {
       <p class="muted">Chọn một lớp để xem kho tài liệu.</p>
     }
@@ -164,10 +186,18 @@ import { PageHeader } from '../../shared/page-header';
     .cat-form { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
     .cat-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--hs-border); }
     .cat-row .n { flex: 1; }
+    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; }
+    .mobile-card-list nz-card { width: 100%; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .card-title { font-weight: 600; flex: 1; margin-right: 8px; }
+    .card-field { display: flex; gap: 8px; margin-bottom: 4px; }
+    .card-field .label { color: var(--hs-text-muted); min-width: 72px; }
+    .card-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   `
 })
 export class MaterialsPage {
   protected readonly auth = inject(AuthService);
+  protected readonly screen = inject(ScreenService);
   private readonly materialsService = inject(MaterialsService);
   private readonly classesService = inject(ClassesService);
   private readonly filesService = inject(FilesService);
@@ -278,7 +308,7 @@ export class MaterialsPage {
       },
       error: (e: HttpErrorResponse) => {
         item.onError?.(e as never, item.file);
-        this.message.error((e.error as ApiProblem | null)?.detail ?? 'Tải file thất bại.');
+        this.message.error(e.error?.message ?? e.message);
       }
     });
     return new Subscription();
@@ -307,14 +337,14 @@ export class MaterialsPage {
     this.saving.set(true);
     op.subscribe({
       next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success('Đã lưu tài liệu.'); this.loadMaterials(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
     });
   }
 
   protected remove(m: Material): void {
     this.materialsService.delete(m.id).subscribe({
       next: () => { this.message.success('Đã xóa.'); this.loadMaterials(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Xóa thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
 
@@ -348,14 +378,14 @@ export class MaterialsPage {
         this.resetCatForm();
         this.materialsService.getCategories().subscribe(c => this.categories.set(c));
       },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.')
     });
   }
 
   protected removeCat(c: MaterialCategory): void {
     this.materialsService.deleteCategory(c.id).subscribe({
       next: () => { this.message.success('Đã xóa danh mục.'); this.materialsService.getCategories().subscribe(x => this.categories.set(x)); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Xóa thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
 }

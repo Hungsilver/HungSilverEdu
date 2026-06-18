@@ -2,7 +2,7 @@ using HungSilver.Domain.Common.Results;
 
 namespace HungSilver.Application.Reports;
 
-public sealed record ParentReportDto(Guid? Id, int Year, int Month, string Content, DateTime GeneratedAtUtc);
+public sealed record ParentReportDto(Guid? Id, int Year, int Month, string Content, DateTime GeneratedAt);
 
 public interface IParentReportService
 {

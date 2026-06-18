@@ -16,7 +16,7 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
-import { ApiProblem, ROLE_USER, RewardTier, REWARD_TIER_LABELS, SKILLS, Student, StudentProgress, UserListItem } from '../../core/models';
+import { ROLE_USER, RewardTier, REWARD_TIER_LABELS, SKILLS, Student, StudentProgress, UserListItem } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
 import { UsersService } from '../../core/users.service';
 import { Chart } from '../../shared/chart';
@@ -178,7 +178,7 @@ export class StudentDetailPage implements OnInit {
     if (!this.linkUserId) return;
     this.studentsService.linkUser(this.id(), this.linkUserId).subscribe({
       next: () => { this.message.success('Đã liên kết tài khoản.'); this.linkUserId = null; this.reload(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Liên kết thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Liên kết thất bại.')
     });
   }
 
@@ -191,7 +191,7 @@ export class StudentDetailPage implements OnInit {
   protected redeem(tier: RewardTier): void {
     this.studentsService.redeem(this.id(), { tier, note: null }).subscribe({
       next: () => { this.message.success('Đã quy đổi điểm thưởng.'); this.reload(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Quy đổi thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Quy đổi thất bại.')
     });
   }
 
@@ -199,7 +199,7 @@ export class StudentDetailPage implements OnInit {
     this.reportLoading.set(true);
     this.studentsService.generateParentReport(this.id(), this.reportPeriod.getFullYear(), this.reportPeriod.getMonth() + 1).subscribe({
       next: r => { this.reportLoading.set(false); this.reportContent.set(r.content); },
-      error: (err: HttpErrorResponse) => { this.reportLoading.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Tạo báo cáo thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.reportLoading.set(false); this.message.error(err.error?.message ?? err.message ??'Tạo báo cáo thất bại.'); }
     });
   }
 

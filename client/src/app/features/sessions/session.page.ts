@@ -12,11 +12,14 @@ import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import {
-  ApiProblem, AttendanceStatus, AttitudeStatus, ATTITUDE_LABELS, HomeworkStatus, HOMEWORK_LABELS,
+  AttendanceStatus, AttitudeStatus, ATTITUDE_LABELS, HomeworkStatus, HOMEWORK_LABELS,
   PointType, SaveAttendanceRow, SessionSheet, SessionStudentRow
 } from '../../core/models';
+import { ScreenService } from '../../core/screen.service';
 import { SessionsService } from '../../core/sessions.service';
 import { SettingsService } from '../../core/settings.service';
 import { PageHeader } from '../../shared/page-header';
@@ -27,7 +30,7 @@ interface PointReason { label: string; points: number; }
   selector: 'app-session-page',
   imports: [
     FormsModule, RouterLink, DatePipe,
-    NzTableModule, NzRadioModule, NzSelectModule, NzInputModule, NzButtonModule, NzIconModule,
+    NzTableModule, NzCardModule, NzRadioModule, NzSelectModule, NzInputModule, NzButtonModule, NzIconModule,
     NzTagModule, NzModalModule, NzInputNumberModule, PageHeader
   ],
   template: `
@@ -48,66 +51,123 @@ interface PointReason { label: string; points: number; }
         <span class="muted counter">Có mặt: {{ presentCount() }}/{{ rows().length }}</span>
       </div>
 
-      <nz-table [nzData]="rows()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '1240px' }">
-        <thead>
-          <tr>
-            <th nzLeft nzWidth="160px">Học viên</th>
-            <th nzWidth="300px">Điểm danh</th>
-            <th nzWidth="150px">BTVN</th>
-            <th nzWidth="140px">Thái độ</th>
-            <th nzWidth="290px">Điểm thưởng/phạt</th>
-            <th nzWidth="200px">Ghi chú</th>
-          </tr>
-        </thead>
-        <tbody>
+      @if (screen.isMobile()) {
+        <div class="mobile-card-list">
           @for (row of rows(); track row.studentId) {
-            <tr>
-              <td nzLeft><a [routerLink]="['/students', row.studentId]">{{ row.fullName }}</a></td>
-              <td>
-                <nz-radio-group [(ngModel)]="row.attendance" nzButtonStyle="solid" nzSize="small">
+            <nz-card [nzBordered]="true" nzSize="small">
+              <div class="card-header">
+                <span class="card-title"><a [routerLink]="['/students', row.studentId]">{{ row.fullName }}</a></span>
+                <nz-tag [nzColor]="row.rewardBalance >= 0 ? 'gold' : 'red'">{{ row.rewardBalance }}</nz-tag>
+              </div>
+              <div class="card-field-block">
+                <label class="field-label">Điểm danh</label>
+                <nz-radio-group [(ngModel)]="row.attendance" nzButtonStyle="solid" nzSize="small" class="full">
                   <label nz-radio-button [nzValue]="AttendanceStatus.Present">Có mặt</label>
                   <label nz-radio-button [nzValue]="AttendanceStatus.Late">Muộn</label>
                   <label nz-radio-button [nzValue]="AttendanceStatus.ExcusedAbsence">Vắng P</label>
                   <label nz-radio-button [nzValue]="AttendanceStatus.UnexcusedAbsence">Vắng KP</label>
                 </nz-radio-group>
-              </td>
-              <td>
+              </div>
+              <div class="card-field-block">
+                <label class="field-label">BTVN</label>
                 <nz-select [(ngModel)]="row.homework" nzSize="small" class="full">
                   <nz-option [nzValue]="HomeworkStatus.NotAssigned" nzLabel="Không giao" />
                   <nz-option [nzValue]="HomeworkStatus.CompletedWell" nzLabel="Hoàn thành tốt" />
                   <nz-option [nzValue]="HomeworkStatus.Completed" nzLabel="Hoàn thành" />
                   <nz-option [nzValue]="HomeworkStatus.NotCompleted" nzLabel="Chưa hoàn thành" />
                 </nz-select>
-              </td>
-              <td>
+              </div>
+              <div class="card-field-block">
+                <label class="field-label">Thái độ</label>
                 <nz-select [(ngModel)]="row.attitude" nzSize="small" class="full">
                   <nz-option [nzValue]="AttitudeStatus.Positive" nzLabel="Tích cực" />
                   <nz-option [nzValue]="AttitudeStatus.Normal" nzLabel="Bình thường" />
                   <nz-option [nzValue]="AttitudeStatus.Unfocused" nzLabel="Chưa tập trung" />
                 </nz-select>
-              </td>
-              <td>
-                <div class="points">
-                  <div class="bal">
-                    <button nz-button nzSize="small" nzShape="circle" (click)="openPoint(row, PointType.Penalty)"><nz-icon nzType="minus" /></button>
-                    <nz-tag [nzColor]="row.rewardBalance >= 0 ? 'gold' : 'red'">{{ row.rewardBalance }}</nz-tag>
-                    <button nz-button nzSize="small" nzShape="circle" nzType="primary" (click)="openPoint(row, PointType.Reward)"><nz-icon nzType="plus" /></button>
-                  </div>
-                  <div class="quick">
-                    @for (r of rewardReasons(); track r.label) {
-                      <button nz-button nzSize="small" class="chip reward" (click)="quickAdd(row, PointType.Reward, r)">+{{ r.points }} {{ r.label }}</button>
-                    }
-                    @for (r of penaltyReasons(); track r.label) {
-                      <button nz-button nzSize="small" nzDanger class="chip" (click)="quickAdd(row, PointType.Penalty, r)">−{{ r.points }} {{ r.label }}</button>
-                    }
-                  </div>
+              </div>
+              <div class="card-actions">
+                <div class="bal">
+                  <button nz-button nzSize="small" nzShape="circle" (click)="openPoint(row, PointType.Penalty)"><nz-icon nzType="minus" /></button>
+                  <nz-tag [nzColor]="row.rewardBalance >= 0 ? 'gold' : 'red'">{{ row.rewardBalance }}</nz-tag>
+                  <button nz-button nzSize="small" nzShape="circle" nzType="primary" (click)="openPoint(row, PointType.Reward)"><nz-icon nzType="plus" /></button>
                 </div>
-              </td>
-              <td><input nz-input nzSize="small" [(ngModel)]="row.personalNote" placeholder="Ghi chú..." /></td>
-            </tr>
+                <div class="quick">
+                  @for (r of rewardReasons(); track r.label) {
+                    <button nz-button nzSize="small" class="chip reward" (click)="quickAdd(row, PointType.Reward, r)">+{{ r.points }} {{ r.label }}</button>
+                  }
+                  @for (r of penaltyReasons(); track r.label) {
+                    <button nz-button nzSize="small" nzDanger class="chip" (click)="quickAdd(row, PointType.Penalty, r)">−{{ r.points }} {{ r.label }}</button>
+                  }
+                </div>
+              </div>
+              <div class="card-field-block">
+                <input nz-input nzSize="small" [(ngModel)]="row.personalNote" placeholder="Ghi chú..." class="full" />
+              </div>
+            </nz-card>
           }
-        </tbody>
-      </nz-table>
+        </div>
+      } @else {
+        <nz-table [nzData]="rows()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '1240px' }">
+          <thead>
+            <tr>
+              <th nzLeft nzWidth="160px">Học viên</th>
+              <th nzWidth="300px">Điểm danh</th>
+              <th nzWidth="150px">BTVN</th>
+              <th nzWidth="140px">Thái độ</th>
+              <th nzWidth="290px">Điểm thưởng/phạt</th>
+              <th nzWidth="200px">Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.studentId) {
+              <tr>
+                <td nzLeft><a [routerLink]="['/students', row.studentId]">{{ row.fullName }}</a></td>
+                <td>
+                  <nz-radio-group [(ngModel)]="row.attendance" nzButtonStyle="solid" nzSize="small">
+                    <label nz-radio-button [nzValue]="AttendanceStatus.Present">Có mặt</label>
+                    <label nz-radio-button [nzValue]="AttendanceStatus.Late">Muộn</label>
+                    <label nz-radio-button [nzValue]="AttendanceStatus.ExcusedAbsence">Vắng P</label>
+                    <label nz-radio-button [nzValue]="AttendanceStatus.UnexcusedAbsence">Vắng KP</label>
+                  </nz-radio-group>
+                </td>
+                <td>
+                  <nz-select [(ngModel)]="row.homework" nzSize="small" class="full">
+                    <nz-option [nzValue]="HomeworkStatus.NotAssigned" nzLabel="Không giao" />
+                    <nz-option [nzValue]="HomeworkStatus.CompletedWell" nzLabel="Hoàn thành tốt" />
+                    <nz-option [nzValue]="HomeworkStatus.Completed" nzLabel="Hoàn thành" />
+                    <nz-option [nzValue]="HomeworkStatus.NotCompleted" nzLabel="Chưa hoàn thành" />
+                  </nz-select>
+                </td>
+                <td>
+                  <nz-select [(ngModel)]="row.attitude" nzSize="small" class="full">
+                    <nz-option [nzValue]="AttitudeStatus.Positive" nzLabel="Tích cực" />
+                    <nz-option [nzValue]="AttitudeStatus.Normal" nzLabel="Bình thường" />
+                    <nz-option [nzValue]="AttitudeStatus.Unfocused" nzLabel="Chưa tập trung" />
+                  </nz-select>
+                </td>
+                <td>
+                  <div class="points">
+                    <div class="bal">
+                      <button nz-button nzSize="small" nzShape="circle" (click)="openPoint(row, PointType.Penalty)"><nz-icon nzType="minus" /></button>
+                      <nz-tag [nzColor]="row.rewardBalance >= 0 ? 'gold' : 'red'">{{ row.rewardBalance }}</nz-tag>
+                      <button nz-button nzSize="small" nzShape="circle" nzType="primary" (click)="openPoint(row, PointType.Reward)"><nz-icon nzType="plus" /></button>
+                    </div>
+                    <div class="quick">
+                      @for (r of rewardReasons(); track r.label) {
+                        <button nz-button nzSize="small" class="chip reward" (click)="quickAdd(row, PointType.Reward, r)">+{{ r.points }} {{ r.label }}</button>
+                      }
+                      @for (r of penaltyReasons(); track r.label) {
+                        <button nz-button nzSize="small" nzDanger class="chip" (click)="quickAdd(row, PointType.Penalty, r)">−{{ r.points }} {{ r.label }}</button>
+                      }
+                    </div>
+                  </div>
+                </td>
+                <td><input nz-input nzSize="small" [(ngModel)]="row.personalNote" placeholder="Ghi chú..." /></td>
+              </tr>
+            }
+          </tbody>
+        </nz-table>
+      }
 
       <div class="save-bar">
         <button nz-button nzType="primary" nzSize="large" [nzLoading]="saving()" (click)="saveAll()">
@@ -144,6 +204,12 @@ interface PointReason { label: string; points: number; }
     .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
     .save-bar { position: sticky; bottom: 0; background: var(--hs-surface); padding: 12px 0; margin-top: 12px; border-top: 1px solid var(--hs-border); text-align: right; }
     .muted { color: var(--hs-text-muted); }
+    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .card-title { font-weight: 600; font-size: 15px; }
+    .card-field-block { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .card-field-block .field-label { font-size: 12px; color: var(--hs-text-muted); font-weight: 500; }
+    .card-actions { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
   `
 })
 export class SessionPage implements OnInit {
@@ -156,6 +222,7 @@ export class SessionPage implements OnInit {
   protected readonly homeworkLabels = HOMEWORK_LABELS;
   protected readonly attitudeLabels = ATTITUDE_LABELS;
 
+  protected readonly screen = inject(ScreenService);
   private readonly sessionsService = inject(SessionsService);
   private readonly settingsService = inject(SettingsService);
   private readonly message = inject(NzMessageService);
@@ -206,7 +273,7 @@ export class SessionPage implements OnInit {
           : x));
         this.message.success(`${type === PointType.Reward ? '+' : '−'}${r.points} ${r.label}`);
       },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Ghi điểm thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Ghi điểm thất bại.')
     });
   }
 
@@ -232,7 +299,7 @@ export class SessionPage implements OnInit {
     this.saving.set(true);
     this.sessionsService.saveAttendance(this.id(), entries).subscribe({
       next: () => { this.saving.set(false); this.message.success('Đã lưu buổi học.'); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
     });
   }
 
@@ -262,7 +329,7 @@ export class SessionPage implements OnInit {
           ? { ...r, rewardBalance: r.rewardBalance + delta, points: [...r.points, entry] }
           : r));
       },
-      error: (err: HttpErrorResponse) => { this.busy.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Ghi điểm thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.busy.set(false); this.message.error(err.error?.message ?? err.message ??'Ghi điểm thất bại.'); }
     });
   }
 }

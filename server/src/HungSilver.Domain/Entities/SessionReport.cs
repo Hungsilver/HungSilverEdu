@@ -9,5 +9,5 @@ public class SessionReport : BaseEntity
     public Guid ClassSessionId { get; set; }
     public ReportType Type { get; set; }
     public string GeneratedContent { get; set; } = string.Empty;
-    public DateTime GeneratedAtUtc { get; set; }
+    public DateTime GeneratedAt { get; set; }
 }

@@ -32,6 +32,7 @@ import { AssignmentsService } from '../../core/assignments.service';
 import { MaterialsService } from '../../core/materials.service';
 import { ScheduleService } from '../../core/schedule.service';
 import { StudentsService } from '../../core/students.service';
+import { ScreenService } from '../../core/screen.service';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
@@ -80,41 +81,69 @@ import { PageHeader } from '../../shared/page-header';
                 <button nz-button [disabled]="!enrollStudentId" (click)="enroll()">Thêm vào lớp</button>
               }
             </div>
-            <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '620px' }">
-              <thead><tr>
-                <th nzLeft>Họ tên</th><th>SĐT phụ huynh</th>
-                <th>Điểm thưởng</th><th>Chuyên cần</th><th>BTVN</th>
-                <th nzRight>Thao tác</th>
-              </tr></thead>
-              <tbody>
-                @for (r of rt.data; track r.studentId) {
-                  <tr>
-                    <td nzLeft><a [routerLink]="['/students', r.studentId]">{{ r.fullName }}</a></td>
-                    <td>{{ r.parentPhone || '—' }}</td>
-                    <td>
-                      @if (ov(r.studentId); as o) {
-                        <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
-                      } @else { <span class="muted">—</span> }
-                    </td>
-                    <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
-                    <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
-                    <td nzRight>
+            @if (screen.isMobile()) {
+              <div class="mobile-card-list">
+                @for (r of roster(); track r.studentId) {
+                  <nz-card>
+                    <div class="card-header">
+                      <a class="card-title" [routerLink]="['/students', r.studentId]">{{ r.fullName }}</a>
+                    </div>
+                    <div class="card-field"><span class="label">SĐT PH</span><span>{{ r.parentPhone || '—' }}</span></div>
+                    <div class="card-field"><span class="label">Điểm thưởng</span>
+                      <span>@if (ov(r.studentId); as o) { <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag> } @else { — }</span>
+                    </div>
+                    <div class="card-field"><span class="label">Chuyên cần</span><span>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</span></div>
+                    <div class="card-field"><span class="label">BTVN</span><span>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</span></div>
+                    <div class="card-actions">
                       @if (r.userId) {
-                        <button nz-button nzType="link" nzSize="small" (click)="openResetPassword(r)">
-                          <nz-icon nzType="key" /> Đổi MK
-                        </button>
+                        <button nz-button nzSize="small" (click)="openResetPassword(r)"><nz-icon nzType="key" /> Đổi MK</button>
                       } @else {
-                        <span class="muted no-acc">Chưa có TK</span>
+                        <span class="muted" style="font-size:12px">Chưa có TK</span>
                       }
                       @if (auth.isAdmin()) {
-                        <button nz-button nzType="link" nzSize="small" nzDanger
-                                nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
+                        <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
                       }
-                    </td>
-                  </tr>
+                    </div>
+                  </nz-card>
                 }
-              </tbody>
-            </nz-table>
+              </div>
+            } @else {
+              <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '620px' }">
+                <thead><tr>
+                  <th nzLeft>Họ tên</th><th>SĐT phụ huynh</th>
+                  <th>Điểm thưởng</th><th>Chuyên cần</th><th>BTVN</th>
+                  <th nzRight>Thao tác</th>
+                </tr></thead>
+                <tbody>
+                  @for (r of rt.data; track r.studentId) {
+                    <tr>
+                      <td nzLeft><a [routerLink]="['/students', r.studentId]">{{ r.fullName }}</a></td>
+                      <td>{{ r.parentPhone || '—' }}</td>
+                      <td>
+                        @if (ov(r.studentId); as o) {
+                          <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
+                        } @else { <span class="muted">—</span> }
+                      </td>
+                      <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
+                      <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
+                      <td nzRight>
+                        @if (r.userId) {
+                          <button nz-button nzType="link" nzSize="small" (click)="openResetPassword(r)">
+                            <nz-icon nzType="key" /> Đổi MK
+                          </button>
+                        } @else {
+                          <span class="muted no-acc">Chưa có TK</span>
+                        }
+                        @if (auth.isAdmin()) {
+                          <button nz-button nzType="link" nzSize="small" nzDanger
+                                  nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </nz-table>
+            }
           </nz-card>
         </nz-col>
 
@@ -153,24 +182,45 @@ import { PageHeader } from '../../shared/page-header';
 
       <nz-card nzTitle="Bài tập" class="mt">
         <button nz-button nzType="primary" class="mb" (click)="openAssignment()"><nz-icon nzType="plus" /> Giao bài</button>
-        <nz-table #at [nzData]="assignments()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '560px' }">
-          <thead><tr><th nzLeft>Tiêu đề</th><th>Học liệu</th><th>Hạn nộp</th><th>Đã nộp</th><th nzRight></th></tr></thead>
-          <tbody>
-            @for (a of at.data; track a.id) {
-              <tr>
-                <td nzLeft>{{ a.title }}</td>
-                <td>{{ a.materialTitle || '—' }}</td>
-                <td>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</td>
-                <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
-                <td nzRight>
-                  <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                  <button nz-button nzType="link" nzSize="small" nzDanger
-                          nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
-                </td>
-              </tr>
-            } @empty { <tr><td colspan="5"><span class="muted">Chưa giao bài nào.</span></td></tr> }
-          </tbody>
-        </nz-table>
+        @if (screen.isMobile()) {
+          <div class="mobile-card-list">
+            @for (a of assignments(); track a.id) {
+              <nz-card>
+                <div class="card-header">
+                  <span class="card-title">{{ a.title }}</span>
+                  <span>{{ a.submittedCount }}/{{ a.totalCount }}</span>
+                </div>
+                <div class="card-field"><span class="label">Học liệu</span><span>{{ a.materialTitle || '—' }}</span></div>
+                <div class="card-field"><span class="label">Hạn nộp</span><span>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</span></div>
+                <div class="card-actions">
+                  <button nz-button nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
+                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /> Xóa</button>
+                </div>
+              </nz-card>
+            } @empty {
+              <span class="muted">Chưa giao bài nào.</span>
+            }
+          </div>
+        } @else {
+          <nz-table #at [nzData]="assignments()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '560px' }">
+            <thead><tr><th nzLeft>Tiêu đề</th><th>Học liệu</th><th>Hạn nộp</th><th>Đã nộp</th><th nzRight></th></tr></thead>
+            <tbody>
+              @for (a of at.data; track a.id) {
+                <tr>
+                  <td nzLeft>{{ a.title }}</td>
+                  <td>{{ a.materialTitle || '—' }}</td>
+                  <td>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</td>
+                  <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
+                  <td nzRight>
+                    <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger
+                            nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
+                  </td>
+                </tr>
+              } @empty { <tr><td colspan="5"><span class="muted">Chưa giao bài nào.</span></td></tr> }
+            </tbody>
+          </nz-table>
+        }
       </nz-card>
     }
 
@@ -356,12 +406,21 @@ import { PageHeader } from '../../shared/page-header';
     .imp-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
     .imp-actions { margin-top: 12px; text-align: right; }
     .no-acc { font-size: 12px; }
+    .mobile-card-list { display: flex; flex-direction: column; gap: 8px; }
+    .mobile-card-list nz-card { border-radius: 8px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .card-title { font-weight: 600; font-size: 14px; }
+    .card-field { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--hs-border); font-size: 13px; }
+    .card-field:last-of-type { border-bottom: none; }
+    .card-field .label { color: var(--hs-text-muted); }
+    .card-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
   `
 })
 export class ClassDetailPage implements OnInit {
   readonly id = input.required<string>();
 
   protected readonly auth = inject(AuthService);
+  protected readonly screen = inject(ScreenService);
   private readonly classesService = inject(ClassesService);
   private readonly scheduleService = inject(ScheduleService);
   private readonly studentsService = inject(StudentsService);
@@ -493,14 +552,14 @@ export class ClassDetailPage implements OnInit {
     this.assignBusy.set(true);
     this.assignmentsService.create(request).subscribe({
       next: () => { this.assignBusy.set(false); this.assignOpen.set(false); this.message.success('Đã giao bài.'); this.loadAssignments(); },
-      error: (e: HttpErrorResponse) => { this.assignBusy.set(false); this.message.error(e.error?.detail ?? 'Giao bài thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.assignBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Giao bài thất bại.'); }
     });
   }
 
   protected deleteAssignment(a: Assignment): void {
     this.assignmentsService.delete(a.id).subscribe({
       next: () => { this.message.success('Đã xóa bài tập.'); this.loadAssignments(); },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Xóa thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Xóa thất bại.')
     });
   }
 
@@ -519,7 +578,7 @@ export class ClassDetailPage implements OnInit {
         this.submissions.set(this.submissions().map(x => x.studentId === s.studentId ? { ...x, status } : x));
         this.loadAssignments();
       },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Cập nhật thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Cập nhật thất bại.')
     });
   }
 
@@ -549,7 +608,7 @@ export class ClassDetailPage implements OnInit {
     this.importResult.set(null);
     this.classesService.importPreview(this.id(), this.importFile).subscribe({
       next: p => this.importPreview.set(p),
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Đọc file thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Đọc file thất bại.')
     });
     return false;
   };
@@ -565,7 +624,7 @@ export class ClassDetailPage implements OnInit {
         this.message.success(`Đã nhập ${res.created} học viên.`);
         this.reloadPublic();
       },
-      error: (e: HttpErrorResponse) => { this.importBusy.set(false); this.message.error(e.error?.detail ?? 'Nhập thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.importBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Nhập thất bại.'); }
     });
   }
 
@@ -610,7 +669,7 @@ export class ClassDetailPage implements OnInit {
           : 'Đã tạo học sinh.');
         this.reloadPublic();
       },
-      error: (e: HttpErrorResponse) => { this.studentBusy.set(false); this.message.error(e.error?.detail ?? 'Tạo học sinh thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.studentBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Tạo học sinh thất bại.'); }
     });
   }
 
@@ -628,7 +687,7 @@ export class ClassDetailPage implements OnInit {
     this.resetBusy.set(true);
     this.studentsService.resetPassword(r.studentId, this.newPassword).subscribe({
       next: () => { this.resetBusy.set(false); this.resetOpen.set(false); this.message.success('Đã đổi mật khẩu học sinh.'); },
-      error: (e: HttpErrorResponse) => { this.resetBusy.set(false); this.message.error(e.error?.detail ?? 'Đổi mật khẩu thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.resetBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Đổi mật khẩu thất bại.'); }
     });
   }
 
@@ -636,14 +695,14 @@ export class ClassDetailPage implements OnInit {
     if (!this.enrollStudentId) return;
     this.classesService.enroll(this.id(), this.enrollStudentId).subscribe({
       next: () => { this.message.success('Đã thêm vào lớp.'); this.enrollStudentId = null; this.reload(); },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Thêm thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thêm thất bại.')
     });
   }
 
   protected withdraw(r: RosterItem): void {
     this.classesService.withdraw(this.id(), r.studentId).subscribe({
       next: () => { this.message.success('Đã xóa khỏi lớp.'); this.reload(); },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thất bại.')
     });
   }
 
@@ -661,7 +720,7 @@ export class ClassDetailPage implements OnInit {
       topic: this.newTopic || null, sessionNumber: null
     }).subscribe({
       next: s => { this.busy.set(false); this.createOpen.set(false); this.router.navigate(['/sessions', s.id]); },
-      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.detail ?? 'Tạo thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Tạo thất bại.'); }
     });
   }
 
@@ -670,7 +729,7 @@ export class ClassDetailPage implements OnInit {
     this.busy.set(true);
     this.scheduleService.generateSessions(this.id(), { fromDate: iso(this.genRange[0]), toDate: iso(this.genRange[1]) }).subscribe({
       next: count => { this.busy.set(false); this.generateOpen.set(false); this.message.success(`Đã sinh ${count} buổi học.`); this.reload(); },
-      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.detail ?? 'Sinh buổi thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Sinh buổi thất bại.'); }
     });
   }
 
@@ -680,14 +739,14 @@ export class ClassDetailPage implements OnInit {
       classId: this.id(), dayOfWeek: this.slotDay, startTime: time(this.slotStart), endTime: time(this.slotEnd)
     }).subscribe({
       next: () => { this.message.success('Đã thêm khung giờ.'); this.slotStart = null; this.slotEnd = null; this.reload(); },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thất bại.')
     });
   }
 
   protected removeSlot(slot: ScheduleSlot): void {
     this.scheduleService.removeSlot(slot.id).subscribe({
       next: () => { this.message.success('Đã xóa khung giờ.'); this.reload(); },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.detail ?? 'Thất bại.')
+      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thất bại.')
     });
   }
 }

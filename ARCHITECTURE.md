@@ -71,13 +71,13 @@ E:\MyProject\
 `WebApi → Infrastructure → Application → Domain`. Tầng trong **không biết** tầng ngoài.
 
 ### 3.1 Domain (`HungSilver.Domain`) — không phụ thuộc package ngoài
-- `Common/BaseEntity.cs` — base cho mọi entity nghiệp vụ: `Id` (Guid), audit (`CreatedAtUtc`/`UpdatedAtUtc`), soft delete (`IsDeleted`/`DeletedAtUtc`). Implement `IAuditable` + `ISoftDeletable`.
+- `Common/BaseEntity.cs` — base cho mọi entity nghiệp vụ: `Id` (Guid), audit (`CreatedAt`/`UpdatedAt`), soft delete (`IsDeleted`/`DeletedAt`). Implement `IAuditable` + `ISoftDeletable`.
 - `Common/IAuditable.cs`, `Common/ISoftDeletable.cs` — interface marker, driver cho interceptor & query filter.
 - `Common/AppRoles.cs` — hằng `Admin`, `User`, mảng `All`.
 - `Common/Results/Result.cs` — **Result pattern**: `Result` và `Result<T>`. `Success()/Failure(error)`; ép kiểu ngầm `T → Result<T>`. Truy cập `.Value` khi failure sẽ ném (lỗi lập trình).
 - `Common/Results/Error.cs` — `record Error(Code, Message, ErrorType)`. `ErrorType`: `Failure, Validation, NotFound, Conflict, Unauthorized, Forbidden`. Factory: `Error.NotFound(...)`, `Error.Conflict(...)`, …
 - `Entities/Product.cs` — entity demo: `Name, Sku, Description?, Price, IsActive`.
-- `Entities/RefreshToken.cs` — `UserId, TokenHash (SHA-256), ExpiresAtUtc, RevokedAtUtc?, ReplacedByTokenHash?`; `IsActive => RevokedAtUtc == null && now < ExpiresAtUtc`. **Chỉ lưu hash**, token gốc ở cookie client.
+- `Entities/RefreshToken.cs` — `UserId, TokenHash (SHA-256), ExpiresAt, RevokedAt?, ReplacedByTokenHash?`; `IsActive => RevokedAt == null && now < ExpiresAt`. **Chỉ lưu hash**, token gốc ở cookie client.
 
 ### 3.2 Application (`HungSilver.Application`) — interface + use case, không chạm EF/HTTP
 - `Abstractions/IRepository.cs` — hợp đồng CRUD generic (`GetByIdAsync, FindAsync, AnyAsync, GetPagedAsync, AddAsync, Update, SoftDelete, RestoreAsync`). Tham số `includeDeleted` để bỏ qua query filter.
@@ -94,8 +94,8 @@ E:\MyProject\
 
 ### 3.3 Infrastructure (`HungSilver.Infrastructure`) — EF Core, Identity, hiện thực
 - `Persistence/AppDbContext.cs` — kế thừa `IdentityDbContext<AppUser, AppRole, Guid>`. `DbSet<Product>`, `DbSet<RefreshToken>`. **`OnModelCreating` tự gắn global query filter `IsDeleted == false` cho MỌI entity `ISoftDeletable`** (kể cả bảng Users) bằng reflection + expression.
-- `Persistence/Repositories/Repository.cs` — hiện thực `IRepository<T>`. `Query(includeDeleted)` chọn có/không `IgnoreQueryFilters()`. `SoftDelete` = `Remove()` (interceptor sẽ đổi thành UPDATE). `ApplySort` build OrderBy động qua reflection theo `sortBy` (fallback `CreatedAtUtc desc`).
-- `Persistence/Interceptors/AuditSaveChangesInterceptor.cs` — **trái tim của audit + soft delete**: `Added→CreatedAtUtc`; `Modified→UpdatedAtUtc`; `Deleted + ISoftDeletable → chuyển state về Modified, set IsDeleted=true, DeletedAtUtc=now`. Đăng ký **Singleton**.
+- `Persistence/Repositories/Repository.cs` — hiện thực `IRepository<T>`. `Query(includeDeleted)` chọn có/không `IgnoreQueryFilters()`. `SoftDelete` = `Remove()` (interceptor sẽ đổi thành UPDATE). `ApplySort` build OrderBy động qua reflection theo `sortBy` (fallback `CreatedAt desc`).
+- `Persistence/Interceptors/AuditSaveChangesInterceptor.cs` — **trái tim của audit + soft delete**: `Added→CreatedAt`; `Modified→UpdatedAt`; `Deleted + ISoftDeletable → chuyển state về Modified, set IsDeleted=true, DeletedAt=now`. Dùng `DateTime.Now` (giờ local). Đăng ký **Singleton**.
 - `Persistence/UnitOfWork.cs` — wrap `context.SaveChangesAsync`.
 - `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + Settings mặc định (`FileStorage.Mode=Server`). **KHÔNG tự tạo tài khoản admin** — tạo thủ công khi cần. **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
 - `Identity/AppUser.cs` — `IdentityUser<Guid>` + `FullName?, AvatarUrl?` + audit + soft delete.
@@ -113,7 +113,9 @@ E:\MyProject\
 - `Program.cs` — pipeline (xem [§4](#4-program-cs--pipeline-khởi-động)).
 - `Controllers/AuthController.cs`, `ProductsController.cs`, `UsersController.cs` — xem [§8](#8-api-endpoints).
 - `Common/ResultExtensions.cs` — **map `Result`/`Error` → HTTP**: Success→`Ok`/`NoContent`; Error theo `ErrorType` → 400/404/409/401/403/500 dạng `ProblemDetails`.
-- `Common/GlobalExceptionHandler.cs` — exception chưa bắt → log + `ProblemDetails 500`, không lộ stack trace.
+- `Common/ApiResponse.cs` — **API Response Wrapper**: `ApiResponse<T>` (`Data, IsSuccess, Message, StatusCode`) + factory `Ok(data, status)`, `Fail(message, status)`.
+- `Common/ApiResponseWrapperFilter.cs` — **IResultFilter** bọc mọi response MVC trong `ApiResponse`. Skip `FileResult` (download). `ProblemDetails` → `Fail`; `ObjectResult` → `Ok`; `NoContentResult` → `Ok(null, 204)` HTTP 200.
+- `Common/GlobalExceptionHandler.cs` — exception chưa bắt → log + `ApiResponse.Fail(…, 500)`, không lộ stack trace.
 
 ---
 
@@ -164,7 +166,7 @@ Thứ tự trong `server/src/HungSilver.WebApi/Program.cs`:
 - **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role; **tài khoản admin tạo thủ công** (đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
 - **Server:**
   - `[Authorize]` mặc định; `[Authorize(Policy="AdminOnly")]` cho `UsersController` (gồm `POST /api/users` tạo tài khoản); `TeacherOrAdmin` cho lớp/học sinh — thao tác theo phạm vi qua `IClassAccessGuard`.
-  - `ProfileController` (`api/profile`) `[Authorize]` mọi role; `FilesController.Download` `[AllowAnonymous]` (ảnh/tài liệu theo GUID), upload vẫn `TeacherOrAdmin`.
+  - `ProfileController` (`api/profile`) `[Authorize]` mọi role: `PUT /api/profile` (cập nhật họ tên + SĐT), `POST avatar`, `PUT password`; `FilesController.Download` `[AllowAnonymous]` (ảnh/tài liệu theo GUID), upload vẫn `TeacherOrAdmin`.
 - **Client (guards `core/guards.ts`):**
   - `authGuard` — chưa đăng nhập → `/login`.
   - `guestGuard` — đã đăng nhập thì chặn vào lại `/login`. (Route `/register` đã gỡ — đăng ký bị khóa.)
@@ -223,12 +225,14 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 
 **Mapping status** (`ResultExtensions`): Validation→400, NotFound→404, Conflict→409, Unauthorized→401, Forbidden→403, Failure→500.
 
+**API Response Wrapper**: mọi response từ controller được `ApiResponseWrapperFilter` bọc trong `{ data, isSuccess, message, statusCode }`. Ngoại lệ: `FileResult` (download), health check, OpenAPI/Scalar (nằm ngoài MVC pipeline). FE `apiResponseInterceptor` tự unwrap `data` từ wrapper.
+
 ---
 
 ## 9. Frontend (Angular 21)
 
 - **Bootstrap:** `main.ts` → `bootstrapApplication(App, appConfig)`. **Zoneless** (Angular 21 mặc định, không Zone.js), standalone components, **signals** xuyên suốt.
-- **`app.config.ts`:** providers — router, **HttpClient + authInterceptor**, ng-zorro i18n `vi_VN`, đăng ký icon, `LOCALE_ID='vi'`, `provideAppInitializer(tryRestoreSession)`.
+- **`app.config.ts`:** providers — router, **HttpClient + apiResponseInterceptor + authInterceptor**, ng-zorro i18n `vi_VN`, đăng ký icon, `LOCALE_ID='vi'`, `provideAppInitializer(tryRestoreSession)`.
 - **Routing (`app.routes.ts`):** lazy `loadComponent`. `/login`,`/register` (guestGuard) ngoài shell; còn lại nằm trong `Shell` (authGuard): `/products`, `/admin/users` (roleGuard Admin). `**` → `/`.
 - **`core/` (singleton):**
   - `auth.service.ts` — phiên đăng nhập (xem §5).
@@ -403,4 +407,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **2026-06-17** — **Bỏ tự tạo tài khoản admin khi khởi động.** `DbSeeder` chỉ còn seed role + settings; admin tạo **thủ công bằng SQL** (`server/scripts/create-admin.sql` — idempotent, hash PBKDF2 của `Admin@a1`). Gỡ `SeedOptions` (class + đăng ký DI + section `Seed` trong appsettings) và biến `Seed__Admin*`/`ADMIN_*` rác trong `docker-compose*.yml` + `.env.example`. Build BE sạch. — `server/src/HungSilver.Infrastructure/{Persistence/DbSeeder,Auth/AuthOptions,DependencyInjection}.cs`, `server/src/HungSilver.WebApi/appsettings.json`, `server/scripts/create-admin.sql`, `docker-compose.yml`, `docker-compose.prod.yml`, `.env.example`, `ARCHITECTURE.md`.
 - **2026-06-17** — **Gỡ `create-admin.sql` khỏi git** (`git rm --cached` + `.gitignore`) để không lộ tài khoản admin trên repo — file giữ local, chạy tay trên VPS. Thêm `server/scripts/reset-db.sql` (xóa sạch DB: `DROP SCHEMA public CASCADE`). Lịch sử cũ giữ nguyên (không force-push) ⇒ đổi mật khẩu admin sau lần đăng nhập đầu. — `.gitignore`, `server/scripts/reset-db.sql`, `ARCHITECTURE.md`.
 - **2026-06-17** — **(TẠM THỜI) seed lại admin khi khởi chạy đầu** để bootstrap sau khi wipe DB: `DbSeeder` tạo `admin`/`Admin@a1` (hardcode, chỉ khi chưa có). **Sẽ gỡ ở commit kế** sau khi đã tạo xong; nhớ đổi mật khẩu sau đăng nhập đầu. — `server/src/HungSilver.Infrastructure/Persistence/DbSeeder.cs`, `ARCHITECTURE.md`.
+- **2026-06-17** — **Redesign trang cá nhân**: `UserDto` thêm `PhoneNumber`; `PUT /api/profile` (cập nhật họ tên + SĐT); FE inline edit họ tên/SĐT + thu gọn form đổi mật khẩu (ẩn sau nút bấm). — `server/.../Auth/AuthDtos.cs`, `server/.../Account/{IProfileService,ProfileService}.cs`, `server/.../Auth/AuthService.cs`, `server/.../Controllers/ProfileController.cs`, `client/src/app/core/{models.ts,profile.service.ts}`, `client/src/app/features/profile/profile.page.ts`, `ARCHITECTURE.md`.
 - **2026-06-17** — **Dọn dẹp sau bootstrap**: gỡ khối seed admin tạm trong `DbSeeder` (về lại chỉ seed role + settings); xóa script SQL dư thừa `server/scripts/reset-db.sql` + gỡ mục `.gitignore`/ghi chú `.env.example` trỏ tới `create-admin.sql`. Admin đã tạo xong từ bước bootstrap; tạo lại thủ công khi cần. — `server/src/HungSilver.Infrastructure/Persistence/DbSeeder.cs`, `.gitignore`, `.env.example`, `ARCHITECTURE.md`.
+- **2026-06-18** — **Đổi DateTime.UtcNow → DateTime.Now + Rename properties**: bỏ hậu tố `Utc` khỏi mọi property audit/timestamp (`CreatedAtUtc`→`CreatedAt`, `UpdatedAtUtc`→`UpdatedAt`, `DeletedAtUtc`→`DeletedAt`, `ExpiresAtUtc`→`ExpiresAt`, `RevokedAtUtc`→`RevokedAt`, `GeneratedAtUtc`→`GeneratedAt`, `SentAtUtc`→`SentAt`). Dùng `DateTime.Now` (giờ local) thay vì `DateTime.UtcNow`; xóa mọi hack `AddHours(7)`/`ConvertTimeFromUtc`. Thêm `Npgsql.EnableLegacyTimestampBehavior=true`. Migration `RenameUtcColumns` rename cột DB. — `server/src/**` (Domain, Application, Infrastructure, WebApi), `client/src/app/core/models.ts`, `ARCHITECTURE.md`.
+- **2026-06-18** — **API Response Wrapper toàn cục**: mọi response MVC bọc trong `ApiResponse<T>` (`data, isSuccess, message, statusCode`) qua `ApiResponseWrapperFilter` (IResultFilter). `GlobalExceptionHandler` trả `ApiResponse.Fail` thay vì `ProblemDetails`. FE: `apiResponseInterceptor` unwrap `body.data`, error handler đổi từ `(err.error as ApiProblem)?.detail` → `err.error?.message ?? err.message`. — `server/src/HungSilver.WebApi/Common/{ApiResponse,ApiResponseWrapperFilter,GlobalExceptionHandler}.cs`, `server/src/HungSilver.WebApi/Program.cs`, `client/src/app/core/{api-response.interceptor.ts,models.ts}`, `client/src/app/app.config.ts`, `client/src/app/features/**`.

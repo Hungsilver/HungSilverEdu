@@ -15,8 +15,8 @@ public sealed record ClassDto(
     decimal? AverageScore,
     decimal AttendanceRate,
     bool IsDeleted,
-    DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);
 
 public sealed record ClassListItemDto(
     Guid Id,
@@ -27,7 +27,7 @@ public sealed record ClassListItemDto(
     int CurrentSize,
     bool IsActive,
     bool IsDeleted,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAt);
 
 public sealed record CreateClassRequest(
     string Name,

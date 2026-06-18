@@ -151,7 +151,7 @@ public sealed class AuthService(
             return Result.Failure<AuthTokens>(InvalidRefreshToken);
 
         // Rotation: thu hồi token cũ ngay khi dùng.
-        stored.RevokedAtUtc = DateTime.UtcNow;
+        stored.RevokedAt = DateTime.Now;
 
         var tokens = await IssueTokensAsync(user, ct);
         if (tokens.IsSuccess)
@@ -167,9 +167,9 @@ public sealed class AuthService(
         {
             var tokenHash = tokenService.HashToken(refreshToken);
             var stored = await context.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
-            if (stored is { RevokedAtUtc: null })
+            if (stored is { RevokedAt: null })
             {
-                stored.RevokedAtUtc = DateTime.UtcNow;
+                stored.RevokedAt = DateTime.Now;
                 await context.SaveChangesAsync(ct);
             }
         }
@@ -194,23 +194,23 @@ public sealed class AuthService(
         var access = tokenService.CreateAccessToken(user.Id, identity, user.FullName, roles);
 
         var refreshRaw = tokenService.CreateRefreshToken();
-        var refreshExpiresAtUtc = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenDays);
+        var refreshExpiresAt = DateTime.Now.AddDays(jwtOptions.Value.RefreshTokenDays);
 
         context.RefreshTokens.Add(new RefreshToken
         {
             UserId = user.Id,
             TokenHash = tokenService.HashToken(refreshRaw),
-            ExpiresAtUtc = refreshExpiresAtUtc
+            ExpiresAt = refreshExpiresAt
         });
         await context.SaveChangesAsync(ct);
 
-        var userDto = new UserDto(user.Id, identity, user.FullName, user.AvatarUrl, [.. roles]);
-        return new AuthTokens(access.Token, access.ExpiresAtUtc, refreshRaw, refreshExpiresAtUtc, userDto);
+        var userDto = new UserDto(user.Id, identity, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles]);
+        return new AuthTokens(access.Token, access.ExpiresAt, refreshRaw, refreshExpiresAt, userDto);
     }
 
     private async Task<UserDto> ToUserDtoAsync(AppUser user)
     {
         var roles = await userManager.GetRolesAsync(user);
-        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.AvatarUrl, [.. roles]);
+        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles]);
     }
 }

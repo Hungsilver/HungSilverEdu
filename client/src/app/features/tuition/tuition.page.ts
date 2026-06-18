@@ -12,11 +12,14 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
+import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
+import { ScreenService } from '../../core/screen.service';
 import {
-  ApiProblem, CreateTuitionInvoiceRequest, Student, TuitionInvoice,
+  CreateTuitionInvoiceRequest, Student, TuitionInvoice,
   TUITION_STATUS_COLORS, TUITION_STATUS_LABELS
 } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
@@ -28,7 +31,8 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, ReactiveFormsModule, CurrencyPipe, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzTagModule, NzSelectModule,
-    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzDatePickerModule, NzPopconfirmModule, PageHeader
+    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzDatePickerModule, NzPopconfirmModule, PageHeader,
+    NzCardModule, NzPaginationModule
   ],
   template: `
     <app-page-header title="Học phí" subtitle="Hóa đơn theo tháng & trạng thái đóng" icon="dollar">
@@ -37,37 +41,63 @@ import { PageHeader } from '../../shared/page-header';
       }
     </app-page-header>
 
-    <nz-table #table [nzData]="invoices()" [nzLoading]="loading()" [nzFrontPagination]="false"
-      [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"
-      (nzPageIndexChange)="onPageChange($event)" [nzScroll]="{ x: '720px' }">
-      <thead>
-        <tr>
-          <th nzLeft>Học sinh</th><th>Kỳ</th><th>Số tiền</th><th>Hạn đóng</th><th>Trạng thái</th>
-          @if (auth.isAdmin()) { <th nzRight>Thao tác</th> }
-        </tr>
-      </thead>
-      <tbody>
-        @for (t of table.data; track t.id) {
-          <tr>
-            <td nzLeft>{{ t.studentName }}</td>
-            <td>{{ t.periodMonth }}/{{ t.periodYear }}</td>
-            <td>{{ t.amount | currency: 'VND' }}</td>
-            <td>{{ t.dueDate | date: 'dd/MM/yyyy' }}</td>
-            <td><nz-tag [nzColor]="statusColors[t.status]">{{ statusLabels[t.status] }}</nz-tag></td>
+    @if (screen.isMobile()) {
+      <div class="mobile-card-list">
+        @for (t of invoices(); track t.id) {
+          <nz-card>
+            <div class="card-header">
+              <span class="card-title">{{ t.studentName }}</span>
+              <nz-tag [nzColor]="statusColors[t.status]">{{ statusLabels[t.status] }}</nz-tag>
+            </div>
+            <div class="card-field"><span class="label">Kỳ</span><span>{{ t.periodMonth }}/{{ t.periodYear }}</span></div>
+            <div class="card-field"><span class="label">Số tiền</span><span>{{ t.amount | currency: 'VND' }}</span></div>
+            <div class="card-field"><span class="label">Hạn đóng</span><span>{{ t.dueDate | date: 'dd/MM/yyyy' }}</span></div>
             @if (auth.isAdmin()) {
-              <td nzRight>
+              <div class="card-actions">
                 @if (!t.paidOn) {
-                  <button nz-button nzType="link" nzSize="small" (click)="markPaid(t)">Đã đóng</button>
-                  <button nz-button nzType="link" nzSize="small" (click)="openEdit(t)"><nz-icon nzType="edit" /></button>
+                  <button nz-button nzSize="small" (click)="markPaid(t)">Đã đóng</button>
+                  <button nz-button nzSize="small" (click)="openEdit(t)"><nz-icon nzType="edit" /> Sửa</button>
                 }
-                <button nz-button nzType="link" nzSize="small" nzDanger
-                        nz-popconfirm nzPopconfirmTitle="Xóa hóa đơn này?" (nzOnConfirm)="remove(t)"><nz-icon nzType="delete" /></button>
-              </td>
+                <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa hóa đơn này?" (nzOnConfirm)="remove(t)"><nz-icon nzType="delete" /> Xóa</button>
+              </div>
             }
-          </tr>
+          </nz-card>
         }
-      </tbody>
-    </nz-table>
+      </div>
+      <nz-pagination class="mobile-pagination" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()" (nzPageIndexChange)="onPageChange($event)" />
+    } @else {
+      <nz-table #table [nzData]="invoices()" [nzLoading]="loading()" [nzFrontPagination]="false"
+        [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"
+        (nzPageIndexChange)="onPageChange($event)" [nzScroll]="{ x: '720px' }">
+        <thead>
+          <tr>
+            <th nzLeft>Học sinh</th><th>Kỳ</th><th>Số tiền</th><th>Hạn đóng</th><th>Trạng thái</th>
+            @if (auth.isAdmin()) { <th nzRight>Thao tác</th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of table.data; track t.id) {
+            <tr>
+              <td nzLeft>{{ t.studentName }}</td>
+              <td>{{ t.periodMonth }}/{{ t.periodYear }}</td>
+              <td>{{ t.amount | currency: 'VND' }}</td>
+              <td>{{ t.dueDate | date: 'dd/MM/yyyy' }}</td>
+              <td><nz-tag [nzColor]="statusColors[t.status]">{{ statusLabels[t.status] }}</nz-tag></td>
+              @if (auth.isAdmin()) {
+                <td nzRight>
+                  @if (!t.paidOn) {
+                    <button nz-button nzType="link" nzSize="small" (click)="markPaid(t)">Đã đóng</button>
+                    <button nz-button nzType="link" nzSize="small" (click)="openEdit(t)"><nz-icon nzType="edit" /></button>
+                  }
+                  <button nz-button nzType="link" nzSize="small" nzDanger
+                          nz-popconfirm nzPopconfirmTitle="Xóa hóa đơn này?" (nzOnConfirm)="remove(t)"><nz-icon nzType="delete" /></button>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </nz-table>
+    }
 
     <nz-modal [nzVisible]="modalOpen()" [nzTitle]="editing() ? 'Sửa hóa đơn' : 'Tạo hóa đơn học phí'"
       [nzOkLoading]="saving()" [nzOkDisabled]="form.invalid" (nzOnOk)="save()" (nzOnCancel)="modalOpen.set(false)">
@@ -105,6 +135,7 @@ import { PageHeader } from '../../shared/page-header';
 })
 export class TuitionPage {
   protected readonly auth = inject(AuthService);
+  protected readonly screen = inject(ScreenService);
   private readonly tuitionService = inject(TuitionService);
   private readonly studentsService = inject(StudentsService);
   private readonly message = inject(NzMessageService);
@@ -171,21 +202,21 @@ export class TuitionPage {
     this.saving.set(true);
     op.subscribe({
       next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success('Đã lưu hóa đơn.'); this.load(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
     });
   }
 
   protected markPaid(t: TuitionInvoice): void {
     this.tuitionService.markPaid(t.id, null).subscribe({
       next: () => { this.message.success('Đã ghi nhận đóng học phí.'); this.load(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Thất bại.')
     });
   }
 
   protected remove(t: TuitionInvoice): void {
     this.tuitionService.delete(t.id).subscribe({
       next: () => { this.message.success('Đã xóa.'); this.load(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Xóa thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
 }

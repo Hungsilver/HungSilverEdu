@@ -7,7 +7,6 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
-import { ApiProblem } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
@@ -100,7 +99,7 @@ export class RegisterPage {
       next: () => this.router.navigate(['/']),
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
-        this.error.set((err.error as ApiProblem | null)?.detail ?? 'Đăng ký thất bại, thử lại sau.');
+        this.error.set(err.error?.message ?? err.message ?? 'Đăng ký thất bại, thử lại sau.');
       }
     });
   }

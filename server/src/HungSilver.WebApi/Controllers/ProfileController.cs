@@ -29,6 +29,16 @@ public class ProfileController(IProfileService profileService) : ControllerBase
         return result.ToActionResult();
     }
 
+    /// <summary>Cập nhật họ tên + số điện thoại.</summary>
+    [HttpPut]
+    public async Task<ActionResult<UserDto>> UpdateProfile(UpdateProfileRequest request, CancellationToken ct)
+    {
+        if (!TryGetUserId(out var userId))
+            return Error.Unauthorized("Auth.InvalidToken", "Token không hợp lệ.").ToProblemResult();
+
+        return (await profileService.UpdateProfileAsync(userId, request, ct)).ToActionResult();
+    }
+
     /// <summary>Người dùng tự đổi mật khẩu của chính mình.</summary>
     [HttpPut("password")]
     public async Task<ActionResult> ChangePassword(ChangeOwnPasswordRequest request, CancellationToken ct)

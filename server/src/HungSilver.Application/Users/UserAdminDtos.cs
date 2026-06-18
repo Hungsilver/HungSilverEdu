@@ -7,7 +7,7 @@ public sealed record UserListItemDto(
     string? FullName,
     IReadOnlyList<string> Roles,
     bool IsDeleted,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAt);
 
 public sealed record AssignRolesRequest(IReadOnlyList<string> Roles);
 

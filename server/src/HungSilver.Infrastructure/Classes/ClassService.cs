@@ -40,7 +40,7 @@ public sealed class ClassService(
         var page = Math.Max(request.Page, 1);
 
         var items = await query
-            .OrderByDescending(c => c.CreatedAtUtc)
+            .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(ct);
@@ -59,7 +59,7 @@ public sealed class ClassService(
             teacherNames.GetValueOrDefault(c.TeacherId),
             c.MaxCapacity,
             sizes.GetValueOrDefault(c.Id),
-            c.IsActive, c.IsDeleted, c.CreatedAtUtc)).ToList();
+            c.IsActive, c.IsDeleted, c.CreatedAt)).ToList();
 
         return new PagedResult<ClassListItemDto>
         {
@@ -159,7 +159,7 @@ public sealed class ClassService(
             return Result.Failure(NotFoundError);
 
         cls.IsDeleted = false;
-        cls.DeletedAtUtc = null;
+        cls.DeletedAt = null;
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }
@@ -293,7 +293,7 @@ public sealed class ClassService(
         {
             ClassId = classId,
             StudentId = request.StudentId,
-            EnrolledOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            EnrolledOn = DateOnly.FromDateTime(DateTime.Now),
             IsActive = true
         });
 
@@ -309,7 +309,7 @@ public sealed class ClassService(
             return Result.Failure(Error.NotFound("Class.EnrollmentNotFound", "Học sinh không có trong lớp này."));
 
         enrollment.IsActive = false;
-        enrollment.WithdrawnOn = DateOnly.FromDateTime(DateTime.UtcNow);
+        enrollment.WithdrawnOn = DateOnly.FromDateTime(DateTime.Now);
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }
@@ -381,6 +381,6 @@ public sealed class ClassService(
             cls.Id, cls.Name, cls.TeacherId, teacherName,
             cls.CurriculumId, curriculumName, cls.MaxCapacity, cls.Schedule, cls.StartDate,
             cls.IsActive, currentSize, averageScore, attendanceRate,
-            cls.IsDeleted, cls.CreatedAtUtc, cls.UpdatedAtUtc);
+            cls.IsDeleted, cls.CreatedAt, cls.UpdatedAt);
     }
 }

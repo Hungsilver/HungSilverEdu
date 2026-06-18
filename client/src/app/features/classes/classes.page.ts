@@ -14,11 +14,14 @@ import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSwitchModule } from 'ng-zorro-antd/switch';
+import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
+import { ScreenService } from '../../core/screen.service';
 import { ClassesService } from '../../core/classes.service';
-import { ApiProblem, ClassListItem, ClassRequest, ROLE_ADMIN, ROLE_TEACHER, UserListItem } from '../../core/models';
+import { ClassListItem, ClassRequest, ROLE_ADMIN, ROLE_TEACHER, UserListItem } from '../../core/models';
 import { UsersService } from '../../core/users.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -28,7 +31,7 @@ import { PageHeader } from '../../shared/page-header';
     FormsModule, ReactiveFormsModule, RouterLink,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule, NzTagModule, NzSelectModule,
     NzModalModule, NzFormModule, NzInputNumberModule, NzSwitchModule, NzDatePickerModule,
-    NzPopconfirmModule, NzCheckboxModule, PageHeader
+    NzPopconfirmModule, NzCheckboxModule, NzCardModule, NzPaginationModule, PageHeader
   ],
   template: `
     <app-page-header title="Lớp học" subtitle="Danh sách lớp & phân công giáo viên" icon="book">
@@ -42,46 +45,74 @@ import { PageHeader } from '../../shared/page-header';
       </div>
     </app-page-header>
 
-    <nz-table #table [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
-      [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"
-      (nzPageIndexChange)="onPageChange($event)" [nzScroll]="{ x: '640px' }">
-      <thead>
-        <tr>
-          <th nzLeft>Tên lớp</th>
-          <th>Giáo viên</th>
-          <th>Sĩ số</th>
-          <th>Trạng thái</th>
-          @if (auth.isAdmin()) { <th nzRight class="actions-col">Thao tác</th> }
-        </tr>
-      </thead>
-      <tbody>
-        @for (c of table.data; track c.id) {
-          <tr>
-            <td nzLeft [class.text-deleted]="c.isDeleted"><a [routerLink]="['/classes', c.id]">{{ c.name }}</a></td>
-            <td>{{ c.teacherName || '—' }}</td>
-            <td>{{ c.currentSize }}/{{ c.maxCapacity }}</td>
-            <td>
+    @if (screen.isMobile()) {
+      <div class="mobile-card-list">
+        @for (c of classes(); track c.id) {
+          <nz-card>
+            <div class="card-header">
+              <a class="card-title" [routerLink]="['/classes', c.id]" [class.text-deleted]="c.isDeleted">{{ c.name }}</a>
               @if (c.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
               @else if (c.isActive) { <nz-tag nzColor="green">Đang mở</nz-tag> }
               @else { <nz-tag>Đóng</nz-tag> }
-            </td>
+            </div>
+            <div class="card-field"><span class="label">Giáo viên</span><span>{{ c.teacherName || '—' }}</span></div>
+            <div class="card-field"><span class="label">Sĩ số</span><span>{{ c.currentSize }}/{{ c.maxCapacity }}</span></div>
             @if (auth.isAdmin()) {
-              <td nzRight>
+              <div class="card-actions">
                 @if (!c.isDeleted) {
-                  <button nz-button nzType="link" nzSize="small" (click)="openEdit(c)"><nz-icon nzType="edit" /></button>
-                  <button nz-button nzType="link" nzSize="small" nzDanger
-                          nz-popconfirm nzPopconfirmTitle="Xóa mềm lớp này?" (nzOnConfirm)="remove(c)">
-                    <nz-icon nzType="delete" />
-                  </button>
+                  <button nz-button nzSize="small" (click)="openEdit(c)"><nz-icon nzType="edit" /> Sửa</button>
+                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa mềm lớp này?" (nzOnConfirm)="remove(c)"><nz-icon nzType="delete" /> Xóa</button>
                 } @else {
-                  <button nz-button nzType="link" nzSize="small" (click)="restore(c)"><nz-icon nzType="undo" /> Khôi phục</button>
+                  <button nz-button nzSize="small" (click)="restore(c)"><nz-icon nzType="undo" /> Khôi phục</button>
                 }
-              </td>
+              </div>
             }
-          </tr>
+          </nz-card>
         }
-      </tbody>
-    </nz-table>
+      </div>
+      <nz-pagination class="mobile-pagination" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()" (nzPageIndexChange)="onPageChange($event)" />
+    } @else {
+      <nz-table #table [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
+        [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"
+        (nzPageIndexChange)="onPageChange($event)" [nzScroll]="{ x: '640px' }">
+        <thead>
+          <tr>
+            <th nzLeft>Tên lớp</th>
+            <th>Giáo viên</th>
+            <th>Sĩ số</th>
+            <th>Trạng thái</th>
+            @if (auth.isAdmin()) { <th nzRight class="actions-col">Thao tác</th> }
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of table.data; track c.id) {
+            <tr>
+              <td nzLeft [class.text-deleted]="c.isDeleted"><a [routerLink]="['/classes', c.id]">{{ c.name }}</a></td>
+              <td>{{ c.teacherName || '—' }}</td>
+              <td>{{ c.currentSize }}/{{ c.maxCapacity }}</td>
+              <td>
+                @if (c.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
+                @else if (c.isActive) { <nz-tag nzColor="green">Đang mở</nz-tag> }
+                @else { <nz-tag>Đóng</nz-tag> }
+              </td>
+              @if (auth.isAdmin()) {
+                <td nzRight>
+                  @if (!c.isDeleted) {
+                    <button nz-button nzType="link" nzSize="small" (click)="openEdit(c)"><nz-icon nzType="edit" /></button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger
+                            nz-popconfirm nzPopconfirmTitle="Xóa mềm lớp này?" (nzOnConfirm)="remove(c)">
+                      <nz-icon nzType="delete" />
+                    </button>
+                  } @else {
+                    <button nz-button nzType="link" nzSize="small" (click)="restore(c)"><nz-icon nzType="undo" /> Khôi phục</button>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </nz-table>
+    }
 
     <nz-modal [nzVisible]="modalOpen()" [nzTitle]="editing() ? 'Sửa lớp' : 'Thêm lớp'"
       [nzOkLoading]="saving()" [nzOkDisabled]="form.invalid" (nzOnOk)="save()" (nzOnCancel)="closeModal()">
@@ -129,6 +160,7 @@ import { PageHeader } from '../../shared/page-header';
 })
 export class ClassesPage {
   protected readonly auth = inject(AuthService);
+  protected readonly screen = inject(ScreenService);
   private readonly classesService = inject(ClassesService);
   private readonly usersService = inject(UsersService);
   private readonly message = inject(NzMessageService);
@@ -220,21 +252,21 @@ export class ClassesPage {
     this.saving.set(true);
     op.subscribe({
       next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success(editing ? 'Đã cập nhật lớp.' : 'Đã thêm lớp.'); this.load(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
     });
   }
 
   protected remove(c: ClassListItem): void {
     this.classesService.delete(c.id).subscribe({
       next: () => { this.message.success('Đã xóa (mềm).'); this.load(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Xóa thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
 
   protected restore(c: ClassListItem): void {
     this.classesService.restore(c.id).subscribe({
       next: () => { this.message.success('Đã khôi phục.'); this.load(); },
-      error: (err: HttpErrorResponse) => this.message.error((err.error as ApiProblem | null)?.detail ?? 'Khôi phục thất bại.')
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Khôi phục thất bại.')
     });
   }
 }

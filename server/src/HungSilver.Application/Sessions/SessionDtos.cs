@@ -30,7 +30,7 @@ public sealed record PointEntryDto(
     PointType Type,
     int Points,
     string Reason,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAt);
 
 public sealed record SaveAttendanceRequest(IReadOnlyList<SaveAttendanceRow> Entries);
 

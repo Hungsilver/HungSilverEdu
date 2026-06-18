@@ -6,7 +6,6 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
-import { ApiProblem } from '../../core/models';
 import { SessionsService } from '../../core/sessions.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -52,7 +51,7 @@ export class SessionReportPage {
     this.loading.set(true);
     this.sessionsService.generateReport(this.id()).subscribe({
       next: r => { this.loading.set(false); this.content.set(r.content); },
-      error: (err: HttpErrorResponse) => { this.loading.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Tạo báo cáo thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.loading.set(false); this.message.error(err.error?.message ?? err.message); }
     });
   }
 

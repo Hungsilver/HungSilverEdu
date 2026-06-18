@@ -75,20 +75,20 @@ public class Repository<T>(AppDbContext context) : IRepository<T> where T : Base
             return false;
 
         entity.IsDeleted = false;
-        entity.DeletedAtUtc = null;
+        entity.DeletedAt = null;
         return true;
     }
 
     private static IQueryable<T> ApplySort(IQueryable<T> query, string? sortBy, bool desc)
     {
         if (string.IsNullOrWhiteSpace(sortBy))
-            return query.OrderByDescending(e => e.CreatedAtUtc);
+            return query.OrderByDescending(e => e.CreatedAt);
 
         var property = typeof(T).GetProperty(sortBy,
             BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
 
         if (property is null)
-            return query.OrderByDescending(e => e.CreatedAtUtc);
+            return query.OrderByDescending(e => e.CreatedAt);
 
         var parameter = Expression.Parameter(typeof(T), "e");
         var lambda = Expression.Lambda(Expression.Property(parameter, property), parameter);

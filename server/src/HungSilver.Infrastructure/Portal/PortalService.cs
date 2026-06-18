@@ -37,7 +37,7 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
             .Where(e => e.StudentId == student.Id && e.IsActive)
             .Select(e => e.ClassId).ToListAsync(ct);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var upcoming = await (
             from s in context.ClassSessions.AsNoTracking()
             join c in context.Classes.AsNoTracking() on s.ClassId equals c.Id
@@ -68,7 +68,7 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
             from a in context.Assignments.AsNoTracking()
             join c in context.Classes.AsNoTracking() on a.ClassId equals c.Id
             where classIds.Contains(a.ClassId)
-            orderby a.DueDate descending, a.CreatedAtUtc descending
+            orderby a.DueDate descending, a.CreatedAt descending
             select new { a, c.Name }).ToListAsync(ct);
         if (assignments.Count == 0)
             return new List<PortalAssignmentDto>();
@@ -86,7 +86,7 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
                 .Where(m => materialIds.Contains(m.Id))
                 .ToDictionaryAsync(m => m.Id, m => m, ct);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var today = DateOnly.FromDateTime(DateTime.Now);
         return assignments.Select(x =>
         {
             subs.TryGetValue(x.a.Id, out var sub);
@@ -122,7 +122,7 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
         if (!enrolled)
             return Result.Failure(Error.Forbidden("Assignment.NotInClass", "Bài tập không thuộc lớp của bạn."));
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var sub = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == student.Id, ct);
         if (sub is null)
         {

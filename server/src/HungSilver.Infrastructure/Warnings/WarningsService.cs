@@ -72,7 +72,7 @@ public sealed class WarningsService(
         }
 
         // Học phí quá hạn.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var overdue = await context.TuitionInvoices.AsNoTracking()
             .Where(t => studentIds.Contains(t.StudentId) && t.PaidOn == null && t.DueDate < today)
             .Select(t => new { t.StudentId, t.DueDate, t.Amount })

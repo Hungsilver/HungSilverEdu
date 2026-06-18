@@ -105,7 +105,7 @@ public sealed class NotificationService(
                     Channel = channel,
                     RenderedContent = notification.Content,
                     Status = status,
-                    SentAtUtc = status == NotificationDeliveryStatus.Sent ? DateTime.UtcNow : null,
+                    SentAt = status == NotificationDeliveryStatus.Sent ? DateTime.Now : null,
                     ErrorMessage = error
                 };
                 deliveries.Add(delivery);

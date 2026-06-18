@@ -10,7 +10,7 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzSelectModule } from 'ng-zorro-antd/select';
-import { ApiProblem, FileStorageMode, SettingScope, UpsertSettingRequest } from '../../core/models';
+import { FileStorageMode, SettingScope, UpsertSettingRequest } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -118,7 +118,7 @@ export class SettingsPage implements OnInit {
       this.settingsService.upsert(sys(KEY_PENALTY_REASONS, this.penaltyReasons))
     ]).subscribe({
       next: () => { this.saving.set(false); this.message.success('Đã lưu cấu hình.'); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message); }
     });
   }
 }

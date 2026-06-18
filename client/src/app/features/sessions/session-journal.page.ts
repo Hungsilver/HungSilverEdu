@@ -8,7 +8,7 @@ import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
-import { ApiProblem, UpsertJournalRequest } from '../../core/models';
+import { UpsertJournalRequest } from '../../core/models';
 import { SessionsService } from '../../core/sessions.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -52,7 +52,7 @@ export class SessionJournalPage implements OnInit {
     this.saving.set(true);
     this.sessionsService.saveJournal(this.id(), this.model).subscribe({
       next: () => { this.saving.set(false); this.message.success('Đã lưu nhật ký.'); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message); }
     });
   }
 }

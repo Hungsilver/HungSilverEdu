@@ -12,11 +12,14 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSwitchModule } from 'ng-zorro-antd/switch';
+import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { ApiProblem, Product, ProductRequest } from '../../core/models';
+import { Product, ProductRequest } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
 import { ProductsService } from '../../core/products.service';
+import { ScreenService } from '../../core/screen.service';
 
 @Component({
   selector: 'app-products-page',
@@ -24,7 +27,7 @@ import { ProductsService } from '../../core/products.service';
     FormsModule, ReactiveFormsModule, CurrencyPipe, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule, NzTagModule,
     NzModalModule, NzFormModule, NzInputNumberModule, NzSwitchModule,
-    NzPopconfirmModule, NzCheckboxModule
+    NzPopconfirmModule, NzCheckboxModule, NzCardModule, NzPaginationModule
   ],
   template: `
     <div class="page-header">
@@ -44,68 +47,96 @@ import { ProductsService } from '../../core/products.service';
       </div>
     </div>
 
-    <nz-table
-      #table
-      [nzData]="products()"
-      [nzLoading]="loading()"
-      [nzFrontPagination]="false"
-      [nzTotal]="total()"
-      [nzPageIndex]="page()"
-      [nzPageSize]="pageSize()"
-      (nzPageIndexChange)="onPageChange($event)"
-      nzShowSizeChanger
-      (nzPageSizeChange)="onPageSizeChange($event)">
-      <thead>
-        <tr>
-          <th>Tên</th>
-          <th>SKU</th>
-          <th>Giá</th>
-          <th>Trạng thái</th>
-          <th>Ngày tạo</th>
-          @if (auth.isAdmin()) {
-            <th class="actions-col">Thao tác</th>
-          }
-        </tr>
-      </thead>
-      <tbody>
-        @for (product of table.data; track product.id) {
-          <tr>
-            <td [class.text-deleted]="product.isDeleted">{{ product.name }}</td>
-            <td>{{ product.sku }}</td>
-            <td>{{ product.price | currency: 'VND' }}</td>
-            <td>
-              @if (product.isDeleted) {
-                <nz-tag nzColor="red">Đã xóa</nz-tag>
-              } @else if (product.isActive) {
-                <nz-tag nzColor="green">Đang bán</nz-tag>
-              } @else {
-                <nz-tag>Ngừng bán</nz-tag>
-              }
-            </td>
-            <td>{{ product.createdAtUtc | date: 'dd/MM/yyyy HH:mm' }}</td>
+    @if (screen.isMobile()) {
+      <div class="mobile-card-list">
+        @for (product of products(); track product.id) {
+          <nz-card>
+            <div class="card-header">
+              <span class="card-title" [class.text-deleted]="product.isDeleted">{{ product.name }}</span>
+              @if (product.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
+              @else if (product.isActive) { <nz-tag nzColor="green">Đang bán</nz-tag> }
+              @else { <nz-tag>Ngừng bán</nz-tag> }
+            </div>
+            <div class="card-field"><span class="label">SKU</span><span>{{ product.sku }}</span></div>
+            <div class="card-field"><span class="label">Giá</span><span>{{ product.price | currency: 'VND' }}</span></div>
             @if (auth.isAdmin()) {
-              <td>
+              <div class="card-actions">
                 @if (!product.isDeleted) {
-                  <button nz-button nzType="link" nzSize="small" (click)="openEdit(product)">
-                    <nz-icon nzType="edit" />
-                  </button>
-                  <button nz-button nzType="link" nzSize="small" nzDanger
-                          nz-popconfirm nzPopconfirmTitle="Xóa mềm sản phẩm này?"
-                          (nzOnConfirm)="remove(product)">
-                    <nz-icon nzType="delete" />
-                  </button>
+                  <button nz-button nzSize="small" (click)="openEdit(product)"><nz-icon nzType="edit" /> Sửa</button>
+                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa mềm sản phẩm này?" (nzOnConfirm)="remove(product)"><nz-icon nzType="delete" /> Xóa</button>
                 } @else {
-                  <button nz-button nzType="link" nzSize="small" (click)="restore(product)">
-                    <nz-icon nzType="undo" />
-                    Khôi phục
-                  </button>
+                  <button nz-button nzSize="small" (click)="restore(product)"><nz-icon nzType="undo" /> Khôi phục</button>
                 }
-              </td>
+              </div>
+            }
+          </nz-card>
+        }
+      </div>
+      <nz-pagination class="mobile-pagination" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()" (nzPageIndexChange)="onPageChange($event)" nzShowSizeChanger (nzPageSizeChange)="onPageSizeChange($event)" />
+    } @else {
+      <nz-table
+        #table
+        [nzData]="products()"
+        [nzLoading]="loading()"
+        [nzFrontPagination]="false"
+        [nzTotal]="total()"
+        [nzPageIndex]="page()"
+        [nzPageSize]="pageSize()"
+        (nzPageIndexChange)="onPageChange($event)"
+        nzShowSizeChanger
+        (nzPageSizeChange)="onPageSizeChange($event)">
+        <thead>
+          <tr>
+            <th>Tên</th>
+            <th>SKU</th>
+            <th>Giá</th>
+            <th>Trạng thái</th>
+            <th>Ngày tạo</th>
+            @if (auth.isAdmin()) {
+              <th class="actions-col">Thao tác</th>
             }
           </tr>
-        }
-      </tbody>
-    </nz-table>
+        </thead>
+        <tbody>
+          @for (product of table.data; track product.id) {
+            <tr>
+              <td [class.text-deleted]="product.isDeleted">{{ product.name }}</td>
+              <td>{{ product.sku }}</td>
+              <td>{{ product.price | currency: 'VND' }}</td>
+              <td>
+                @if (product.isDeleted) {
+                  <nz-tag nzColor="red">Đã xóa</nz-tag>
+                } @else if (product.isActive) {
+                  <nz-tag nzColor="green">Đang bán</nz-tag>
+                } @else {
+                  <nz-tag>Ngừng bán</nz-tag>
+                }
+              </td>
+              <td>{{ product.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+              @if (auth.isAdmin()) {
+                <td>
+                  @if (!product.isDeleted) {
+                    <button nz-button nzType="link" nzSize="small" (click)="openEdit(product)">
+                      <nz-icon nzType="edit" />
+                    </button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger
+                            nz-popconfirm nzPopconfirmTitle="Xóa mềm sản phẩm này?"
+                            (nzOnConfirm)="remove(product)">
+                      <nz-icon nzType="delete" />
+                    </button>
+                  } @else {
+                    <button nz-button nzType="link" nzSize="small" (click)="restore(product)">
+                      <nz-icon nzType="undo" />
+                      Khôi phục
+                    </button>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </nz-table>
+    }
 
     <nz-modal
       [nzVisible]="modalOpen()"
@@ -169,6 +200,7 @@ import { ProductsService } from '../../core/products.service';
 })
 export class ProductsPage {
   protected readonly auth = inject(AuthService);
+  protected readonly screen = inject(ScreenService);
   private readonly productsService = inject(ProductsService);
   private readonly message = inject(NzMessageService);
 
@@ -284,7 +316,7 @@ export class ProductsPage {
       },
       error: (err: HttpErrorResponse) => {
         this.saving.set(false);
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu sản phẩm thất bại.');
+        this.message.error(err.error?.message ?? err.message ??'Lưu sản phẩm thất bại.');
       }
     });
   }
@@ -296,7 +328,7 @@ export class ProductsPage {
         this.load();
       },
       error: (err: HttpErrorResponse) =>
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Xóa thất bại.')
+        this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
 
@@ -307,7 +339,7 @@ export class ProductsPage {
         this.load();
       },
       error: (err: HttpErrorResponse) =>
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Khôi phục thất bại.')
+        this.message.error(err.error?.message ?? err.message ??'Khôi phục thất bại.')
     });
   }
 }

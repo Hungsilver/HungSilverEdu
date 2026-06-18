@@ -14,7 +14,7 @@ public sealed record AssignmentDto(
     DateOnly? DueDate,
     int SubmittedCount,
     int TotalCount,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAt);
 
 public sealed record CreateAssignmentRequest(
     Guid ClassId,

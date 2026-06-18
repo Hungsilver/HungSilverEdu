@@ -35,7 +35,7 @@ public sealed class MaterialService(
 
         var items = await materials.FindAsync(m => m.ClassId == classId, ct);
         var names = await LoadCategoryNamesAsync(items, ct);
-        return items.OrderByDescending(m => m.CreatedAtUtc).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
+        return items.OrderByDescending(m => m.CreatedAt).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
     }
 
     /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại.</summary>
@@ -46,7 +46,7 @@ public sealed class MaterialService(
                  && (categoryId == null || m.CategoryId == categoryId)
                  && (type == null || m.Type == type), ct);
         var names = await LoadCategoryNamesAsync(items, ct);
-        return items.OrderByDescending(m => m.CreatedAtUtc).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
+        return items.OrderByDescending(m => m.CreatedAt).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
     }
 
     public async Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default)
@@ -157,6 +157,6 @@ public sealed class MaterialService(
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
         return new MaterialDto(m.Id, m.ClassId, m.CategoryId, categoryName, m.Title, m.Type, m.Source,
-            m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAtUtc);
+            m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAt);
     }
 }

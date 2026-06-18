@@ -15,7 +15,7 @@ import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import {
-  ApiProblem, PortalAssignment, PortalProfile, SUBMISSION_STATUS_COLORS, SUBMISSION_STATUS_LABELS
+  PortalAssignment, PortalProfile, SUBMISSION_STATUS_COLORS, SUBMISSION_STATUS_LABELS
 } from '../../core/models';
 import { PortalService } from '../../core/portal.service';
 import { PageHeader } from '../../shared/page-header';
@@ -135,7 +135,7 @@ export class PortalPage {
         this.message.success('Đã nộp bài.');
         this.portalService.assignments().subscribe(x => this.assignments.set(x));
       },
-      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error((e.error as ApiProblem | null)?.detail ?? 'Nộp bài thất bại.'); }
+      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Nộp bài thất bại.'); }
     });
   }
 }

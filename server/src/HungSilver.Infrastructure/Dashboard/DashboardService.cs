@@ -219,23 +219,8 @@ public sealed class DashboardService(
         return result;
     }
 
-    private async Task<DateOnly> GetTodayAsync(CancellationToken ct)
-    {
-        var tz = await settings.GetEffectiveValueAsync(SettingKeys.CenterTimeZone, ct: ct);
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(tz))
-            {
-                var info = TimeZoneInfo.FindSystemTimeZoneById(tz);
-                return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, info));
-            }
-        }
-        catch
-        {
-            // bỏ qua, dùng mặc định +7
-        }
-        return DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-    }
+    private Task<DateOnly> GetTodayAsync(CancellationToken ct) =>
+        Task.FromResult(DateOnly.FromDateTime(DateTime.Now));
 
     private async Task<int> GetIntSettingAsync(string key, int fallback, CancellationToken ct)
     {

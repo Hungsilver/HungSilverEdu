@@ -8,8 +8,8 @@ public sealed record ProductDto(
     decimal Price,
     bool IsActive,
     bool IsDeleted,
-    DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);
 
 public sealed record CreateProductRequest(string Name, string Sku, string? Description, decimal Price, bool IsActive);
 

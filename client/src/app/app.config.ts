@@ -56,6 +56,7 @@ import { provideNzI18n, vi_VN } from 'ng-zorro-antd/i18n';
 import { provideNzIcons } from 'ng-zorro-antd/icon';
 
 import { routes } from './app.routes';
+import { apiResponseInterceptor } from './core/api-response.interceptor';
 import { authInterceptor } from './core/auth.interceptor';
 import { AuthService } from './core/auth.service';
 import { ThemeService } from './core/theme.service';
@@ -66,7 +67,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withComponentInputBinding()),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([apiResponseInterceptor, authInterceptor])),
     provideNzI18n(vi_VN),
     provideNzIcons([
       UserOutline, LockOutline, DownOutline, LogoutOutline, TeamOutline,

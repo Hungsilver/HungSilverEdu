@@ -11,6 +11,6 @@ public class NotificationDelivery : BaseEntity
     public NotificationChannel Channel { get; set; }
     public string RenderedContent { get; set; } = string.Empty;
     public NotificationDeliveryStatus Status { get; set; } = NotificationDeliveryStatus.Pending;
-    public DateTime? SentAtUtc { get; set; }
+    public DateTime? SentAt { get; set; }
     public string? ErrorMessage { get; set; }
 }

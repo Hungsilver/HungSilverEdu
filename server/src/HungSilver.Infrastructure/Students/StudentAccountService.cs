@@ -52,7 +52,7 @@ public sealed class StudentAccountService(
             ParentPhone = Clean(request.ParentPhone),
             EnglishLevel = Clean(request.EnglishLevel),
             LearningGoal = Clean(request.LearningGoal),
-            EnrollmentDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            EnrollmentDate = DateOnly.FromDateTime(DateTime.Now),
             IsActive = true
         };
         context.Students.Add(student);
@@ -62,7 +62,7 @@ public sealed class StudentAccountService(
         {
             ClassId = classId,
             StudentId = student.Id,
-            EnrolledOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            EnrolledOn = DateOnly.FromDateTime(DateTime.Now),
             IsActive = true
         });
         await context.SaveChangesAsync(ct);

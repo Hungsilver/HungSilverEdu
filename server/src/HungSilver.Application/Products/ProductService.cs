@@ -37,7 +37,7 @@ public sealed class ProductService(
 
         var page = await products.GetPagedAsync(
             request.Page, request.PageSize, filter,
-            request.SortBy ?? nameof(Product.CreatedAtUtc), request.SortDesc || request.SortBy is null,
+            request.SortBy ?? nameof(Product.CreatedAt), request.SortDesc || request.SortBy is null,
             includeDeleted, ct);
 
         return page.Map(ToDto);
@@ -121,5 +121,5 @@ public sealed class ProductService(
     }
 
     private static ProductDto ToDto(Product p) =>
-        new(p.Id, p.Name, p.Sku, p.Description, p.Price, p.IsActive, p.IsDeleted, p.CreatedAtUtc, p.UpdatedAtUtc);
+        new(p.Id, p.Name, p.Sku, p.Description, p.Price, p.IsActive, p.IsDeleted, p.CreatedAt, p.UpdatedAt);
 }

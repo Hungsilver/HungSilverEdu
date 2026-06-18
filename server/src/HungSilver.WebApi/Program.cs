@@ -10,6 +10,10 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
 
+// Cho phép Npgsql chấp nhận DateTime.Now (Local kind) với cột "timestamp with time zone"
+// vì hệ thống chạy trên VPS cùng múi giờ, không cần UTC.
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((context, config) => config
@@ -59,7 +63,7 @@ builder.Services.AddCors(options => options.AddPolicy("Client", policy => policy
     .AllowCredentials()));
 
 builder.Services
-    .AddControllers()
+    .AddControllers(options => options.Filters.Add<ApiResponseWrapperFilter>())
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
