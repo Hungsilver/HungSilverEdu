@@ -2,6 +2,7 @@ using HungSilver.Application.Account;
 using HungSilver.Application.Auth;
 using HungSilver.Application.Files;
 using HungSilver.Domain.Common.Results;
+using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 
@@ -21,8 +22,10 @@ public sealed class ProfileService(
         if (user is null)
             return Result.Failure<UserDto>(UserNotFound);
 
-        // Ảnh đại diện luôn lưu server, không phụ thuộc cấu hình FileStorage.Mode.
-        var upload = await fileService.UploadAsync(content, fileName, contentType, length, enforceStorageMode: false, ct);
+        // Ảnh đại diện luôn lưu server (không phụ thuộc FileStorage.Mode) và công khai (hiển thị qua thẻ <img>).
+        var upload = await fileService.UploadAsync(
+            content, fileName, contentType, length,
+            enforceStorageMode: false, visibility: FileVisibility.Public, ct: ct);
         if (upload.IsFailure)
             return Result.Failure<UserDto>(upload.Error);
 

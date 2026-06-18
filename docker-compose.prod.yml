@@ -28,6 +28,10 @@ services:
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=hungsilver;Username=hungsilver;Password=${POSTGRES_PASSWORD}
       Jwt__Secret: ${JWT_SECRET:?Thiếu JWT_SECRET trong .env (tối thiểu 32 ký tự)}
       Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      # File upload lưu ở volume bền vững (không mất khi deploy lại image).
+      FileStorage__RootPath: /app/uploads
+    volumes:
+      - hungsilver_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,3 +48,4 @@ services:
 
 volumes:
   hungsilver_pgdata:
+  hungsilver_uploads:

@@ -143,6 +143,13 @@ export enum FileStorageMode {
   Server = 'Server'
 }
 
+/** Mức truy cập file khi tải xuống (phân tầng theo độ nhạy cảm). */
+export enum FileVisibility {
+  Public = 'Public',               // tải ẩn danh qua link GUID (ảnh đại diện)
+  Authenticated = 'Authenticated', // phải đăng nhập
+  Restricted = 'Restricted'        // chỉ người upload hoặc Teacher/Admin
+}
+
 export enum MaterialSource {
   ExternalUrl = 'ExternalUrl',
   ServerFile = 'ServerFile'

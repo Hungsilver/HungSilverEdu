@@ -89,6 +89,7 @@ public static class DependencyInjection
         // File storage + cấu hình phân tầng
         services.AddScoped<IFileStorage, LocalDiskFileStorage>();
         services.AddScoped<IFileService, FileService>();
+        services.AddHostedService<FileCleanupService>(); // dọn file đã xóa mềm quá hạn
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());

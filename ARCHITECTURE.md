@@ -166,7 +166,7 @@ Thứ tự trong `server/src/HungSilver.WebApi/Program.cs`:
 - **Roles:** `Admin`, `Teacher`, `User`=học sinh (`AppRoles`). Seed sẵn 3 role; **tài khoản admin tạo thủ công** (đăng nhập bằng username `admin`). **Đăng nhập chấp nhận username HOẶC email** (`AuthService.LoginAsync`). **Đăng ký tự do bị khóa** (`AuthFeatureOptions.AllowRegistration=false`) — chỉ Admin tạo tài khoản Admin/GV; GV tạo tài khoản học sinh.
 - **Server:**
   - `[Authorize]` mặc định; `[Authorize(Policy="AdminOnly")]` cho `UsersController` (gồm `POST /api/users` tạo tài khoản); `TeacherOrAdmin` cho lớp/học sinh — thao tác theo phạm vi qua `IClassAccessGuard`.
-  - `ProfileController` (`api/profile`) `[Authorize]` mọi role: `PUT /api/profile` (cập nhật họ tên + SĐT), `POST avatar`, `PUT password`; `FilesController.Download` `[AllowAnonymous]` (ảnh/tài liệu theo GUID), upload vẫn `TeacherOrAdmin`.
+  - `ProfileController` (`api/profile`) `[Authorize]` mọi role: `PUT /api/profile` (cập nhật họ tên + SĐT), `POST avatar`, `PUT password`. `FilesController` upload `[Authorize]` (**mọi user đã đăng nhập**, rate-limit 30/phút/user, quota/user); download `[AllowAnonymous]` nhưng **phân tầng theo `Visibility`** trong code (Public ẩn danh / Authenticated cần đăng nhập / Restricted = uploader|Teacher|Admin) + ETag/Cache-Control/nosniff/304.
 - **Client (guards `core/guards.ts`):**
   - `authGuard` — chưa đăng nhập → `/login`.
   - `guestGuard` — đã đăng nhập thì chặn vào lại `/login`. (Route `/register` đã gỡ — đăng ký bị khóa.)
@@ -267,6 +267,7 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `Jwt:AccessTokenMinutes` / `RefreshTokenDays` | — | — | 15' / 7 ngày |
 | `Google:ClientId` | `Google__ClientId` | `GOOGLE_CLIENT_ID` | Trống ⇒ ẩn Google Login |
 | `Cors:Origins` | `Cors__Origins__0` | — | Dev: `http://localhost:4200` |
+| `FileStorage:*` | `FileStorage__*` | — | `RootPath=/app/uploads` (volume prod), `MaxSizeBytes` 20MB, `PerUserQuotaBytes` 200MB, `CleanupRetentionDays` 30, `AllowedExtensions` (đuôi cơ bản); mode `Server` (DbSeeder) |
 | — | `HTTP_PORT` | `HTTP_PORT` | cổng public client (nginx), mặc định 80 |
 | — | `GHCR_OWNER`, `IMAGE_TAG` | — | chỉ cho `docker-compose.prod.yml` |
 
@@ -302,6 +303,7 @@ Tài khoản admin: **tạo thủ công** khi cần (mặc định `admin` / `Ad
 - **`client/Dockerfile`** — `node:22` build → `nginx:alpine` (static + proxy `/api`→`api:8080`).
 - **Full stack tại chỗ:** `cp .env.example .env` (đổi `JWT_SECRET`, `POSTGRES_PASSWORD`…) → `docker compose up -d --build`. Mở `http://<ip>:HTTP_PORT`.
 - **Prod qua GHCR:** `docker-compose.prod.yml` kéo image `ghcr.io/<GHCR_OWNER>/hungsilver-{api,client}:<IMAGE_TAG>`.
+- **File upload (bền vững):** service `api` mount volume **`hungsilver_uploads:/app/uploads`** (cả `docker-compose.yml` & `.prod.yml`) ⇒ file KHÔNG mất khi deploy lại image; backup volume này cùng `hungsilver_pgdata`. **`client/nginx.conf`** đặt `client_max_body_size 25m` cho `/api/` (mặc định nginx 1MB sẽ chặn upload); đổi nginx.conf phải **rebuild lại client image** mới có hiệu lực.
 - **HTTPS:** cookie refresh `Secure` ở Production ⇒ cần TLS (Caddy/nginx + Let's Encrypt, hoặc Cloudflare) trỏ về client.
 
 ---
@@ -354,7 +356,7 @@ Tài khoản admin: **tạo thủ công** khi cần (mặc định `admin` / `Ad
 - **Application** (IRepository): `Students/StudentService`, `Journals/TeacherJournalService`, `Common/ClassAccessGuard`.
 - **Infrastructure** (AppDbContext join/aggregate): `Classes/ClassService`, `Schedule/ScheduleService`, `Sessions/SessionService`, `Dashboard/DashboardService`, `Reports/SessionReportService`, `Settings/SettingsService`, `Services/UserDirectory`, `Storage/{LocalDiskFileStorage,FileService}`, `Notifications/*`.
 - **Cấu hình phân tầng (Settings):** `ISettingsResolver`/`ISettingsService` (1 impl `SettingsService`). Giải theo **User → Class → Role → System → Default**. `SettingKeys`: `FileStorage.Mode`, `Tuition.DueSoonDays`, `Warning.ScoreDropThreshold`, `Center.TimeZone`.
-- **Upload 2 chế độ:** `IFileStorage` (local disk, `FileStorageOptions`) + setting `FileStorage.Mode` (`Server`|`ExternalUrl`); `FilesController` từ chối upload khi mode=`ExternalUrl`.
+- **Module upload file (`Storage/`):** `IFileStorage` (local disk, `FileStorageOptions`) + setting `FileStorage.Mode` (`Server`|`ExternalUrl`; mặc định **Server**) — `FileService` từ chối upload khi mode=`ExternalUrl`. **Validate**: dung lượng (`MaxSizeBytes` 20MB), **allowlist phần mở rộng** (`AllowedExtensions` — loại cơ bản: ảnh/pdf/office/txt/csv/zip), **chữ ký nội dung magic-byte** (`FileSignatureValidator` — chống đổi đuôi giả mạo), **hạn mức/user** (`PerUserQuotaBytes` 200MB, miễn Admin); **dedup theo SHA-256** (file trùng nội dung dùng lại 1 bản vật lý). `StoredFile` thêm cột `Sha256` + `Visibility`. **Tải xuống phân tầng** theo `Visibility`: `Public` (ẩn danh, ảnh đại diện) / `Authenticated` (mặc định upload, cần đăng nhập) / `Restricted` (uploader hoặc Teacher/Admin) — kèm ETag + Cache-Control + `nosniff`, hỗ trợ 304. **Dọn rác:** `FileCleanupService` (BackgroundService) hard-delete file vật lý đã xóa mềm quá `CleanupRetentionDays` (refcount theo StoragePath).
 - **Thông báo:** `INotificationSender`/`INotificationDispatcher`; Email thật (MailKit, `SmtpOptions`); Zalo/Messenger stub → `Manual` (GĐ2 tích hợp API).
 - **Điểm thưởng** = sổ cái `PointEntry`; số dư = SUM(reward) − SUM(penalty) − SUM(redeem). Quy đổi = `RewardRedemption`.
 
@@ -365,7 +367,7 @@ Tài khoản admin: **tạo thủ công** khi cần (mặc định `admin` / `Ad
 - `/api/sessions/{id}/sheet` · `/{id}/attendance` PUT(bulk) · `/{id}/points` POST · `DELETE /points/{entryId}` · `/{id}/journal` GET/PUT · `/{id}/report/generate` POST.
 - `/api/dashboard/summary` · `/charts`.
 - `/api/settings/effective` · `/scope/{scope}` · PUT · DELETE.
-- `/api/files` POST(upload theo mode) · `/{id}` GET.
+- `/api/files` POST (upload, mọi user đã đăng nhập, mode=Server) · `/{id}` GET (tải, phân tầng theo Visibility).
 
 ### 15.5 Migration & seed
 Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm). DbSeeder thêm: role Teacher, GV demo `teacher@hungsilver.local`/`Teacher@12345`, Curriculum/ClassRoom "Movers A"/3 Students/Enrollment/Slot/Session demo, `AppSetting` mặc định. appsettings thêm section `Seed.Teacher*`, `FileStorage`, `Smtp`.
@@ -401,6 +403,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 
 > Ghi lại mỗi thay đổi đáng kể (entity/endpoint/luồng/config/hạ tầng) theo định dạng: `ngày — mô tả — file chính`.
 
+- **2026-06-18** — **Hoàn thiện & hardening module upload file** (xem §15.3): mở quyền upload cho **mọi user đã đăng nhập** (`FilesController` `TeacherOrAdmin`→`[Authorize]`); allowlist **phần mở rộng** + validate **magic-byte** (`FileSignatureValidator`); **hạn mức/user** + **rate-limit** 30/phút (`AddRateLimiter` policy `upload`); **dedup SHA-256** + cột `StoredFile.Sha256`/`Visibility` (migration `AddStoredFileHardening`, backfill `Visibility=Public` giữ hành vi ảnh đại diện); **tải xuống phân tầng** (Public/Authenticated/Restricted) + ETag/Cache-Control/nosniff/304; **dọn file vật lý** quá hạn (`FileCleanupService`); fallback `SettingKeys` mode=`Server`. **Hạ tầng VPS:** volume `hungsilver_uploads:/app/uploads` (sửa mất file khi deploy) + `client_max_body_size 25m` ở nginx (sửa 413). FE: `files.service` thêm hằng `ACCEPT_ATTR`/`MAX_UPLOAD_BYTES`/`validate()` + `download()` (blob, kèm Bearer); enum `FileVisibility`. Build BE/FE sạch. — `server/src/**` (`Domain/{Entities/StoredFile,Enums/StoredFileEnums}`, `Application/Files/IFileService`, `Infrastructure/Storage/{FileService,FileSignatureValidator,FileCleanupService,FileStorageOptions}`, `Controllers/FilesController`, `Program.cs`, migration), `client/src/app/core/{files.service,models}.ts`, `docker-compose*.yml`, `client/nginx.conf`, `appsettings.json`, `ARCHITECTURE.md`.
 - **2026-06-18** — **Fix web Đợt 7** (xem §15.8): entity `Subject` (Môn, Admin CRUD, 0 FK) + `ClassRoom.SubjectId/GradeBand` + `LearningMaterial.GradeBand` (migration `AddSubjectAndClassTaxonomy`); Khối = danh sách chuẩn ở Settings `Class.GradeBands`. FE trang Lớp học điều hướng **Môn → Khối → Lớp** (query param + breadcrumb) + quản lý Môn + chọn Môn/Khối khi tạo lớp. **Import danh sách LỚP từ Excel** (`ClassImportService`, endpoints `/api/classes/import-classes*`). **GV xem lịch lớp mình** (mở route `/schedule` cho Teacher + menu). **Gộp cảnh báo** vào chi tiết Lớp (`?classId=`) & Học sinh (`?studentId=`, thêm filter ở `WarningsService`) — giữ trang `/warnings` tổng. Học liệu lọc/gắn theo Khối. Build BE/FE sạch, 10/10 test BE + FE test xanh. — `server/src/**` (`Domain/Entities/{Subject,ClassRoom,LearningMaterial}`, `Application/{Subjects,Classes,Materials,Settings,Warnings}`, `Infrastructure/{Classes/ClassImportService,Warnings,Classes/ClassService}`, `Controllers/{Subjects,Classes,Materials,Warnings}`, migration), `client/src/app/**` (`core/{models,classes,subjects,warnings,materials,settings}.service`, `features/{classes,students/student-detail,materials,schedule,settings}`, `layout/shell`, `app.routes`), `ARCHITECTURE.md`.
 - **2026-06-13** — Khởi tạo tài liệu kiến trúc từ commit gốc `481dc3e`. Phản ánh trạng thái base: Auth (JWT + refresh rotation + Google), Products CRUD + soft delete, Users admin, CI/CD GHCR→VPS. — `ARCHITECTURE.md`.
 - **2026-06-14** — Thêm quy ước bắt buộc: FE phải dùng ng-zorro-antd cho mọi UI (không HTML/CSS thuần, không thư viện UI khác); ghi rõ ở §14 (công thức task mới + Quy ước). — `ARCHITECTURE.md`, `CLAUDE.md`.
