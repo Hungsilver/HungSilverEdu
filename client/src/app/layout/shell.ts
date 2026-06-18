@@ -66,6 +66,9 @@ import { ThemeService } from '../core/theme.service';
           <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="book" /><span>Lớp học</span>
           </li>
+          <li nz-menu-item routerLink="/schedule" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="calendar" /><span>Lịch học</span>
+          </li>
           <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="link" /><span>Kho tài liệu</span>
           </li>

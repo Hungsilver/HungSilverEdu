@@ -17,11 +17,12 @@ export class MaterialsService {
     return this.http.get<Material[]>(this.apiUrl, { params });
   }
 
-  /** Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại. */
-  getLibrary(categoryId?: string | null, type?: MaterialType | null): Observable<Material[]> {
+  /** Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại/khối. */
+  getLibrary(categoryId?: string | null, type?: MaterialType | null, gradeBand?: string | null): Observable<Material[]> {
     let params = new HttpParams();
     if (categoryId) params = params.set('categoryId', categoryId);
     if (type) params = params.set('type', type);
+    if (gradeBand) params = params.set('gradeBand', gradeBand);
     return this.http.get<Material[]>(`${this.apiUrl}/library`, { params });
   }
 

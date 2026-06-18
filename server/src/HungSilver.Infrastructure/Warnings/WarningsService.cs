@@ -13,19 +13,31 @@ public sealed class WarningsService(
     IClassAccessGuard accessGuard,
     ISettingsResolver settings) : IWarningsService
 {
-    public async Task<Result<WarningsDto>> GetWarningsAsync(Guid? classId, CancellationToken ct = default)
+    public async Task<Result<WarningsDto>> GetWarningsAsync(Guid? classId, Guid? studentId = null, CancellationToken ct = default)
     {
-        if (classId is not null)
+        List<Guid> studentIds;
+        if (studentId is not null)
         {
-            var access = await accessGuard.EnsureCanAccessClassAsync(classId.Value, ct);
+            // Cảnh báo của riêng 1 học sinh (nhúng ở chi tiết HS — Đợt 7).
+            var access = await accessGuard.EnsureCanAccessStudentAsync(studentId.Value, ct);
             if (access.IsFailure)
                 return Result.Failure<WarningsDto>(access.Error);
+            studentIds = [studentId.Value];
         }
+        else
+        {
+            if (classId is not null)
+            {
+                var access = await accessGuard.EnsureCanAccessClassAsync(classId.Value, ct);
+                if (access.IsFailure)
+                    return Result.Failure<WarningsDto>(access.Error);
+            }
 
-        var classIds = await ScopeClassIdsAsync(classId, ct);
-        var studentIds = await context.Enrollments.AsNoTracking()
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+            var classIds = await ScopeClassIdsAsync(classId, ct);
+            studentIds = await context.Enrollments.AsNoTracking()
+                .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
+                .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+        }
 
         if (studentIds.Count == 0)
             return new WarningsDto([], [], [], []);

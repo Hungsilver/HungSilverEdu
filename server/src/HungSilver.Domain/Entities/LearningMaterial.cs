@@ -12,6 +12,9 @@ public class LearningMaterial : BaseEntity
     /// <summary>Danh mục/khối học liệu (thư viện). Tùy chọn.</summary>
     public Guid? CategoryId { get; set; }
 
+    /// <summary>Khối lớp gắn học liệu (danh sách chuẩn ở Settings, vd "Khối 6"). Tùy chọn (Đợt 7).</summary>
+    public string? GradeBand { get; set; }
+
     public string Title { get; set; } = string.Empty;
     public MaterialType Type { get; set; }
     public MaterialSource Source { get; set; } = MaterialSource.ExternalUrl;

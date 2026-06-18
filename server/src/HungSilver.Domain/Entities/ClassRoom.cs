@@ -13,6 +13,12 @@ public class ClassRoom : BaseEntity
     /// <summary>Giáo viên phụ trách (AppUser.Id) — Guid thuần, không FK.</summary>
     public Guid TeacherId { get; set; }
 
+    /// <summary>Môn học (Subject.Id) — Guid thuần, không FK. Null = chưa phân môn (Đợt 7).</summary>
+    public Guid? SubjectId { get; set; }
+
+    /// <summary>Khối lớp (danh sách chuẩn ở Settings, vd "Khối 6"). Null = chưa phân khối (Đợt 7).</summary>
+    public string? GradeBand { get; set; }
+
     public Guid? CurriculumId { get; set; }
     public int MaxCapacity { get; set; }
 

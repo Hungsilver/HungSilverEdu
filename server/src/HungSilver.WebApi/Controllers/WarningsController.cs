@@ -11,6 +11,6 @@ namespace HungSilver.WebApi.Controllers;
 public class WarningsController(IWarningsService warningsService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<WarningsDto>> Get([FromQuery] Guid? classId, CancellationToken ct) =>
-        (await warningsService.GetWarningsAsync(classId, ct)).ToActionResult();
+    public async Task<ActionResult<WarningsDto>> Get([FromQuery] Guid? classId, [FromQuery] Guid? studentId, CancellationToken ct) =>
+        (await warningsService.GetWarningsAsync(classId, studentId, ct)).ToActionResult();
 }

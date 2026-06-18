@@ -3,8 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  ClassDetail, ClassListItem, ClassRequest, ClassStudentOverview, CreateClassStudentRequest,
-  CreateClassStudentResult, PagedResult, RosterItem, StudentImportPreview, StudentImportResult
+  ClassDetail, ClassImportPreview, ClassImportResult, ClassListItem, ClassRequest, ClassStudentOverview,
+  CreateClassStudentRequest, CreateClassStudentResult, PagedResult, RosterItem, StudentImportPreview, StudentImportResult
 } from './models';
 
 export interface ClassQuery {
@@ -12,6 +12,8 @@ export interface ClassQuery {
   pageSize: number;
   search?: string;
   includeDeleted?: boolean;
+  subjectId?: string;
+  gradeBand?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -23,6 +25,8 @@ export class ClassesService {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.search) params = params.set('search', query.search);
     if (query.includeDeleted) params = params.set('includeDeleted', true);
+    if (query.subjectId) params = params.set('subjectId', query.subjectId);
+    if (query.gradeBand) params = params.set('gradeBand', query.gradeBand);
     return this.http.get<PagedResult<ClassListItem>>(this.apiUrl, { params });
   }
 
@@ -87,5 +91,22 @@ export class ClassesService {
     fd.append('file', file);
     fd.append('createAccounts', String(createAccounts));
     return this.http.post<StudentImportResult>(`${this.apiUrl}/${classId}/import-students`, fd);
+  }
+
+  // ---- Import Excel danh sách LỚP (Đợt 7) ----
+  downloadClassImportTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/import-classes-template`, { responseType: 'blob' });
+  }
+
+  importClassesPreview(file: File): Observable<ClassImportPreview> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<ClassImportPreview>(`${this.apiUrl}/import-classes/preview`, fd);
+  }
+
+  importClassesCommit(file: File): Observable<ClassImportResult> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<ClassImportResult>(`${this.apiUrl}/import-classes`, fd);
   }
 }

@@ -21,7 +21,7 @@ public sealed class ClassService(
 {
     private static readonly Error NotFoundError = Error.NotFound("Class.NotFound", "Không tìm thấy lớp học.");
 
-    public async Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, CancellationToken ct = default)
+    public async Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? subjectId = null, string? gradeBand = null, CancellationToken ct = default)
     {
         var query = includeDeleted && accessGuard.IsAdmin
             ? context.Classes.IgnoreQueryFilters().AsNoTracking()
@@ -29,6 +29,12 @@ public sealed class ClassService(
 
         if (!accessGuard.IsAdmin)
             query = query.Where(c => c.TeacherId == accessGuard.TeacherScopeId);
+
+        if (subjectId is not null)
+            query = query.Where(c => c.SubjectId == subjectId);
+
+        if (!string.IsNullOrWhiteSpace(gradeBand))
+            query = query.Where(c => c.GradeBand == gradeBand);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -53,10 +59,12 @@ public sealed class ClassService(
             .ToDictionaryAsync(x => x.ClassId, x => x.Count, ct);
 
         var teacherNames = await userDirectory.GetDisplayNamesAsync(items.Select(c => c.TeacherId), ct);
+        var subjectNames = await LoadSubjectNamesAsync(items, ct);
 
         var dtos = items.Select(c => new ClassListItemDto(
             c.Id, c.Name, c.TeacherId,
             teacherNames.GetValueOrDefault(c.TeacherId),
+            c.SubjectId, Lookup(subjectNames, c.SubjectId), c.GradeBand,
             c.MaxCapacity,
             sizes.GetValueOrDefault(c.Id),
             c.IsActive, c.IsDeleted, c.CreatedAt)).ToList();
@@ -97,6 +105,8 @@ public sealed class ClassService(
         {
             Name = request.Name.Trim(),
             TeacherId = request.TeacherId,
+            SubjectId = Normalize(request.SubjectId),
+            GradeBand = CleanGradeBand(request.GradeBand),
             CurriculumId = request.CurriculumId,
             MaxCapacity = request.MaxCapacity,
             Schedule = request.Schedule?.Trim(),
@@ -126,6 +136,8 @@ public sealed class ClassService(
 
         cls.Name = request.Name.Trim();
         cls.TeacherId = request.TeacherId;
+        cls.SubjectId = Normalize(request.SubjectId);
+        cls.GradeBand = CleanGradeBand(request.GradeBand);
         cls.CurriculumId = request.CurriculumId;
         cls.MaxCapacity = request.MaxCapacity;
         cls.Schedule = request.Schedule?.Trim();
@@ -377,10 +389,31 @@ public sealed class ClassService(
         if (cls.CurriculumId is not null)
             curriculumName = (await context.Curriculums.FirstOrDefaultAsync(c => c.Id == cls.CurriculumId, ct))?.Name;
 
+        string? subjectName = null;
+        if (cls.SubjectId is not null)
+            subjectName = (await context.Subjects.AsNoTracking().FirstOrDefaultAsync(s => s.Id == cls.SubjectId, ct))?.Name;
+
         return new ClassDto(
             cls.Id, cls.Name, cls.TeacherId, teacherName,
+            cls.SubjectId, subjectName, cls.GradeBand,
             cls.CurriculumId, curriculumName, cls.MaxCapacity, cls.Schedule, cls.StartDate,
             cls.IsActive, currentSize, averageScore, attendanceRate,
             cls.IsDeleted, cls.CreatedAt, cls.UpdatedAt);
     }
+
+    private async Task<Dictionary<Guid, string>> LoadSubjectNamesAsync(IEnumerable<ClassRoom> items, CancellationToken ct)
+    {
+        var ids = items.Where(c => c.SubjectId.HasValue).Select(c => c.SubjectId!.Value).Distinct().ToList();
+        if (ids.Count == 0) return [];
+        return await context.Subjects.AsNoTracking()
+            .Where(s => ids.Contains(s.Id))
+            .ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+    }
+
+    private static string? Lookup(Dictionary<Guid, string> map, Guid? id) =>
+        id.HasValue && map.TryGetValue(id.Value, out var name) ? name : null;
+
+    private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
+
+    private static string? CleanGradeBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 }

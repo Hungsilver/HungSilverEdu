@@ -56,7 +56,7 @@ export const routes: Routes = [
       {
         path: 'schedule',
         canActivate: [roleGuard],
-        data: adminOnly,
+        data: teacherOrAdmin,
         loadComponent: () => import('./features/schedule/schedule.page').then(m => m.SchedulePage)
       },
       {

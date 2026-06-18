@@ -16,9 +16,10 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
-import { ROLE_USER, RewardTier, REWARD_TIER_LABELS, SKILLS, Student, StudentProgress, UserListItem } from '../../core/models';
+import { ROLE_USER, RewardTier, REWARD_TIER_LABELS, SKILLS, Student, StudentProgress, UserListItem, Warnings } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
 import { UsersService } from '../../core/users.service';
+import { WarningsService } from '../../core/warnings.service';
 import { Chart } from '../../shared/chart';
 import { PageHeader } from '../../shared/page-header';
 
@@ -95,6 +96,24 @@ import { PageHeader } from '../../shared/page-header';
             @else { <p class="muted">Chưa có dữ liệu kiểm tra.</p> }
           </nz-card>
         </nz-col>
+
+        @if (warnings(); as w) {
+          @if (warnTotal(w) > 0) {
+            <nz-col [nzXs]="24">
+              <nz-card [nzTitle]="warnTitle">
+                <ng-template #warnTitle><nz-icon nzType="warning" /> Cảnh báo <nz-tag nzColor="red" class="ml">{{ warnTotal(w) }}</nz-tag></ng-template>
+                @for (grp of warnGroups(w); track grp.label) {
+                  @if (grp.items.length) {
+                    <div class="warn-item">
+                      <nz-icon [nzType]="grp.icon" /> <strong>{{ grp.label }}:</strong>
+                      @for (it of grp.items; track it.detail) { <span class="muted"> {{ it.detail }};</span> }
+                    </div>
+                  }
+                }
+              </nz-card>
+            </nz-col>
+          }
+        }
       </nz-row>
     }
 
@@ -115,6 +134,8 @@ import { PageHeader } from '../../shared/page-header';
     .mt { margin-top: 16px; }
     .redeem-btn { margin: 0 8px 8px 0; }
     .muted { color: var(--hs-text-muted); }
+    .ml { margin-left: 8px; }
+    .warn-item { padding: 4px 0; font-size: 13px; }
     .report-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
     .link-select { min-width: 220px; flex: 1; }
     .report { white-space: pre-wrap; font-family: inherit; background: var(--hs-surface-2); border: 1px solid var(--hs-border); padding: 12px; border-radius: 8px; }
@@ -125,8 +146,24 @@ export class StudentDetailPage implements OnInit {
 
   private readonly studentsService = inject(StudentsService);
   private readonly usersService = inject(UsersService);
+  private readonly warningsService = inject(WarningsService);
   private readonly auth = inject(AuthService);
   private readonly message = inject(NzMessageService);
+
+  protected readonly warnings = signal<Warnings | null>(null);
+
+  protected warnTotal(w: Warnings): number {
+    return w.consecutiveAbsences.length + w.missedHomework.length + w.scoreDrop.length + w.tuitionOverdue.length;
+  }
+
+  protected warnGroups(w: Warnings) {
+    return [
+      { label: 'Vắng liên tiếp', icon: 'user-delete', items: w.consecutiveAbsences },
+      { label: 'Không làm BTVN', icon: 'close-circle', items: w.missedHomework },
+      { label: 'Điểm giảm', icon: 'fall', items: w.scoreDrop },
+      { label: 'Học phí quá hạn', icon: 'dollar', items: w.tuitionOverdue }
+    ];
+  }
 
   protected readonly users = signal<UserListItem[]>([]);
   protected linkUserId: string | null = null;
@@ -186,6 +223,7 @@ export class StudentDetailPage implements OnInit {
     const id = this.id();
     this.studentsService.getById(id).subscribe({ next: s => this.student.set(s) });
     this.studentsService.getProgress(id).subscribe({ next: p => this.prog.set(p) });
+    this.warningsService.getStudentWarnings(id).subscribe({ next: w => this.warnings.set(w) });
   }
 
   protected redeem(tier: RewardTier): void {

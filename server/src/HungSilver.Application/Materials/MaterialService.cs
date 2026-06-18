@@ -10,7 +10,7 @@ namespace HungSilver.Application.Materials;
 public interface IMaterialService
 {
     Task<Result<List<MaterialDto>>> GetByClassAsync(Guid classId, CancellationToken ct = default);
-    Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, CancellationToken ct = default);
+    Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, string? gradeBand, CancellationToken ct = default);
     Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default);
     Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
@@ -38,13 +38,15 @@ public sealed class MaterialService(
         return items.OrderByDescending(m => m.CreatedAt).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
     }
 
-    /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại.</summary>
-    public async Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, CancellationToken ct = default)
+    /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại/khối.</summary>
+    public async Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, string? gradeBand, CancellationToken ct = default)
     {
+        var band = string.IsNullOrWhiteSpace(gradeBand) ? null : gradeBand.Trim();
         var items = await materials.FindAsync(
             m => m.ClassId == null
                  && (categoryId == null || m.CategoryId == categoryId)
-                 && (type == null || m.Type == type), ct);
+                 && (type == null || m.Type == type)
+                 && (band == null || m.GradeBand == band), ct);
         var names = await LoadCategoryNamesAsync(items, ct);
         return items.OrderByDescending(m => m.CreatedAt).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
     }
@@ -67,6 +69,7 @@ public sealed class MaterialService(
         {
             ClassId = classId,
             CategoryId = Normalize(request.CategoryId),
+            GradeBand = CleanBand(request.GradeBand),
             Title = request.Title.Trim(),
             Type = request.Type,
             Source = request.Source,
@@ -105,6 +108,7 @@ public sealed class MaterialService(
         }
 
         material.CategoryId = Normalize(request.CategoryId);
+        material.GradeBand = CleanBand(request.GradeBand);
         material.Title = request.Title.Trim();
         material.Type = request.Type;
         material.Source = request.Source;
@@ -137,6 +141,8 @@ public sealed class MaterialService(
 
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
 
+    private static string? CleanBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
     private async Task<Dictionary<Guid, string>> LoadCategoryNamesAsync(IEnumerable<LearningMaterial> items, CancellationToken ct)
     {
         var ids = items.Where(m => m.CategoryId.HasValue).Select(m => m.CategoryId!.Value).Distinct().ToList();
@@ -156,7 +162,7 @@ public sealed class MaterialService(
         var downloadUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
-        return new MaterialDto(m.Id, m.ClassId, m.CategoryId, categoryName, m.Title, m.Type, m.Source,
+        return new MaterialDto(m.Id, m.ClassId, m.CategoryId, categoryName, m.GradeBand, m.Title, m.Type, m.Source,
             m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAt);
     }
 }

@@ -20,6 +20,7 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
 const KEY_TIMEZONE = 'Center.TimeZone';
 const KEY_REWARD_REASONS = 'Points.RewardReasons';
 const KEY_PENALTY_REASONS = 'Points.PenaltyReasons';
+const KEY_GRADE_BANDS = 'Class.GradeBands';
 
 @Component({
   selector: 'app-settings-page',
@@ -57,6 +58,14 @@ const KEY_PENALTY_REASONS = 'Points.PenaltyReasons';
         </nz-form-item>
 
         <nz-form-item>
+          <nz-form-label>Danh sách Khối (mỗi dòng 1 khối — dùng cho lớp &amp; học liệu)</nz-form-label>
+          <nz-form-control>
+            <textarea nz-input [(ngModel)]="gradeBands" name="gb" rows="4" class="field"
+              placeholder="Khối 6&#10;Khối 7&#10;Khối 8"></textarea>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
           <nz-form-label>Lý do cộng điểm (mỗi dòng: Nhãn=điểm)</nz-form-label>
           <nz-form-control>
             <textarea nz-input [(ngModel)]="rewardReasons" name="rr" rows="4" class="field"
@@ -91,6 +100,7 @@ export class SettingsPage implements OnInit {
   protected timeZone = 'Asia/Ho_Chi_Minh';
   protected rewardReasons = '';
   protected penaltyReasons = '';
+  protected gradeBands = '';
 
   ngOnInit(): void {
     this.settingsService.getEffective().subscribe(res => {
@@ -101,6 +111,7 @@ export class SettingsPage implements OnInit {
       if (v[KEY_TIMEZONE]) this.timeZone = v[KEY_TIMEZONE];
       if (v[KEY_REWARD_REASONS]) this.rewardReasons = v[KEY_REWARD_REASONS];
       if (v[KEY_PENALTY_REASONS]) this.penaltyReasons = v[KEY_PENALTY_REASONS];
+      if (v[KEY_GRADE_BANDS]) this.gradeBands = v[KEY_GRADE_BANDS];
     });
   }
 
@@ -115,7 +126,8 @@ export class SettingsPage implements OnInit {
       this.settingsService.upsert(sys(KEY_SCORE_DROP, String(this.scoreDrop))),
       this.settingsService.upsert(sys(KEY_TIMEZONE, this.timeZone)),
       this.settingsService.upsert(sys(KEY_REWARD_REASONS, this.rewardReasons)),
-      this.settingsService.upsert(sys(KEY_PENALTY_REASONS, this.penaltyReasons))
+      this.settingsService.upsert(sys(KEY_PENALTY_REASONS, this.penaltyReasons)),
+      this.settingsService.upsert(sys(KEY_GRADE_BANDS, this.gradeBands))
     ]).subscribe({
       next: () => { this.saving.set(false); this.message.success('Đã lưu cấu hình.'); },
       error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message); }
