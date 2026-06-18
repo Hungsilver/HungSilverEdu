@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using HungSilver.Application;
 using HungSilver.Domain.Common;
 using HungSilver.Infrastructure;
@@ -6,6 +7,7 @@ using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.WebApi.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -55,6 +57,24 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("TeacherOrAdmin", policy => policy.RequireRole(AppRoles.Admin, AppRoles.Teacher));
 });
 
+// Rate limit upload theo user (chống nhồi file): 30 lần / phút / user.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("upload", httpContext =>
+    {
+        var key = httpContext.User.FindFirst("sub")?.Value
+                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "anon";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
+    });
+});
+
 var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy("Client", policy => policy
     .WithOrigins(corsOrigins)
@@ -86,6 +106,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("Client");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health");

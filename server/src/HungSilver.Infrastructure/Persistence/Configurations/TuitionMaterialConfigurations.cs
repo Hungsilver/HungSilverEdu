@@ -1,4 +1,5 @@
 using HungSilver.Domain.Entities;
+using HungSilver.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -46,5 +47,9 @@ public sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredFil
         e.Property(x => x.FileName).HasMaxLength(260);
         e.Property(x => x.ContentType).HasMaxLength(200);
         e.Property(x => x.StoragePath).HasMaxLength(1000);
+        e.Property(x => x.Sha256).HasMaxLength(64);
+        // Row cũ (kể cả avatar đang dùng qua <img>) backfill = Public để giữ nguyên hành vi tải ẩn danh hiện tại.
+        e.Property(x => x.Visibility).HasDefaultValue(FileVisibility.Public);
+        e.HasIndex(x => x.Sha256);
     }
 }

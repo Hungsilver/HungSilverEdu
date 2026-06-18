@@ -21,7 +21,7 @@ public static class SettingKeys
     /// <summary>Giá trị mặc định khi chưa có cấu hình ở scope nào.</summary>
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
-        [FileStorageMode] = "ExternalUrl",
+        [FileStorageMode] = "Server",
         [TuitionDueSoonDays] = "7",
         [WarningScoreDropThreshold] = "1.5",
         [CenterTimeZone] = "Asia/Ho_Chi_Minh",
