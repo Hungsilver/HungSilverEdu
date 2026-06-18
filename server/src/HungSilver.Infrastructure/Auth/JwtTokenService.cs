@@ -14,7 +14,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
 
     public AccessTokenResult CreateAccessToken(Guid userId, string email, string? fullName, IEnumerable<string> roles)
     {
-        var expiresAtUtc = DateTime.UtcNow.AddMinutes(_options.AccessTokenMinutes);
+        var expiresAt = DateTime.Now.AddMinutes(_options.AccessTokenMinutes);
 
         var claims = new List<Claim>
         {
@@ -30,14 +30,14 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
             Subject = new ClaimsIdentity(claims),
             Issuer = _options.Issuer,
             Audience = _options.Audience,
-            Expires = expiresAtUtc,
+            Expires = expiresAt,
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret)),
                 SecurityAlgorithms.HmacSha256)
         };
 
         var token = new JsonWebTokenHandler().CreateToken(descriptor);
-        return new AccessTokenResult(token, expiresAtUtc);
+        return new AccessTokenResult(token, expiresAt);
     }
 
     public string CreateRefreshToken() =>

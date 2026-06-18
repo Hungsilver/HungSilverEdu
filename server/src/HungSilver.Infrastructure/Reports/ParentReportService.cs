@@ -40,8 +40,8 @@ public sealed class ParentReportService(
 
         var points = await context.PointEntries.AsNoTracking()
             .Where(p => p.StudentId == studentId
-                        && DateOnly.FromDateTime(p.CreatedAtUtc) >= fromDate
-                        && DateOnly.FromDateTime(p.CreatedAtUtc) <= toDate)
+                        && DateOnly.FromDateTime(p.CreatedAt) >= fromDate
+                        && DateOnly.FromDateTime(p.CreatedAt) <= toDate)
             .ToListAsync(ct);
         var rewardPoints = points.Where(p => p.Type == PointType.Reward).Sum(p => p.Points)
                            - points.Where(p => p.Type == PointType.Penalty).Sum(p => p.Points);
@@ -54,7 +54,7 @@ public sealed class ParentReportService(
             eval?.Comment, eval is null ? null : "Tiếp tục duy trì và phát huy ở nhà.");
 
         var content = ReportTemplates.RenderParentReport(model);
-        var generatedAt = DateTime.UtcNow;
+        var generatedAt = DateTime.Now;
 
         var report = new MonthlyParentReport
         {

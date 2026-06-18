@@ -16,6 +16,10 @@ export class ProfileService {
     return this.http.post<UserDto>(`${this.apiUrl}/avatar`, form);
   }
 
+  updateProfile(data: { fullName: string | null; phoneNumber: string | null }): Observable<UserDto> {
+    return this.http.put<UserDto>(this.apiUrl, data);
+  }
+
   changePassword(currentPassword: string, newPassword: string): Observable<void> {
     return this.http.put<void>(`${this.apiUrl}/password`, { currentPassword, newPassword });
   }

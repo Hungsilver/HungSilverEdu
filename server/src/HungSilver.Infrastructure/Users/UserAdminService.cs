@@ -35,7 +35,7 @@ public sealed class UserAdminService(
 
         var page = Math.Max(request.Page, 1);
         var users = await query
-            .OrderByDescending(u => u.CreatedAtUtc)
+            .OrderByDescending(u => u.CreatedAt)
             .Skip((page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(ct);
@@ -56,7 +56,7 @@ public sealed class UserAdminService(
             u.FullName,
             roleMap.TryGetValue(u.Id, out var roles) ? roles : [],
             u.IsDeleted,
-            u.CreatedAtUtc)).ToList();
+            u.CreatedAt)).ToList();
 
         return new PagedResult<UserListItemDto>
         {
@@ -111,7 +111,7 @@ public sealed class UserAdminService(
             return Result.Failure<UserListItemDto>(Error.Failure(
                 "Users.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
 
-        return new UserListItemDto(user.Id, user.UserName!, user.Email!, user.FullName, [role], user.IsDeleted, user.CreatedAtUtc);
+        return new UserListItemDto(user.Id, user.UserName!, user.Email!, user.FullName, [role], user.IsDeleted, user.CreatedAt);
     }
 
     public async Task<Result> AssignRolesAsync(Guid userId, AssignRolesRequest request, CancellationToken ct = default)
@@ -175,10 +175,10 @@ public sealed class UserAdminService(
 
         // Thu hồi mọi refresh token còn hiệu lực của user bị xóa.
         var activeTokens = await context.RefreshTokens
-            .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ToListAsync(ct);
         foreach (var token in activeTokens)
-            token.RevokedAtUtc = DateTime.UtcNow;
+            token.RevokedAt = DateTime.Now;
 
         await context.SaveChangesAsync(ct);
         return Result.Success();
@@ -193,7 +193,7 @@ public sealed class UserAdminService(
             return Result.Failure(UserNotFound);
 
         user.IsDeleted = false;
-        user.DeletedAtUtc = null;
+        user.DeletedAt = null;
 
         await context.SaveChangesAsync(ct);
         return Result.Success();

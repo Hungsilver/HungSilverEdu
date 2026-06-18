@@ -16,7 +16,7 @@ public sealed class AssignmentService(
 {
     private static readonly Error NotFoundError = Error.NotFound("Assignment.NotFound", "Không tìm thấy bài tập.");
 
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
 
     public Task<Result<List<AssignmentDto>>> GetByClassAsync(Guid classId, CancellationToken ct = default) =>
         ListAsync(a => a.ClassId == classId, accessClassId: classId, ct);
@@ -37,7 +37,7 @@ public sealed class AssignmentService(
             return Result.Failure<List<AssignmentDto>>(access.Error);
 
         var items = await context.Assignments.AsNoTracking().Where(filter)
-            .OrderByDescending(a => a.CreatedAtUtc).ToListAsync(ct);
+            .OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
         if (items.Count == 0)
             return new List<AssignmentDto>();
 
@@ -65,7 +65,7 @@ public sealed class AssignmentService(
             a.Id, a.ClassId, a.ClassSessionId, a.MaterialId,
             a.MaterialId.HasValue ? materialTitles.GetValueOrDefault(a.MaterialId.Value) : null,
             a.Title, a.Instructions, a.DueDate,
-            submitted.GetValueOrDefault(a.Id), totals.GetValueOrDefault(a.ClassId), a.CreatedAtUtc)).ToList();
+            submitted.GetValueOrDefault(a.Id), totals.GetValueOrDefault(a.ClassId), a.CreatedAt)).ToList();
     }
 
     public async Task<Result<AssignmentDto>> CreateAsync(CreateAssignmentRequest request, CancellationToken ct = default)
@@ -97,7 +97,7 @@ public sealed class AssignmentService(
             : null;
 
         return new AssignmentDto(assignment.Id, assignment.ClassId, assignment.ClassSessionId, assignment.MaterialId,
-            materialTitle, assignment.Title, assignment.Instructions, assignment.DueDate, 0, total, assignment.CreatedAtUtc);
+            materialTitle, assignment.Title, assignment.Instructions, assignment.DueDate, 0, total, assignment.CreatedAt);
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)

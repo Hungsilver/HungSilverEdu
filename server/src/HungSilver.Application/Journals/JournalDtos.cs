@@ -7,8 +7,8 @@ public sealed record TeacherJournalDto(
     string? Activities,
     string? Difficulties,
     string? NotesForNextSession,
-    DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);
 
 public sealed record UpsertJournalRequest(
     string? ContentTaught,

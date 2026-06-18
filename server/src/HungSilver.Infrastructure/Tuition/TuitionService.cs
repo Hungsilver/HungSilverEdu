@@ -140,7 +140,7 @@ public sealed class TuitionService(
             return Result.Failure(NotFoundError);
 
         invoice.IsDeleted = false;
-        invoice.DeletedAtUtc = null;
+        invoice.DeletedAt = null;
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }
@@ -161,7 +161,7 @@ public sealed class TuitionService(
         return items.Select(i => new TuitionInvoiceDto(
             i.Id, i.StudentId, names.GetValueOrDefault(i.StudentId, string.Empty), i.ClassId,
             i.PeriodYear, i.PeriodMonth, i.Amount, i.DueDate,
-            EffectiveStatus(i, today, dueSoonDays), i.PaidOn, i.Note, i.IsDeleted, i.CreatedAtUtc)).ToList();
+            EffectiveStatus(i, today, dueSoonDays), i.PaidOn, i.Note, i.IsDeleted, i.CreatedAt)).ToList();
     }
 
     private static TuitionStatus EffectiveStatus(TuitionInvoice i, DateOnly today, int dueSoonDays)
@@ -191,15 +191,6 @@ public sealed class TuitionService(
         return int.TryParse(v, out var n) ? n : 7;
     }
 
-    private async Task<DateOnly> TodayAsync(CancellationToken ct)
-    {
-        var tz = await settings.GetEffectiveValueAsync(SettingKeys.CenterTimeZone, ct: ct);
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(tz))
-                return DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById(tz)));
-        }
-        catch { /* fallback */ }
-        return DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-    }
+    private Task<DateOnly> TodayAsync(CancellationToken ct) =>
+        Task.FromResult(DateOnly.FromDateTime(DateTime.Now));
 }

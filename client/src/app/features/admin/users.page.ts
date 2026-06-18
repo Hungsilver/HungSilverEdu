@@ -10,10 +10,13 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
+import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { ApiProblem, ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserListItem } from '../../core/models';
+import { ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserListItem } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
+import { ScreenService } from '../../core/screen.service';
 import { UsersService } from '../../core/users.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -22,7 +25,7 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
-    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, PageHeader
+    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzCardModule, NzPaginationModule, PageHeader
   ],
   template: `
     <app-page-header title="Quản lý người dùng" subtitle="Tài khoản & phân quyền" icon="team">
@@ -33,74 +36,116 @@ import { PageHeader } from '../../shared/page-header';
       </button>
     </app-page-header>
 
-    <nz-table
-      #table
-      [nzData]="users()"
-      [nzLoading]="loading()"
-      [nzFrontPagination]="false"
-      [nzTotal]="total()"
-      [nzPageIndex]="page()"
-      [nzPageSize]="pageSize()"
-      (nzPageIndexChange)="onPageChange($event)"
-      [nzScroll]="{ x: '760px' }">
-      <thead>
-        <tr>
-          <th>Tài khoản</th>
-          <th>Email</th>
-          <th>Họ tên</th>
-          <th>Quyền</th>
-          <th>Trạng thái</th>
-          <th>Ngày tạo</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (user of table.data; track user.id) {
-          <tr>
-            <td [class.text-deleted]="user.isDeleted"><strong>{{ user.userName }}</strong></td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.fullName }}</td>
-            <td>
+    @if (screen.isMobile()) {
+      <div class="mobile-card-list">
+        @for (user of users(); track user.id) {
+          <nz-card>
+            <div class="card-header">
+              <span class="card-title" [class.text-deleted]="user.isDeleted">{{ user.userName }}</span>
+              @if (user.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
+              @else { <nz-tag nzColor="green">Hoạt động</nz-tag> }
+            </div>
+            <div class="card-field"><span class="label">Email</span><span>{{ user.email }}</span></div>
+            <div class="card-field"><span class="label">Họ tên</span><span>{{ user.fullName }}</span></div>
+            <div class="card-field-block">
+              <span class="label">Quyền</span>
               <nz-select
                 [ngModel]="user.roles"
                 (ngModelChange)="assignRoles(user, $event)"
                 nzMode="multiple"
                 nzPlaceHolder="Chọn quyền"
                 [nzDisabled]="user.isDeleted || user.id === currentUserId"
-                class="roles-select">
+                style="width:100%">
                 <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
                 <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
                 <nz-option [nzValue]="ROLE_USER" nzLabel="Học sinh" />
               </nz-select>
-            </td>
-            <td>
-              @if (user.isDeleted) {
-                <nz-tag nzColor="red">Đã xóa</nz-tag>
-              } @else {
-                <nz-tag nzColor="green">Hoạt động</nz-tag>
-              }
-            </td>
-            <td>{{ user.createdAtUtc | date: 'dd/MM/yyyy HH:mm' }}</td>
-            <td>
+            </div>
+            <div class="card-field"><span class="label">Ngày tạo</span><span>{{ user.createdAt | date: 'dd/MM/yyyy' }}</span></div>
+            <div class="card-actions">
               @if (!user.isDeleted) {
-                <button nz-button nzType="link" nzSize="small" nzDanger
-                        [disabled]="user.id === currentUserId"
-                        nz-popconfirm nzPopconfirmTitle="Xóa mềm người dùng này? Mọi phiên đăng nhập sẽ bị thu hồi."
-                        (nzOnConfirm)="remove(user)">
-                  <nz-icon nzType="delete" />
-                  Xóa
+                <button nz-button nzSize="small" nzDanger [disabled]="user.id === currentUserId"
+                        nz-popconfirm nzPopconfirmTitle="Xóa mềm người dùng này?" (nzOnConfirm)="remove(user)">
+                  <nz-icon nzType="delete" /> Xóa
                 </button>
               } @else {
-                <button nz-button nzType="link" nzSize="small" (click)="restore(user)">
-                  <nz-icon nzType="undo" />
-                  Khôi phục
-                </button>
+                <button nz-button nzSize="small" (click)="restore(user)"><nz-icon nzType="undo" /> Khôi phục</button>
               }
-            </td>
-          </tr>
+            </div>
+          </nz-card>
         }
-      </tbody>
-    </nz-table>
+      </div>
+      <nz-pagination class="mobile-pagination" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()" (nzPageIndexChange)="onPageChange($event)" />
+    } @else {
+      <nz-table
+        #table
+        [nzData]="users()"
+        [nzLoading]="loading()"
+        [nzFrontPagination]="false"
+        [nzTotal]="total()"
+        [nzPageIndex]="page()"
+        [nzPageSize]="pageSize()"
+        (nzPageIndexChange)="onPageChange($event)"
+        [nzScroll]="{ x: '760px' }">
+        <thead>
+          <tr>
+            <th>Tài khoản</th>
+            <th>Email</th>
+            <th>Họ tên</th>
+            <th>Quyền</th>
+            <th>Trạng thái</th>
+            <th>Ngày tạo</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of table.data; track user.id) {
+            <tr>
+              <td [class.text-deleted]="user.isDeleted"><strong>{{ user.userName }}</strong></td>
+              <td>{{ user.email }}</td>
+              <td>{{ user.fullName }}</td>
+              <td>
+                <nz-select
+                  [ngModel]="user.roles"
+                  (ngModelChange)="assignRoles(user, $event)"
+                  nzMode="multiple"
+                  nzPlaceHolder="Chọn quyền"
+                  [nzDisabled]="user.isDeleted || user.id === currentUserId"
+                  class="roles-select">
+                  <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
+                  <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
+                  <nz-option [nzValue]="ROLE_USER" nzLabel="Học sinh" />
+                </nz-select>
+              </td>
+              <td>
+                @if (user.isDeleted) {
+                  <nz-tag nzColor="red">Đã xóa</nz-tag>
+                } @else {
+                  <nz-tag nzColor="green">Hoạt động</nz-tag>
+                }
+              </td>
+              <td>{{ user.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+              <td>
+                @if (!user.isDeleted) {
+                  <button nz-button nzType="link" nzSize="small" nzDanger
+                          [disabled]="user.id === currentUserId"
+                          nz-popconfirm nzPopconfirmTitle="Xóa mềm người dùng này? Mọi phiên đăng nhập sẽ bị thu hồi."
+                          (nzOnConfirm)="remove(user)">
+                    <nz-icon nzType="delete" />
+                    Xóa
+                  </button>
+                } @else {
+                  <button nz-button nzType="link" nzSize="small" (click)="restore(user)">
+                    <nz-icon nzType="undo" />
+                    Khôi phục
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </nz-table>
+    }
 
     <!-- Tạo tài khoản Admin/Giáo viên -->
     <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo tài khoản" [nzOkLoading]="createBusy()"
@@ -150,6 +195,16 @@ import { PageHeader } from '../../shared/page-header';
     }
 
     .full { width: 100%; }
+
+    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+    .mobile-card-list nz-card { border-radius: 8px; }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .card-title { font-weight: 600; font-size: 15px; flex: 1; }
+    .card-field { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 13px; }
+    .card-field-block { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; font-size: 13px; }
+    .label { color: #8c8c8c; min-width: 72px; }
+    .card-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .mobile-pagination { margin-top: 16px; text-align: center; }
   `
 })
 export class UsersPage {
@@ -160,6 +215,7 @@ export class UsersPage {
   private readonly usersService = inject(UsersService);
   private readonly auth = inject(AuthService);
   private readonly message = inject(NzMessageService);
+  protected readonly screen = inject(ScreenService);
 
   protected readonly currentUserId = this.auth.currentUser()?.id;
 
@@ -215,7 +271,7 @@ export class UsersPage {
       },
       error: (err: HttpErrorResponse) => {
         this.createBusy.set(false);
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Tạo tài khoản thất bại.');
+        this.message.error(err.error?.message ?? err.message ??'Tạo tài khoản thất bại.');
       }
     });
   }
@@ -253,7 +309,7 @@ export class UsersPage {
         this.load();
       },
       error: (err: HttpErrorResponse) => {
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Cập nhật quyền thất bại.');
+        this.message.error(err.error?.message ?? err.message ??'Cập nhật quyền thất bại.');
         this.load();
       }
     });
@@ -266,7 +322,7 @@ export class UsersPage {
         this.load();
       },
       error: (err: HttpErrorResponse) =>
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Xóa thất bại.')
+        this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
 
@@ -277,7 +333,7 @@ export class UsersPage {
         this.load();
       },
       error: (err: HttpErrorResponse) =>
-        this.message.error((err.error as ApiProblem | null)?.detail ?? 'Khôi phục thất bại.')
+        this.message.error(err.error?.message ?? err.message ??'Khôi phục thất bại.')
     });
   }
 }

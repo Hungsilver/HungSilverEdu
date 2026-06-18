@@ -57,7 +57,7 @@ public sealed class StudentService(
 
         var page = await students.GetPagedAsync(
             request.Page, request.PageSize, filter,
-            request.SortBy ?? nameof(Student.CreatedAtUtc), request.SortDesc || request.SortBy is null,
+            request.SortBy ?? nameof(Student.CreatedAt), request.SortDesc || request.SortBy is null,
             includeDeleted, ct);
 
         return page.Map(s => mapper.Map<StudentDto>(s));
@@ -89,7 +89,7 @@ public sealed class StudentService(
             ParentName = request.ParentName?.Trim(),
             ParentPhone = request.ParentPhone?.Trim(),
             Address = request.Address?.Trim(),
-            EnrollmentDate = request.EnrollmentDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            EnrollmentDate = request.EnrollmentDate ?? DateOnly.FromDateTime(DateTime.Now),
             EnglishLevel = request.EnglishLevel?.Trim(),
             LearningGoal = request.LearningGoal?.Trim(),
             EntryScore = request.EntryScore,

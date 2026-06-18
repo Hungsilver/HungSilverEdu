@@ -16,8 +16,9 @@ import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { ClassesService } from '../../core/classes.service';
 import { EvaluationsService } from '../../core/evaluations.service';
+import { ScreenService } from '../../core/screen.service';
 import {
-  ApiProblem, ClassListItem, EVAL_RANK_COLORS, EVAL_RANK_LABELS, Leaderboard,
+  ClassListItem, EVAL_RANK_COLORS, EVAL_RANK_LABELS, Leaderboard,
   MonthlyEvaluation, RosterItem
 } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
@@ -65,26 +66,48 @@ interface EvalRow { studentId: string; fullName: string; eval: MonthlyEvaluation
     </div>
 
     @if (classId) {
-      <nz-table [nzData]="rows()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '760px' }">
-        <thead>
-          <tr><th nzLeft>Học sinh</th><th>Chuyên cần</th><th>Bài tập</th><th>Thái độ</th><th>Từ vựng</th><th>Ngữ pháp</th><th>Tổng</th><th>Xếp hạng</th><th nzRight></th></tr>
-        </thead>
-        <tbody>
+      @if (screen.isMobile()) {
+        <div class="mobile-card-list">
           @for (r of rows(); track r.studentId) {
-            <tr>
-              <td nzLeft>{{ r.fullName }}</td>
-              <td>{{ r.eval?.attendanceScore ?? '—' }}</td>
-              <td>{{ r.eval?.homeworkScore ?? '—' }}</td>
-              <td>{{ r.eval?.attitudeScore ?? '—' }}</td>
-              <td>{{ r.eval?.vocabularyScore ?? '—' }}</td>
-              <td>{{ r.eval?.grammarScore ?? '—' }}</td>
-              <td>{{ r.eval ? r.eval.total : '—' }}</td>
-              <td>@if (r.eval) { <nz-tag [nzColor]="rankColors[r.eval.rank]">{{ rankLabels[r.eval.rank] }}</nz-tag> }</td>
-              <td nzRight><button nz-button nzType="link" nzSize="small" (click)="openEdit(r)"><nz-icon nzType="edit" /> Đánh giá</button></td>
-            </tr>
+            <nz-card>
+              <div class="card-header">
+                <span class="card-title">{{ r.fullName }}</span>
+                @if (r.eval) { <nz-tag [nzColor]="rankColors[r.eval.rank]">{{ rankLabels[r.eval.rank] }}</nz-tag> }
+              </div>
+              <div class="card-field"><span class="label">Chuyên cần</span><span>{{ r.eval?.attendanceScore ?? '—' }}</span></div>
+              <div class="card-field"><span class="label">Bài tập</span><span>{{ r.eval?.homeworkScore ?? '—' }}</span></div>
+              <div class="card-field"><span class="label">Thái độ</span><span>{{ r.eval?.attitudeScore ?? '—' }}</span></div>
+              <div class="card-field"><span class="label">Từ vựng</span><span>{{ r.eval?.vocabularyScore ?? '—' }}</span></div>
+              <div class="card-field"><span class="label">Ngữ pháp</span><span>{{ r.eval?.grammarScore ?? '—' }}</span></div>
+              <div class="card-field"><span class="label">Tổng</span><span>{{ r.eval ? r.eval.total : '—' }}</span></div>
+              <div class="card-actions">
+                <button nz-button nzSize="small" (click)="openEdit(r)"><nz-icon nzType="edit" /> Đánh giá</button>
+              </div>
+            </nz-card>
           }
-        </tbody>
-      </nz-table>
+        </div>
+      } @else {
+        <nz-table [nzData]="rows()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '760px' }">
+          <thead>
+            <tr><th nzLeft>Học sinh</th><th>Chuyên cần</th><th>Bài tập</th><th>Thái độ</th><th>Từ vựng</th><th>Ngữ pháp</th><th>Tổng</th><th>Xếp hạng</th><th nzRight></th></tr>
+          </thead>
+          <tbody>
+            @for (r of rows(); track r.studentId) {
+              <tr>
+                <td nzLeft>{{ r.fullName }}</td>
+                <td>{{ r.eval?.attendanceScore ?? '—' }}</td>
+                <td>{{ r.eval?.homeworkScore ?? '—' }}</td>
+                <td>{{ r.eval?.attitudeScore ?? '—' }}</td>
+                <td>{{ r.eval?.vocabularyScore ?? '—' }}</td>
+                <td>{{ r.eval?.grammarScore ?? '—' }}</td>
+                <td>{{ r.eval ? r.eval.total : '—' }}</td>
+                <td>@if (r.eval) { <nz-tag [nzColor]="rankColors[r.eval.rank]">{{ rankLabels[r.eval.rank] }}</nz-tag> }</td>
+                <td nzRight><button nz-button nzType="link" nzSize="small" (click)="openEdit(r)"><nz-icon nzType="edit" /> Đánh giá</button></td>
+              </tr>
+            }
+          </tbody>
+        </nz-table>
+      }
     } @else { <p class="muted">Chọn lớp và tháng để đánh giá.</p> }
 
     <nz-modal [nzVisible]="modalOpen()" nzTitle="Đánh giá học sinh" [nzOkLoading]="saving()" [nzOkDisabled]="form.invalid"
@@ -111,12 +134,19 @@ interface EvalRow { studentId: string; fullName: string; eval: MonthlyEvaluation
     .row-item { display: flex; justify-content: space-between; padding: 4px 0; }
     .full { width: 100%; }
     .muted { color: var(--hs-text-muted); }
+    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .card-title { font-weight: 600; }
+    .card-field { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--hs-border, #f0f0f0); }
+    .card-field .label { color: var(--hs-text-muted); }
+    .card-actions { margin-top: 10px; display: flex; justify-content: flex-end; }
   `
 })
 export class EvaluationsPage {
   private readonly classesService = inject(ClassesService);
   private readonly evaluationsService = inject(EvaluationsService);
   private readonly message = inject(NzMessageService);
+  protected readonly screen = inject(ScreenService);
 
   protected readonly rankLabels = EVAL_RANK_LABELS;
   protected readonly rankColors = EVAL_RANK_COLORS;
@@ -190,7 +220,7 @@ export class EvaluationsPage {
       vocabularyScore: v.vocabularyScore, grammarScore: v.grammarScore, comment: v.comment
     }).subscribe({
       next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success('Đã lưu đánh giá.'); this.loadEvals(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Lưu thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
     });
   }
 }

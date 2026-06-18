@@ -3,7 +3,7 @@ using HungSilver.Domain.Enums;
 
 namespace HungSilver.Application.Reports;
 
-public sealed record GeneratedReportDto(Guid? Id, ReportType Type, string Content, DateTime GeneratedAtUtc);
+public sealed record GeneratedReportDto(Guid? Id, ReportType Type, string Content, DateTime GeneratedAt);
 
 public interface ISessionReportService
 {

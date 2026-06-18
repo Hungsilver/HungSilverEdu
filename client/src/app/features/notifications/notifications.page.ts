@@ -14,11 +14,12 @@ import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { ClassesService } from '../../core/classes.service';
 import {
-  ApiProblem, ClassListItem, CreateNotificationRequest, DELIVERY_STATUS_COLORS, DELIVERY_STATUS_LABELS,
+  ClassListItem, CreateNotificationRequest, DELIVERY_STATUS_COLORS, DELIVERY_STATUS_LABELS,
   NotificationChannel, NotificationDelivery, NotificationDeliveryStatus, NotificationTargetScope, NotificationType,
   NOTIFICATION_CHANNEL_LABELS, NOTIFICATION_TYPE_LABELS, Student
 } from '../../core/models';
 import { NotificationsService } from '../../core/notifications.service';
+import { ScreenService } from '../../core/screen.service';
 import { StudentsService } from '../../core/students.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -75,26 +76,48 @@ import { PageHeader } from '../../shared/page-header';
 
     @if (result().length > 0) {
       <nz-card nzTitle="Kết quả gửi" class="mt">
-        <nz-table [nzData]="result()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '600px' }">
-          <thead><tr><th nzLeft>Học sinh</th><th>Kênh</th><th>Trạng thái</th><th nzRight></th></tr></thead>
-          <tbody>
+        @if (screen.isMobile()) {
+          <div class="mobile-card-list">
             @for (d of result(); track d.id) {
-              <tr>
-                <td nzLeft>{{ d.studentName }}</td>
-                <td>{{ channelLabels[d.channel] }}</td>
-                <td>
+              <nz-card>
+                <div class="card-header">
+                  <span class="card-title">{{ d.studentName }}</span>
                   <nz-tag [nzColor]="statusColors[d.status]">{{ statusLabels[d.status] }}</nz-tag>
-                  @if (d.errorMessage) { <span class="muted">{{ d.errorMessage }}</span> }
-                </td>
-                <td nzRight>
-                  @if (d.status === Manual) {
-                    <button nz-button nzType="link" nzSize="small" (click)="copy(d)"><nz-icon nzType="copy" /> Sao chép</button>
-                  }
-                </td>
-              </tr>
+                </div>
+                <div class="card-field"><span class="label">Kênh</span><span>{{ channelLabels[d.channel] }}</span></div>
+                @if (d.errorMessage) {
+                  <div class="card-field"><span class="label">Lỗi</span><span class="muted">{{ d.errorMessage }}</span></div>
+                }
+                @if (d.status === Manual) {
+                  <div class="card-actions">
+                    <button nz-button nzSize="small" (click)="copy(d)"><nz-icon nzType="copy" /> Sao chép</button>
+                  </div>
+                }
+              </nz-card>
             }
-          </tbody>
-        </nz-table>
+          </div>
+        } @else {
+          <nz-table [nzData]="result()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '600px' }">
+            <thead><tr><th nzLeft>Học sinh</th><th>Kênh</th><th>Trạng thái</th><th nzRight></th></tr></thead>
+            <tbody>
+              @for (d of result(); track d.id) {
+                <tr>
+                  <td nzLeft>{{ d.studentName }}</td>
+                  <td>{{ channelLabels[d.channel] }}</td>
+                  <td>
+                    <nz-tag [nzColor]="statusColors[d.status]">{{ statusLabels[d.status] }}</nz-tag>
+                    @if (d.errorMessage) { <span class="muted">{{ d.errorMessage }}</span> }
+                  </td>
+                  <td nzRight>
+                    @if (d.status === Manual) {
+                      <button nz-button nzType="link" nzSize="small" (click)="copy(d)"><nz-icon nzType="copy" /> Sao chép</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </nz-table>
+        }
       </nz-card>
     }
   `,
@@ -103,6 +126,13 @@ import { PageHeader } from '../../shared/page-header';
     .ml { margin-left: 12px; }
     .mt { margin-top: 16px; }
     .muted { color: var(--hs-text-muted); margin-left: 8px; font-size: 12px; }
+    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; }
+    .mobile-card-list nz-card { border-radius: 8px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .card-title { font-weight: 600; font-size: 15px; }
+    .card-field { display: flex; gap: 8px; margin-bottom: 4px; font-size: 13px; }
+    .card-field .label { color: var(--hs-text-muted); min-width: 40px; }
+    .card-actions { margin-top: 8px; }
   `
 })
 export class NotificationsPage {
@@ -110,6 +140,7 @@ export class NotificationsPage {
   private readonly classesService = inject(ClassesService);
   private readonly studentsService = inject(StudentsService);
   private readonly message = inject(NzMessageService);
+  protected readonly screen = inject(ScreenService);
 
   protected readonly Manual = NotificationDeliveryStatus.Manual;
   protected readonly types = [NotificationType.Schedule, NotificationType.DayOff, NotificationType.Report, NotificationType.Tuition, NotificationType.Homework];
@@ -156,7 +187,7 @@ export class NotificationsPage {
     this.sending.set(true);
     this.notificationsService.send(request).subscribe({
       next: r => { this.sending.set(false); this.result.set(r.deliveries); this.message.success(`Đã xử lý ${r.deliveries.length} lượt gửi.`); },
-      error: (err: HttpErrorResponse) => { this.sending.set(false); this.message.error((err.error as ApiProblem | null)?.detail ?? 'Gửi thất bại.'); }
+      error: (err: HttpErrorResponse) => { this.sending.set(false); this.message.error(err.error?.message ?? err.message ??'Gửi thất bại.'); }
     });
   }
 

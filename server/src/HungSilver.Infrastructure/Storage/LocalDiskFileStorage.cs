@@ -12,7 +12,7 @@ public sealed class LocalDiskFileStorage(IOptions<FileStorageOptions> options) :
     {
         var root = GetRoot();
         // Phân thư mục theo năm/tháng (UTC) để tránh dồn quá nhiều file vào một chỗ.
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var subDir = Path.Combine(now.Year.ToString(), now.Month.ToString("D2"));
         Directory.CreateDirectory(Path.Combine(root, subDir));
 

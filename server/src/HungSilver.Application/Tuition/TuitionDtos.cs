@@ -15,7 +15,7 @@ public sealed record TuitionInvoiceDto(
     DateOnly? PaidOn,
     string? Note,
     bool IsDeleted,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAt);
 
 public sealed record CreateTuitionInvoiceRequest(
     Guid StudentId,

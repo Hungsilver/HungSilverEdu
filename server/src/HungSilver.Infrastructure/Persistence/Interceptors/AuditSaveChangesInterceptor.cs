@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 namespace HungSilver.Infrastructure.Persistence.Interceptors;
 
 /// <summary>
-/// - Added  → set CreatedAtUtc
-/// - Modified → set UpdatedAtUtc
+/// - Added  → set CreatedAt
+/// - Modified → set UpdatedAt
 /// - Deleted + ISoftDeletable → chuyển thành UPDATE IsDeleted = true (xóa mềm trên mọi bảng)
 /// </summary>
 public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
@@ -28,7 +28,7 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
     {
         if (context is null) return;
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
 
         foreach (var entry in context.ChangeTracker.Entries())
         {
@@ -37,10 +37,10 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 switch (entry.State)
                 {
                     case EntityState.Added:
-                        auditable.CreatedAtUtc = now;
+                        auditable.CreatedAt = now;
                         break;
                     case EntityState.Modified:
-                        auditable.UpdatedAtUtc = now;
+                        auditable.UpdatedAt = now;
                         break;
                 }
             }
@@ -49,7 +49,7 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
             {
                 entry.State = EntityState.Modified;
                 softDeletable.IsDeleted = true;
-                softDeletable.DeletedAtUtc = now;
+                softDeletable.DeletedAt = now;
             }
         }
     }

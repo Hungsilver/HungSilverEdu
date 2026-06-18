@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HungSilver.WebApi.Controllers;
 
-public sealed record AuthResponse(string AccessToken, DateTime AccessTokenExpiresAtUtc, UserDto User);
+public sealed record AuthResponse(string AccessToken, DateTime AccessTokenExpiresAt, UserDto User);
 
 [ApiController]
 [Route("api/auth")]
@@ -40,7 +40,7 @@ public class AuthController(IAuthService authService, IHostEnvironment environme
         var refreshToken = Request.Cookies[RefreshCookieName];
         await authService.LogoutAsync(refreshToken ?? string.Empty, ct);
 
-        Response.Cookies.Delete(RefreshCookieName, BuildCookieOptions(DateTime.UtcNow));
+        Response.Cookies.Delete(RefreshCookieName, BuildCookieOptions(DateTime.Now));
         return NoContent();
     }
 
@@ -65,17 +65,17 @@ public class AuthController(IAuthService authService, IHostEnvironment environme
 
         var tokens = result.Value;
         Response.Cookies.Append(RefreshCookieName, tokens.RefreshToken,
-            BuildCookieOptions(tokens.RefreshTokenExpiresAtUtc));
+            BuildCookieOptions(tokens.RefreshTokenExpiresAt));
 
-        return Ok(new AuthResponse(tokens.AccessToken, tokens.AccessTokenExpiresAtUtc, tokens.User));
+        return Ok(new AuthResponse(tokens.AccessToken, tokens.AccessTokenExpiresAt, tokens.User));
     }
 
-    private CookieOptions BuildCookieOptions(DateTime expiresAtUtc) => new()
+    private CookieOptions BuildCookieOptions(DateTime expiresAt) => new()
     {
         HttpOnly = true,
         Secure = !environment.IsDevelopment(),
         SameSite = SameSiteMode.Lax,
         Path = "/api/auth",
-        Expires = expiresAtUtc
+        Expires = expiresAt
     };
 }

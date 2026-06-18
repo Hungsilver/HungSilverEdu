@@ -14,7 +14,7 @@ public sealed record MaterialDto(
     Guid? StoredFileId,
     string? Description,
     string DownloadUrl,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAt);
 
 public sealed record CreateMaterialRequest(
     Guid? ClassId,

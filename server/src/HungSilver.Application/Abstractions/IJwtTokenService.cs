@@ -1,6 +1,6 @@
 namespace HungSilver.Application.Abstractions;
 
-public sealed record AccessTokenResult(string Token, DateTime ExpiresAtUtc);
+public sealed record AccessTokenResult(string Token, DateTime ExpiresAt);
 
 public interface IJwtTokenService
 {

@@ -46,7 +46,7 @@ public sealed class SessionService(
 
         var sessionPoints = await context.PointEntries
             .Where(p => p.ClassSessionId == sessionId && studentIds.Contains(p.StudentId))
-            .OrderBy(p => p.CreatedAtUtc)
+            .OrderBy(p => p.CreatedAt)
             .ToListAsync(ct);
         var pointsByStudent = sessionPoints.GroupBy(p => p.StudentId).ToDictionary(g => g.Key, g => g.ToList());
 
@@ -63,7 +63,7 @@ public sealed class SessionService(
                 rec?.Attitude ?? AttitudeStatus.Normal,
                 rec?.PersonalNote,
                 balances.GetValueOrDefault(r.Id),
-                pts.Select(p => new PointEntryDto(p.Id, p.StudentId, p.Type, p.Points, p.Reason, p.CreatedAtUtc)).ToList());
+                pts.Select(p => new PointEntryDto(p.Id, p.StudentId, p.Type, p.Points, p.Reason, p.CreatedAt)).ToList());
         }).ToList();
 
         return new SessionSheetDto(
@@ -155,7 +155,7 @@ public sealed class SessionService(
         context.PointEntries.Add(entry);
         await context.SaveChangesAsync(ct);
 
-        return new PointEntryDto(entry.Id, entry.StudentId, entry.Type, entry.Points, entry.Reason, entry.CreatedAtUtc);
+        return new PointEntryDto(entry.Id, entry.StudentId, entry.Type, entry.Points, entry.Reason, entry.CreatedAt);
     }
 
     public async Task<Result> RemovePointAsync(Guid entryId, CancellationToken ct = default)
@@ -252,7 +252,7 @@ public sealed class SessionService(
             StudentId = studentId,
             Tier = request.Tier,
             PointsSpent = cost,
-            RedeemedOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            RedeemedOn = DateOnly.FromDateTime(DateTime.Now),
             Note = request.Note?.Trim()
         });
 

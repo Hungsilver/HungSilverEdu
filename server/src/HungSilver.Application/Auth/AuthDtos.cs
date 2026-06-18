@@ -10,6 +10,7 @@ public sealed record UserDto(
     Guid Id,
     string Email,
     string? FullName,
+    string? PhoneNumber,
     string? AvatarUrl,
     IReadOnlyList<string> Roles);
 
@@ -19,7 +20,7 @@ public sealed record UserDto(
 /// </summary>
 public sealed record AuthTokens(
     string AccessToken,
-    DateTime AccessTokenExpiresAtUtc,
+    DateTime AccessTokenExpiresAt,
     string RefreshToken,
-    DateTime RefreshTokenExpiresAtUtc,
+    DateTime RefreshTokenExpiresAt,
     UserDto User);

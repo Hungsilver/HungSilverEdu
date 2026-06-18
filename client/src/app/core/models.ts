@@ -2,13 +2,14 @@ export interface UserDto {
   id: string;
   email: string;
   fullName: string | null;
+  phoneNumber: string | null;
   avatarUrl: string | null;
   roles: string[];
 }
 
 export interface AuthResponse {
   accessToken: string;
-  accessTokenExpiresAtUtc: string;
+  accessTokenExpiresAt: string;
   user: UserDto;
 }
 
@@ -28,8 +29,8 @@ export interface Product {
   price: number;
   isActive: boolean;
   isDeleted: boolean;
-  createdAtUtc: string;
-  updatedAtUtc: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 
 export interface ProductRequest {
@@ -47,7 +48,7 @@ export interface UserListItem {
   fullName: string | null;
   roles: string[];
   isDeleted: boolean;
-  createdAtUtc: string;
+  createdAt: string;
 }
 
 /** Admin tạo tài khoản Admin/Giáo viên. */
@@ -64,6 +65,14 @@ export interface ApiProblem {
   status: number;
   title: string;
   detail: string;
+}
+
+/** Wrapper chuẩn cho mọi API response từ backend. */
+export interface ApiResponse<T> {
+  data: T;
+  isSuccess: boolean;
+  message: string;
+  statusCode: number;
 }
 
 export const ROLE_ADMIN = 'Admin';
@@ -202,8 +211,8 @@ export interface Student {
   userId: string | null;
   isActive: boolean;
   isDeleted: boolean;
-  createdAtUtc: string;
-  updatedAtUtc: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 
 export interface StudentRequest {
@@ -234,7 +243,7 @@ export interface ClassListItem {
   currentSize: number;
   isActive: boolean;
   isDeleted: boolean;
-  createdAtUtc: string;
+  createdAt: string;
 }
 
 export interface ClassDetail {
@@ -252,8 +261,8 @@ export interface ClassDetail {
   averageScore: number | null;
   attendanceRate: number;
   isDeleted: boolean;
-  createdAtUtc: string;
-  updatedAtUtc: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 
 export interface ClassRequest {
@@ -362,7 +371,7 @@ export interface PointEntry {
   type: PointType;
   points: number;
   reason: string;
-  createdAtUtc: string;
+  createdAt: string;
 }
 
 export interface SessionStudentRow {
@@ -454,8 +463,8 @@ export interface TeacherJournal {
   activities: string | null;
   difficulties: string | null;
   notesForNextSession: string | null;
-  createdAtUtc: string;
-  updatedAtUtc: string | null;
+  createdAt: string;
+  updatedAt: string | null;
 }
 
 export interface UpsertJournalRequest {
@@ -469,7 +478,7 @@ export interface GeneratedReport {
   id: string | null;
   type: ReportType;
   content: string;
-  generatedAtUtc: string;
+  generatedAt: string;
 }
 
 // ----------------- Dashboard -----------------
@@ -599,7 +608,7 @@ export interface TuitionInvoice {
   paidOn: string | null;
   note: string | null;
   isDeleted: boolean;
-  createdAtUtc: string;
+  createdAt: string;
 }
 
 export interface CreateTuitionInvoiceRequest {
@@ -646,7 +655,7 @@ export interface Material {
   storedFileId: string | null;
   description: string | null;
   downloadUrl: string;
-  createdAtUtc: string;
+  createdAt: string;
 }
 
 export interface CreateMaterialRequest {
@@ -714,7 +723,7 @@ export interface Assignment {
   dueDate: string | null;
   submittedCount: number;
   totalCount: number;
-  createdAtUtc: string;
+  createdAt: string;
 }
 
 export interface CreateAssignmentRequest {
@@ -880,7 +889,7 @@ export interface ParentReport {
   year: number;
   month: number;
   content: string;
-  generatedAtUtc: string;
+  generatedAt: string;
 }
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {

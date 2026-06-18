@@ -41,7 +41,7 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     };
 
     [Fact]
-    public async Task Add_SetsCreatedAtUtc()
+    public async Task Add_SetsCreatedAt()
     {
         var repo = new Repository<Product>(_context);
 
@@ -49,7 +49,7 @@ public sealed class RepositorySoftDeleteTests : IDisposable
         await repo.AddAsync(product);
         await _context.SaveChangesAsync();
 
-        Assert.NotEqual(default, product.CreatedAtUtc);
+        Assert.NotEqual(default, product.CreatedAt);
         Assert.False(product.IsDeleted);
     }
 
@@ -70,7 +70,7 @@ public sealed class RepositorySoftDeleteTests : IDisposable
         // Nhưng row vẫn tồn tại trong database với IsDeleted = true
         var raw = await _context.Products.IgnoreQueryFilters().SingleAsync(p => p.Id == product.Id);
         Assert.True(raw.IsDeleted);
-        Assert.NotNull(raw.DeletedAtUtc);
+        Assert.NotNull(raw.DeletedAt);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class RepositorySoftDeleteTests : IDisposable
         var found = await repo.GetByIdAsync(product.Id);
         Assert.NotNull(found);
         Assert.False(found.IsDeleted);
-        Assert.Null(found.DeletedAtUtc);
+        Assert.Null(found.DeletedAt);
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     }
 
     [Fact]
-    public async Task Update_SetsUpdatedAtUtc()
+    public async Task Update_SetsUpdatedAt()
     {
         var repo = new Repository<Product>(_context);
         var product = NewProduct();
@@ -125,6 +125,6 @@ public sealed class RepositorySoftDeleteTests : IDisposable
         repo.Update(product);
         await _context.SaveChangesAsync();
 
-        Assert.NotNull(product.UpdatedAtUtc);
+        Assert.NotNull(product.UpdatedAt);
     }
 }

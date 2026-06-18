@@ -18,8 +18,8 @@ public sealed record StudentDto(
     Guid? UserId,
     bool IsActive,
     bool IsDeleted,
-    DateTime CreatedAtUtc,
-    DateTime? UpdatedAtUtc);
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);
 
 public sealed record CreateStudentRequest(
     string FullName,

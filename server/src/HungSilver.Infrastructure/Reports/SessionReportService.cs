@@ -62,14 +62,14 @@ public sealed class SessionReportService(
             next?.StartTime);
 
         var content = ReportTemplates.RenderSessionNotice(model);
-        var generatedAt = DateTime.UtcNow;
+        var generatedAt = DateTime.Now;
 
         var report = new SessionReport
         {
             ClassSessionId = sessionId,
             Type = ReportType.SessionNotice,
             GeneratedContent = content,
-            GeneratedAtUtc = generatedAt
+            GeneratedAt = generatedAt
         };
         context.SessionReports.Add(report);
         await context.SaveChangesAsync(ct);
@@ -87,7 +87,7 @@ public sealed class SessionReportService(
         if (cls is null)
             return Result.Failure<GeneratedReportDto>(Error.NotFound("Class.NotFound", "Không tìm thấy lớp học."));
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)); // giờ VN
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var upcoming = await context.ClassSessions.AsNoTracking()
             .Where(s => s.ClassId == classId && s.Status != SessionStatus.Cancelled && s.SessionDate >= today)
             .OrderBy(s => s.SessionDate).ThenBy(s => s.StartTime)
@@ -101,7 +101,7 @@ public sealed class SessionReportService(
             upcoming?.Topic);
 
         var content = ReportTemplates.RenderScheduleNotice(model);
-        var generatedAt = DateTime.UtcNow;
+        var generatedAt = DateTime.Now;
 
         Guid? reportId = null;
         if (upcoming is not null)
@@ -111,7 +111,7 @@ public sealed class SessionReportService(
                 ClassSessionId = upcoming.Id,
                 Type = ReportType.ScheduleNotice,
                 GeneratedContent = content,
-                GeneratedAtUtc = generatedAt
+                GeneratedAt = generatedAt
             };
             context.SessionReports.Add(report);
             await context.SaveChangesAsync(ct);

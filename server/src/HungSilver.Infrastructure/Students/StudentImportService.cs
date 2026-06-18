@@ -70,7 +70,7 @@ public sealed class StudentImportService(
                     ParentPhone = Clean(row.ParentPhone),
                     EnglishLevel = Clean(row.EnglishLevel),
                     LearningGoal = Clean(row.LearningGoal),
-                    EnrollmentDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                    EnrollmentDate = DateOnly.FromDateTime(DateTime.Now),
                     IsActive = true
                 };
                 context.Students.Add(student);
@@ -80,7 +80,7 @@ public sealed class StudentImportService(
                 {
                     ClassId = classId,
                     StudentId = student.Id,
-                    EnrolledOn = DateOnly.FromDateTime(DateTime.UtcNow),
+                    EnrolledOn = DateOnly.FromDateTime(DateTime.Now),
                     IsActive = true
                 });
                 await context.SaveChangesAsync(ct);
