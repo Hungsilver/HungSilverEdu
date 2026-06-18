@@ -26,12 +26,13 @@ import { ClassesService } from '../../core/classes.service';
 import {
   Assignment, CalendarSession, ClassDetail, ClassStudentOverview, CreateAssignmentRequest, Material,
   RosterItem, ScheduleSlot, Student, StudentImportPreview, StudentImportResult, SubmissionStatus,
-  SubmissionStatusInfo, SUBMISSION_STATUS_LABELS, WEEKDAY_LABELS
+  SubmissionStatusInfo, SUBMISSION_STATUS_LABELS, Warnings, WEEKDAY_LABELS
 } from '../../core/models';
 import { AssignmentsService } from '../../core/assignments.service';
 import { MaterialsService } from '../../core/materials.service';
 import { ScheduleService } from '../../core/schedule.service';
 import { StudentsService } from '../../core/students.service';
+import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
 import { PageHeader } from '../../shared/page-header';
 
@@ -57,6 +58,13 @@ import { PageHeader } from '../../shared/page-header';
           }
         </div>
       </app-page-header>
+
+      @if (c.subjectName || c.gradeBand) {
+        <div class="tags-line">
+          @if (c.subjectName) { <nz-tag nzColor="blue"><nz-icon nzType="book" /> {{ c.subjectName }}</nz-tag> }
+          @if (c.gradeBand) { <nz-tag nzColor="geekblue">{{ c.gradeBand }}</nz-tag> }
+        </div>
+      }
 
       <nz-row [nzGutter]="[16, 16]">
         <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.currentSize" [nzSuffix]="'/' + c.maxCapacity" nzTitle="Sĩ số" /></nz-card></nz-col>
@@ -221,6 +229,33 @@ import { PageHeader } from '../../shared/page-header';
             </tbody>
           </nz-table>
         }
+      </nz-card>
+
+      <!-- Cảnh báo của lớp (gộp từ trang Cảnh báo — Đợt 7) -->
+      <nz-card class="mt" [nzTitle]="warnTitle">
+        <ng-template #warnTitle>
+          <nz-icon nzType="warning" /> Cảnh báo của lớp
+          @if (warnings(); as w) { @if (warnTotal(w) > 0) { <nz-tag nzColor="red" class="ml">{{ warnTotal(w) }}</nz-tag> } }
+        </ng-template>
+        @if (warnings(); as w) {
+          @if (warnTotal(w) === 0) {
+            <p class="muted">Không có cảnh báo nào. 👍</p>
+          } @else {
+            @for (grp of warnGroups(w); track grp.label) {
+              @if (grp.items.length) {
+                <div class="warn-group">
+                  <div class="warn-head"><nz-icon [nzType]="grp.icon" /> {{ grp.label }} <span class="muted">({{ grp.items.length }})</span></div>
+                  @for (it of grp.items; track it.studentId + it.detail) {
+                    <div class="warn-item">
+                      <a [routerLink]="['/students', it.studentId]">{{ it.studentName }}</a>
+                      <span class="muted"> — {{ it.detail }}</span>
+                    </div>
+                  }
+                </div>
+              }
+            }
+          }
+        } @else { <p class="muted">Đang tải…</p> }
       </nz-card>
     }
 
@@ -392,7 +427,13 @@ import { PageHeader } from '../../shared/page-header';
   styles: `
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tags-line { margin: -4px 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
     .mt { margin-top: 16px; }
+    .ml { margin-left: 8px; }
+    .warn-group { padding: 6px 0; border-bottom: 1px solid var(--hs-border); }
+    .warn-group:last-child { border-bottom: none; }
+    .warn-head { font-weight: 600; margin-bottom: 4px; }
+    .warn-item { font-size: 13px; padding: 2px 0 2px 22px; }
     .enroll-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .enroll-select { min-width: 220px; flex: 1; }
     .row-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--hs-border); }
@@ -426,6 +467,7 @@ export class ClassDetailPage implements OnInit {
   private readonly studentsService = inject(StudentsService);
   private readonly assignmentsService = inject(AssignmentsService);
   private readonly materialsService = inject(MaterialsService);
+  private readonly warningsService = inject(WarningsService);
   private readonly message = inject(NzMessageService);
   private readonly router = inject(Router);
 
@@ -439,7 +481,21 @@ export class ClassDetailPage implements OnInit {
   protected readonly sessions = signal<CalendarSession[]>([]);
   protected readonly slots = signal<ScheduleSlot[]>([]);
   protected readonly allStudents = signal<Student[]>([]);
+  protected readonly warnings = signal<Warnings | null>(null);
   protected readonly busy = signal(false);
+
+  protected warnTotal(w: Warnings): number {
+    return w.consecutiveAbsences.length + w.missedHomework.length + w.scoreDrop.length + w.tuitionOverdue.length;
+  }
+
+  protected warnGroups(w: Warnings) {
+    return [
+      { label: 'Vắng liên tiếp', icon: 'user-delete', items: w.consecutiveAbsences },
+      { label: 'Không làm BTVN', icon: 'close-circle', items: w.missedHomework },
+      { label: 'Điểm giảm', icon: 'fall', items: w.scoreDrop },
+      { label: 'Học phí quá hạn', icon: 'dollar', items: w.tuitionOverdue }
+    ];
+  }
 
   private readonly overviewMap = computed(() => new Map(this.overview().map(o => [o.studentId, o])));
   protected ov(studentId: string): ClassStudentOverview | undefined {
@@ -515,6 +571,7 @@ export class ClassDetailPage implements OnInit {
     const to = new Date(); to.setDate(to.getDate() + 60);
     this.scheduleService.getRange(iso(from), iso(to), id).subscribe(s => this.sessions.set(s));
     if (this.auth.isAdmin()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
+    this.warningsService.getWarnings(id).subscribe(w => this.warnings.set(w));
     this.loadAssignments();
     this.loadMaterials();
   }

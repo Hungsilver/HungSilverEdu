@@ -4,6 +4,7 @@ using HungSilver.Application.Journals;
 using HungSilver.Application.Materials;
 using HungSilver.Application.Products;
 using HungSilver.Application.Students;
+using HungSilver.Application.Subjects;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HungSilver.Application;
@@ -21,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<ITeacherJournalService, TeacherJournalService>();
         services.AddScoped<IMaterialService, MaterialService>();
         services.AddScoped<IMaterialCategoryService, MaterialCategoryService>();
+        services.AddScoped<ISubjectService, SubjectService>();
         return services;
     }
 }

@@ -109,6 +109,7 @@ public static class DependencyInjection
         services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<IStudentImportService, StudentImportService>();
         services.AddScoped<IStudentAccountService, StudentAccountService>();
+        services.AddScoped<IClassImportService, ClassImportService>();
 
         // Thông báo: Email gửi thật (MailKit); Zalo/Messenger stub (gửi tay).
         services.AddScoped<INotificationSender, EmailNotificationSender>();

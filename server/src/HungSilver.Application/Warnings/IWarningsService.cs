@@ -12,6 +12,6 @@ public sealed record WarningsDto(
 
 public interface IWarningsService
 {
-    /// <summary>Tổng hợp cảnh báo cho phạm vi (Admin = toàn TT; Teacher = lớp của mình; hoặc 1 lớp).</summary>
-    Task<Result<WarningsDto>> GetWarningsAsync(Guid? classId, CancellationToken ct = default);
+    /// <summary>Tổng hợp cảnh báo cho phạm vi (Admin = toàn TT; Teacher = lớp của mình; hoặc 1 lớp; hoặc 1 học sinh).</summary>
+    Task<Result<WarningsDto>> GetWarningsAsync(Guid? classId, Guid? studentId = null, CancellationToken ct = default);
 }

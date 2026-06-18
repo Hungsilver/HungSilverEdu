@@ -13,6 +13,7 @@ namespace HungSilver.WebApi.Controllers;
 public class ClassesController(
     IClassService classService,
     IStudentImportService importService,
+    IClassImportService classImportService,
     IStudentAccountService studentAccountService) : ControllerBase
 {
     /// <summary>Giáo viên/Admin tạo 1 học sinh trong lớp (kèm tài khoản đăng nhập nếu chọn).</summary>
@@ -50,13 +51,43 @@ public class ClassesController(
         return (await importService.CommitAsync(id, stream, createAccounts, ct)).ToActionResult();
     }
 
-    /// <summary>Admin: tất cả lớp; Teacher: chỉ lớp do mình phụ trách.</summary>
+    /// <summary>Tải file Excel mẫu để nhập danh sách lớp.</summary>
+    [HttpGet("import-classes-template")]
+    public IActionResult ImportClassesTemplate() =>
+        File(classImportService.BuildTemplate(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "mau-danh-sach-lop.xlsx");
+
+    /// <summary>Xem trước danh sách lớp từ file Excel (validate từng dòng).</summary>
+    [HttpPost("import-classes/preview")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult<ClassImportPreviewDto>> ImportClassesPreview(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new ProblemDetails { Title = "Import.NoFile", Detail = "Chưa chọn file." });
+        await using var stream = file.OpenReadStream();
+        return (await classImportService.PreviewAsync(stream, ct)).ToActionResult();
+    }
+
+    /// <summary>Xác nhận nhập: tạo các lớp hợp lệ.</summary>
+    [HttpPost("import-classes")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult<ClassImportResultDto>> ImportClassesCommit(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new ProblemDetails { Title = "Import.NoFile", Detail = "Chưa chọn file." });
+        await using var stream = file.OpenReadStream();
+        return (await classImportService.CommitAsync(stream, ct)).ToActionResult();
+    }
+
+    /// <summary>Admin: tất cả lớp; Teacher: chỉ lớp do mình phụ trách. Lọc theo môn/khối (Đợt 7).</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<ClassListItemDto>>> GetClasses(
         [FromQuery] PagedRequest request,
         [FromQuery] bool includeDeleted = false,
+        [FromQuery] Guid? subjectId = null,
+        [FromQuery] string? gradeBand = null,
         CancellationToken ct = default) =>
-        (await classService.GetPagedAsync(request, includeDeleted, ct)).ToActionResult();
+        (await classService.GetPagedAsync(request, includeDeleted, subjectId, gradeBand, ct)).ToActionResult();
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ClassDto>> GetClass(Guid id, CancellationToken ct) =>

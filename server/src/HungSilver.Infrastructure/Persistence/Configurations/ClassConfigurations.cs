@@ -11,7 +11,20 @@ public sealed class ClassRoomConfiguration : IEntityTypeConfiguration<ClassRoom>
         e.ToTable("Classes");
         e.Property(x => x.Name).HasMaxLength(200);
         e.Property(x => x.Schedule).HasMaxLength(500);
+        e.Property(x => x.GradeBand).HasMaxLength(100);
         e.HasIndex(x => x.TeacherId);
+        e.HasIndex(x => x.SubjectId);
+        e.HasIndex(x => x.GradeBand);
+    }
+}
+
+public sealed class SubjectConfiguration : IEntityTypeConfiguration<Subject>
+{
+    public void Configure(EntityTypeBuilder<Subject> e)
+    {
+        e.Property(x => x.Name).HasMaxLength(150);
+        e.Property(x => x.Description).HasMaxLength(500);
+        e.HasIndex(x => x.SortOrder);
     }
 }
 

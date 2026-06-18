@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     // Nghiệp vụ trung tâm (lớp ClassRoom map sang bảng "Classes").
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Curriculum> Curriculums => Set<Curriculum>();
+    public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<ClassRoom> Classes => Set<ClassRoom>();
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
     public DbSet<ClassScheduleSlot> ClassScheduleSlots => Set<ClassScheduleSlot>();

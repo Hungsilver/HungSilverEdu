@@ -239,6 +239,9 @@ export interface ClassListItem {
   name: string;
   teacherId: string;
   teacherName: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  gradeBand: string | null;
   maxCapacity: number;
   currentSize: number;
   isActive: boolean;
@@ -251,6 +254,9 @@ export interface ClassDetail {
   name: string;
   teacherId: string;
   teacherName: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  gradeBand: string | null;
   curriculumId: string | null;
   curriculumName: string | null;
   maxCapacity: number;
@@ -268,10 +274,30 @@ export interface ClassDetail {
 export interface ClassRequest {
   name: string;
   teacherId: string;
+  subjectId: string | null;
+  gradeBand: string | null;
   curriculumId: string | null;
   maxCapacity: number;
   schedule: string | null;
   startDate: string | null;
+  isActive: boolean;
+}
+
+// ----------------- Môn học (Subject — Đợt 7) -----------------
+
+export interface Subject {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  classCount: number;
+}
+
+export interface SubjectRequest {
+  name: string;
+  description: string | null;
+  sortOrder: number;
   isActive: boolean;
 }
 
@@ -648,6 +674,7 @@ export interface Material {
   classId: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  gradeBand: string | null;
   title: string;
   type: MaterialType;
   source: MaterialSource;
@@ -661,6 +688,7 @@ export interface Material {
 export interface CreateMaterialRequest {
   classId: string | null;
   categoryId: string | null;
+  gradeBand: string | null;
   title: string;
   type: MaterialType;
   source: MaterialSource;
@@ -671,12 +699,40 @@ export interface CreateMaterialRequest {
 
 export interface UpdateMaterialRequest {
   categoryId: string | null;
+  gradeBand: string | null;
   title: string;
   type: MaterialType;
   source: MaterialSource;
   url: string | null;
   storedFileId: string | null;
   description: string | null;
+}
+
+// ----------------- Nhập danh sách lớp từ Excel (Đợt 7) -----------------
+
+export interface ClassImportRow {
+  rowNumber: number;
+  name: string;
+  subjectName: string | null;
+  gradeBand: string | null;
+  teacher: string | null;
+  maxCapacity: string | null;
+  startDate: string | null;
+  curriculum: string | null;
+  isValid: boolean;
+  error: string | null;
+}
+
+export interface ClassImportPreview {
+  rows: ClassImportRow[];
+  validCount: number;
+  invalidCount: number;
+}
+
+export interface ClassImportResult {
+  created: number;
+  skipped: number;
+  errors: string[];
 }
 
 export interface MaterialCategory {

@@ -5,7 +5,7 @@ namespace HungSilver.Application.Classes;
 
 public interface IClassService
 {
-    Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, CancellationToken ct = default);
+    Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? subjectId = null, string? gradeBand = null, CancellationToken ct = default);
     Task<Result<ClassDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Result<ClassDto>> CreateAsync(CreateClassRequest request, CancellationToken ct = default);
     Task<Result<ClassDto>> UpdateAsync(Guid id, UpdateClassRequest request, CancellationToken ct = default);

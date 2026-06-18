@@ -60,6 +60,9 @@ import { PageHeader } from '../../shared/page-header';
         <nz-select class="cls" nzAllowClear nzPlaceHolder="Tất cả loại" [(ngModel)]="libType" (ngModelChange)="loadMaterials()">
           @for (t of types; track t) { <nz-option [nzValue]="t" [nzLabel]="typeLabels[t]" /> }
         </nz-select>
+        <nz-select class="cls" nzAllowClear nzShowSearch nzPlaceHolder="Tất cả khối" [(ngModel)]="libGradeBand" (ngModelChange)="loadMaterials()">
+          @for (b of gradeBands(); track b) { <nz-option [nzValue]="b" [nzLabel]="b" /> }
+        </nz-select>
       }
       <button nz-button nzType="primary" [disabled]="mode === 'class' && !classId" (click)="openCreate()">
         <nz-icon nzType="plus" /> Thêm tài liệu
@@ -76,6 +79,7 @@ import { PageHeader } from '../../shared/page-header';
                 <nz-tag>{{ typeLabels[m.type] }}</nz-tag>
               </div>
               <div class="card-field"><span class="label">Danh mục</span><span>{{ m.categoryName || '—' }}</span></div>
+              <div class="card-field"><span class="label">Khối</span><span>{{ m.gradeBand || '—' }}</span></div>
               <div class="card-field"><span class="label">Mô tả</span><span>{{ m.description || '—' }}</span></div>
               <div class="card-actions">
                 <a nz-button nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
@@ -87,13 +91,14 @@ import { PageHeader } from '../../shared/page-header';
         </div>
       } @else {
         <nz-table #table [nzData]="materials()" [nzLoading]="loading()" [nzFrontPagination]="false" [nzScroll]="{ x: '640px' }">
-          <thead><tr><th nzLeft>Tiêu đề</th><th>Loại</th><th>Danh mục</th><th>Mô tả</th><th nzRight>Thao tác</th></tr></thead>
+          <thead><tr><th nzLeft>Tiêu đề</th><th>Loại</th><th>Danh mục</th><th>Khối</th><th>Mô tả</th><th nzRight>Thao tác</th></tr></thead>
           <tbody>
             @for (m of table.data; track m.id) {
               <tr>
                 <td nzLeft>{{ m.title }}</td>
                 <td><nz-tag>{{ typeLabels[m.type] }}</nz-tag></td>
                 <td>{{ m.categoryName || '—' }}</td>
+                <td>{{ m.gradeBand || '—' }}</td>
                 <td>{{ m.description || '—' }}</td>
                 <td nzRight>
                   <a nz-button nzType="link" nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
@@ -128,6 +133,12 @@ import { PageHeader } from '../../shared/page-header';
             <nz-form-control nzErrorTip="Chọn danh mục cho học liệu thư viện">
               <nz-select formControlName="categoryId" class="full" nzAllowClear nzPlaceHolder="Chọn danh mục">
                 @for (c of categories(); track c.id) { <nz-option [nzValue]="c.id" [nzLabel]="c.name" /> }
+              </nz-select>
+            </nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Khối</nz-form-label>
+            <nz-form-control>
+              <nz-select formControlName="gradeBand" class="full" nzAllowClear nzShowSearch nzPlaceHolder="Chọn khối (tùy chọn)">
+                @for (b of gradeBands(); track b) { <nz-option [nzValue]="b" [nzLabel]="b" /> }
               </nz-select>
             </nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label nzRequired>Nguồn</nz-form-label>
@@ -211,6 +222,7 @@ export class MaterialsPage {
   protected readonly classes = signal<ClassListItem[]>([]);
   protected readonly categories = signal<MaterialCategory[]>([]);
   protected readonly materials = signal<Material[]>([]);
+  protected readonly gradeBands = signal<string[]>([]);
   protected readonly loading = signal(false);
   protected readonly serverUploadAllowed = signal(false);
 
@@ -218,6 +230,7 @@ export class MaterialsPage {
   protected classId: string | null = null;
   protected libCategoryId: string | null = null;
   protected libType: MaterialType | null = null;
+  protected libGradeBand: string | null = null;
 
   protected readonly modalOpen = signal(false);
   protected readonly saving = signal(false);
@@ -229,6 +242,7 @@ export class MaterialsPage {
     title: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     type: new FormControl(MaterialType.Pdf, { nonNullable: true }),
     categoryId: new FormControl<string | null>(null),
+    gradeBand: new FormControl<string | null>(null),
     source: new FormControl(MaterialSource.ExternalUrl, { nonNullable: true }),
     url: new FormControl<string | null>(null),
     description: new FormControl<string | null>(null)
@@ -243,8 +257,11 @@ export class MaterialsPage {
   constructor() {
     this.classesService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.classes.set(r.items));
     this.materialsService.getCategories().subscribe(c => this.categories.set(c));
-    this.settingsService.getEffective().subscribe(s =>
-      this.serverUploadAllowed.set(s.values['FileStorage.Mode'] === FileStorageMode.Server));
+    this.settingsService.getEffective().subscribe(s => {
+      this.serverUploadAllowed.set(s.values['FileStorage.Mode'] === FileStorageMode.Server);
+      const raw = s.values['Class.GradeBands'] ?? '';
+      this.gradeBands.set(raw.split(/[\n,]/).map(x => x.trim()).filter(Boolean));
+    });
   }
 
   protected onModeChange(): void {
@@ -262,7 +279,7 @@ export class MaterialsPage {
       });
     } else {
       this.loading.set(true);
-      this.materialsService.getLibrary(this.libCategoryId, this.libType).subscribe({
+      this.materialsService.getLibrary(this.libCategoryId, this.libType, this.libGradeBand).subscribe({
         next: m => { this.materials.set(m); this.loading.set(false); },
         error: () => this.loading.set(false)
       });
@@ -277,6 +294,7 @@ export class MaterialsPage {
     this.form.reset({
       title: '', type: MaterialType.Pdf,
       categoryId: this.mode === 'library' ? this.libCategoryId : null,
+      gradeBand: this.mode === 'library' ? this.libGradeBand : null,
       source: MaterialSource.ExternalUrl, url: null, description: null
     });
     this.modalOpen.set(true);
@@ -287,7 +305,7 @@ export class MaterialsPage {
     this.uploadedFileId.set(m.storedFileId);
     this.uploadedFileName.set(m.storedFileId ? 'file hiện tại' : null);
     this.applyCategoryValidator();
-    this.form.reset({ title: m.title, type: m.type, categoryId: m.categoryId, source: m.source, url: m.url, description: m.description });
+    this.form.reset({ title: m.title, type: m.type, categoryId: m.categoryId, gradeBand: m.gradeBand, source: m.source, url: m.url, description: m.description });
     this.modalOpen.set(true);
   }
 
@@ -322,6 +340,7 @@ export class MaterialsPage {
 
     const body = {
       categoryId: v.categoryId,
+      gradeBand: v.gradeBand,
       title: v.title, type: v.type, source: v.source,
       url: v.source === MaterialSource.ExternalUrl ? v.url : null,
       storedFileId: v.source === MaterialSource.ServerFile ? this.uploadedFileId() : null,

@@ -15,11 +15,11 @@ public class MaterialsController(IMaterialService materialService) : ControllerB
     public async Task<ActionResult<List<MaterialDto>>> GetByClass([FromQuery] Guid classId, CancellationToken ct) =>
         (await materialService.GetByClassAsync(classId, ct)).ToActionResult();
 
-    /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại.</summary>
+    /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại/khối.</summary>
     [HttpGet("library")]
     public async Task<ActionResult<List<MaterialDto>>> GetLibrary(
-        [FromQuery] Guid? categoryId, [FromQuery] MaterialType? type, CancellationToken ct) =>
-        (await materialService.GetLibraryAsync(categoryId, type, ct)).ToActionResult();
+        [FromQuery] Guid? categoryId, [FromQuery] MaterialType? type, [FromQuery] string? gradeBand, CancellationToken ct) =>
+        (await materialService.GetLibraryAsync(categoryId, type, gradeBand, ct)).ToActionResult();
 
     [HttpPost]
     public async Task<ActionResult<MaterialDto>> Create(CreateMaterialRequest request, CancellationToken ct) =>
