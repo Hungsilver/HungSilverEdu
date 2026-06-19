@@ -1,7 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
 import { NzAvatarModule } from 'ng-zorro-antd/avatar';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
@@ -10,18 +9,19 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { NzUploadModule, NzUploadXHRArgs } from 'ng-zorro-antd/upload';
+import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { ProfileService } from '../../core/profile.service';
 import { ROLE_ADMIN, ROLE_TEACHER } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
+import { AvatarCropModal } from '../../shared/avatar-crop-modal';
 
 @Component({
   selector: 'app-profile-page',
   imports: [
     FormsModule,
     NzCardModule, NzAvatarModule, NzButtonModule, NzIconModule, NzUploadModule,
-    NzFormModule, NzInputModule, NzTagModule, PageHeader
+    NzFormModule, NzInputModule, NzTagModule, PageHeader, AvatarCropModal
   ],
   template: `
     <app-page-header title="Trang cá nhân" subtitle="Thông tin tài khoản & ảnh đại diện" icon="user" />
@@ -67,7 +67,7 @@ import { PageHeader } from '../../shared/page-header';
                 }
               </div>
             }
-            <nz-upload [nzCustomRequest]="uploadAvatar" [nzShowUploadList]="false" nzAccept="image/*" class="up">
+            <nz-upload [nzShowUploadList]="false" nzAccept="image/*" [nzBeforeUpload]="onBeforeUpload" class="up">
               <button nz-button [nzLoading]="avatarBusy()">
                 <nz-icon nzType="upload" /> Đổi ảnh đại diện
               </button>
@@ -112,6 +112,13 @@ import { PageHeader } from '../../shared/page-header';
         }
       </nz-card>
     </div>
+
+    <app-avatar-crop-modal
+      [visible]="cropModalVisible()"
+      [imageFile]="selectedFile()"
+      (cropped)="onCropped($event)"
+      (cancelled)="onCropCancelled()"
+    />
   `,
   styles: `
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
@@ -142,6 +149,8 @@ export class ProfilePage {
 
   protected readonly avatarBusy = signal(false);
   protected readonly pwBusy = signal(false);
+  protected readonly cropModalVisible = signal(false);
+  protected readonly selectedFile = signal<File | null>(null);
 
   // Inline edit
   protected readonly editing = signal(false);
@@ -190,22 +199,33 @@ export class ProfilePage {
     });
   }
 
-  protected uploadAvatar = (item: NzUploadXHRArgs): Subscription => {
+  protected onBeforeUpload = (file: NzUploadFile): false => {
+    this.selectedFile.set(file.originFileObj ?? file as unknown as File);
+    this.cropModalVisible.set(true);
+    return false;
+  };
+
+  protected onCropped(file: File): void {
+    this.cropModalVisible.set(false);
+    this.selectedFile.set(null);
     this.avatarBusy.set(true);
-    return this.profileService.uploadAvatar(item.file as unknown as File).subscribe({
+    this.profileService.uploadAvatar(file).subscribe({
       next: user => {
         this.avatarBusy.set(false);
         this.auth.updateCurrentUser(user);
-        item.onSuccess?.(user, item.file, null as never);
         this.message.success('Đã cập nhật ảnh đại diện.');
       },
       error: (e: HttpErrorResponse) => {
         this.avatarBusy.set(false);
-        item.onError?.(e as never, item.file);
         this.message.error(e.error?.message ?? e.message ?? 'Tải ảnh thất bại.');
       }
     });
-  };
+  }
+
+  protected onCropCancelled(): void {
+    this.cropModalVisible.set(false);
+    this.selectedFile.set(null);
+  }
 
   protected changePassword(): void {
     if (!this.currentPassword) { this.message.warning('Nhập mật khẩu hiện tại.'); return; }
