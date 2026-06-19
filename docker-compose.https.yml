@@ -34,6 +34,8 @@ services:
       # Origin thật cho CORS (Google Login / phòng khi gọi chéo origin).
       Cors__Origins__0: https://h-edutech.io.vn
       # File upload lưu ở volume bền vững (không mất khi deploy lại image).
+      Admin__Username: ${ADMIN_USERNAME:-admin}
+      Admin__Password: ${ADMIN_PASSWORD:-Admin@a1}
       FileStorage__RootPath: /app/uploads
     volumes:
       - hungsilver_uploads:/app/uploads

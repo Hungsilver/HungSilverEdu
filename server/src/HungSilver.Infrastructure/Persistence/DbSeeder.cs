@@ -13,9 +13,9 @@ namespace HungSilver.Infrastructure.Persistence;
 public static class DbSeeder
 {
     /// <summary>
-    /// Áp migrations + seed dữ liệu tối thiểu để vận hành thật: roles (Admin/Teacher/User)
-    /// và cấu hình hệ thống mặc định. KHÔNG tự tạo tài khoản admin (tạo thủ công khi cần)
-    /// và KHÔNG seed dữ liệu demo. Gọi khi app khởi động.
+    /// Áp migrations + seed dữ liệu tối thiểu để vận hành thật: roles (Admin/Teacher/User),
+    /// cấu hình hệ thống mặc định, và tự tạo tài khoản Admin nếu chưa có (đọc từ env
+    /// Admin__Username / Admin__Password). Gọi khi app khởi động.
     /// </summary>
     public static async Task MigrateAndSeedAsync(IServiceProvider serviceProvider)
     {
@@ -48,6 +48,43 @@ public static class DbSeeder
             }
             await context.SaveChangesAsync();
             logger.LogInformation("Seeded default settings (FileStorage.Mode = Server)");
+        }
+
+        // Auto-seed tài khoản Admin nếu chưa có admin nào trong hệ thống.
+        var userManager = services.GetRequiredService<UserManager<AppUser>>();
+        var admins = await userManager.GetUsersInRoleAsync(AppRoles.Admin);
+        if (admins.Count == 0)
+        {
+            var config = services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var adminUsername = config["Admin:Username"];
+            var adminPassword = config["Admin:Password"];
+
+            if (!string.IsNullOrWhiteSpace(adminUsername) && !string.IsNullOrWhiteSpace(adminPassword))
+            {
+                var admin = new AppUser
+                {
+                    UserName = adminUsername,
+                    Email = $"{adminUsername}@hedu.local",
+                    FullName = "Administrator",
+                    EmailConfirmed = true
+                };
+
+                var result = await userManager.CreateAsync(admin, adminPassword);
+                if (result.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(admin, AppRoles.Admin);
+                    logger.LogInformation("Seeded admin account: {Username}", adminUsername);
+                }
+                else
+                {
+                    var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                    logger.LogWarning("Failed to seed admin account: {Errors}", errors);
+                }
+            }
+            else
+            {
+                logger.LogWarning("No admin account exists and Admin__Username / Admin__Password not configured in environment");
+            }
         }
     }
 }
