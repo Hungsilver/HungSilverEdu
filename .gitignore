@@ -1,6 +1,10 @@
 # Secrets
 .env
 
+# Chứng chỉ TLS / Cloudflare Origin Certificate (mount vào Caddy, không commit)
+certs/
+*.pem
+
 # .NET
 **/bin/
 **/obj/

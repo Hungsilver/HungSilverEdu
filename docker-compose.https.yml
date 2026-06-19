@@ -54,12 +54,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp"   # HTTP/3
-    environment:
-      ACME_EMAIL: ${ACME_EMAIL:-admin@h-edutech.io.vn}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data       # chứng chỉ TLS — GIỮ volume này để không xin lại cert mỗi lần
+      - ./certs:/etc/caddy/certs:ro   # Cloudflare Origin Certificate (KHÔNG commit — xem .gitignore)
+      - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - client

@@ -1,13 +1,12 @@
-# Caddy reverse proxy + tự động HTTPS (Let's Encrypt) cho HungSilver.
-# Caddy tự xin & gia hạn chứng chỉ, tự ép HTTP -> HTTPS.
-# Email ACME lấy từ biến môi trường ACME_EMAIL (xem docker-compose.https.yml / .env).
-{
-	email {$ACME_EMAIL}
-}
-
-# Domain thật. Muốn thêm www: đổi thành "h-edutech.io.vn, www.h-edutech.io.vn {"
-# (nhớ tạo thêm bản ghi DNS cho www trỏ về cùng IP).
+# Caddy reverse proxy cho HungSilver — HTTPS qua Cloudflare (proxy BẬT).
+#   Trình duyệt  <->  Cloudflare : cert edge của Cloudflare (tự động, Universal SSL).
+#   Cloudflare   <->  origin/Caddy : Cloudflare Origin Certificate (mount ở ./certs).
+# Yêu cầu: đặt SSL/TLS mode = "Full (strict)" trên Cloudflare.
+#
+# (Nếu sau này TẮT proxy Cloudflare — DNS only, trỏ thẳng VPS — thì thay khối tls
+#  bên dưới bằng global "{ email ban@email }" để Caddy tự xin Let's Encrypt.)
 h-edutech.io.vn {
+	tls /etc/caddy/certs/origin-cert.pem /etc/caddy/certs/origin-key.pem
 	encode gzip zstd
 	# Proxy toàn bộ sang container client (nginx). nginx tự xử /api -> api:8080.
 	reverse_proxy client:80
