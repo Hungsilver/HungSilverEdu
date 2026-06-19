@@ -1,0 +1,72 @@
+# Production CÓ HTTPS — build tại VPS + Caddy tự cấp Let's Encrypt cho h-edutech.io.vn.
+# Dùng:  docker compose -f docker-compose.https.yml up -d --build
+# Cần file .env cùng thư mục (xem .env.example): POSTGRES_PASSWORD, JWT_SECRET, GOOGLE_CLIENT_ID, ACME_EMAIL.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: hungsilver-postgres
+    environment:
+      POSTGRES_DB: hungsilver
+      POSTGRES_USER: hungsilver
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Thiếu POSTGRES_PASSWORD trong .env}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      # PG 18+: mount tại /var/lib/postgresql
+      - hungsilver_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hungsilver -d hungsilver"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ./server
+    container_name: hungsilver-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      TZ: Asia/Ho_Chi_Minh
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=hungsilver;Username=hungsilver;Password=${POSTGRES_PASSWORD}
+      Jwt__Secret: ${JWT_SECRET:?Thiếu JWT_SECRET trong .env (tối thiểu 32 ký tự)}
+      Google__ClientId: ${GOOGLE_CLIENT_ID:-}
+      # Origin thật cho CORS (Google Login / phòng khi gọi chéo origin).
+      Cors__Origins__0: https://h-edutech.io.vn
+      # File upload lưu ở volume bền vững (không mất khi deploy lại image).
+      FileStorage__RootPath: /app/uploads
+    volumes:
+      - hungsilver_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  client:
+    build: ./client
+    container_name: hungsilver-client
+    depends_on:
+      - api
+    restart: unless-stopped
+    # KHÔNG publish ra host — chỉ Caddy nói chuyện với client qua mạng docker nội bộ.
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: hungsilver-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-admin@h-edutech.io.vn}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # chứng chỉ TLS — GIỮ volume này để không xin lại cert mỗi lần
+      - caddy_config:/config
+    depends_on:
+      - client
+    restart: unless-stopped
+
+volumes:
+  hungsilver_pgdata:
+  hungsilver_uploads:
+  caddy_data:
+  caddy_config:
