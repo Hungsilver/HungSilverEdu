@@ -26,13 +26,13 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         canActivate: [roleGuard],
-        data: adminOnly,
+        data: teacherOrAdmin,
         loadComponent: () => import('./features/dashboard/dashboard.page').then(m => m.DashboardPage)
       },
       {
         path: 'students',
         canActivate: [roleGuard],
-        data: adminOnly,
+        data: teacherOrAdmin,
         loadComponent: () => import('./features/students/students.page').then(m => m.StudentsPage)
       },
       {
@@ -100,7 +100,7 @@ export const routes: Routes = [
       {
         path: 'tuition',
         canActivate: [roleGuard],
-        data: adminOnly,
+        data: teacherOrAdmin,
         loadComponent: () => import('./features/tuition/tuition.page').then(m => m.TuitionPage)
       },
       {
@@ -112,7 +112,7 @@ export const routes: Routes = [
       {
         path: 'notifications',
         canActivate: [roleGuard],
-        data: adminOnly,
+        data: teacherOrAdmin,
         loadComponent: () => import('./features/notifications/notifications.page').then(m => m.NotificationsPage)
       },
       {
@@ -124,7 +124,7 @@ export const routes: Routes = [
       {
         path: 'warnings',
         canActivate: [roleGuard],
-        data: adminOnly,
+        data: teacherOrAdmin,
         loadComponent: () => import('./features/warnings/warnings.page').then(m => m.WarningsPage)
       },
       {

@@ -63,14 +63,32 @@ import { ThemeService } from '../core/theme.service';
             <nz-icon nzType="setting" /><span>Cấu hình hệ thống</span>
           </li>
         } @else if (auth.isTeacher()) {
+          <li nz-menu-item routerLink="/dashboard" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="dashboard" /><span>Tổng quan</span>
+          </li>
+          <li nz-menu-item routerLink="/students" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="idcard" /><span>Học viên</span>
+          </li>
           <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="book" /><span>Lớp học</span>
           </li>
           <li nz-menu-item routerLink="/schedule" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="calendar" /><span>Lịch học</span>
           </li>
+          <li nz-menu-item routerLink="/tuition" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="dollar" /><span>Học phí</span>
+          </li>
           <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="link" /><span>Kho tài liệu</span>
+          </li>
+          <li nz-menu-item routerLink="/evaluations" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="audit" /><span>Đánh giá hàng tháng</span>
+          </li>
+          <li nz-menu-item routerLink="/notifications" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="bell" /><span>Thông báo</span>
+          </li>
+          <li nz-menu-item routerLink="/warnings" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="warning" /><span>Cảnh báo</span>
           </li>
         }
         @if (auth.isStudent()) {
