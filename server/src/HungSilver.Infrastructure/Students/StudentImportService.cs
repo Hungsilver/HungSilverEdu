@@ -58,46 +58,57 @@ public sealed class StudentImportService(
         {
             if (!row.IsValid) { skipped++; continue; }
 
+            var student = new Student
+            {
+                FullName = row.FullName!.Trim(),
+                DateOfBirth = ParseDate(row.DateOfBirth),
+                School = Clean(row.School),
+                Phone = Clean(row.Phone),
+                ParentName = Clean(row.ParentName),
+                ParentPhone = Clean(row.ParentPhone),
+                EnglishLevel = Clean(row.EnglishLevel),
+                LearningGoal = Clean(row.LearningGoal),
+                EnrollmentDate = DateOnly.FromDateTime(DateTime.Now),
+                IsActive = true
+            };
+            var enrollment = new Enrollment
+            {
+                ClassId = classId,
+                StudentId = student.Id, // Id sinh sẵn (BaseEntity) ⇒ thêm cả 2 rồi lưu 1 lần.
+                EnrolledOn = DateOnly.FromDateTime(DateTime.Now),
+                IsActive = true
+            };
+            context.Students.Add(student);
+            context.Enrollments.Add(enrollment);
+
             try
             {
-                var student = new Student
-                {
-                    FullName = row.FullName!.Trim(),
-                    DateOfBirth = ParseDate(row.DateOfBirth),
-                    School = Clean(row.School),
-                    Phone = Clean(row.Phone),
-                    ParentName = Clean(row.ParentName),
-                    ParentPhone = Clean(row.ParentPhone),
-                    EnglishLevel = Clean(row.EnglishLevel),
-                    LearningGoal = Clean(row.LearningGoal),
-                    EnrollmentDate = DateOnly.FromDateTime(DateTime.Now),
-                    IsActive = true
-                };
-                context.Students.Add(student);
-                await context.SaveChangesAsync(ct);
-
-                context.Enrollments.Add(new Enrollment
-                {
-                    ClassId = classId,
-                    StudentId = student.Id,
-                    EnrolledOn = DateOnly.FromDateTime(DateTime.Now),
-                    IsActive = true
-                });
+                // Một SaveChanges = một transaction ⇒ HS + ghi danh hoặc cùng có hoặc cùng không (không mồ côi).
                 await context.SaveChangesAsync(ct);
                 created++;
-
-                if (createAccounts)
-                {
-                    var accountResult = await TryCreateAccountAsync(student, ct);
-                    if (accountResult) accounts++;
-                    else errors.Add($"Dòng {row.RowNumber}: không tạo được tài khoản cho '{student.FullName}'.");
-                }
             }
             catch (Exception)
             {
-                // Một dòng lỗi không làm hỏng cả lần nhập — ghi nhận & bỏ qua.
+                // Gỡ theo dõi để dòng lỗi không kéo theo các dòng sau; ghi nhận & bỏ qua.
+                context.Entry(student).State = EntityState.Detached;
+                context.Entry(enrollment).State = EntityState.Detached;
                 skipped++;
                 errors.Add($"Dòng {row.RowNumber}: lỗi khi lưu, đã bỏ qua.");
+                continue;
+            }
+
+            // Tạo tài khoản là tùy chọn & best-effort: lỗi ở đây KHÔNG đảo ngược việc tạo HS đã ghi danh.
+            if (createAccounts)
+            {
+                try
+                {
+                    if (await TryCreateAccountAsync(student, ct)) accounts++;
+                    else errors.Add($"Dòng {row.RowNumber}: không tạo được tài khoản cho '{student.FullName}'.");
+                }
+                catch (Exception)
+                {
+                    errors.Add($"Dòng {row.RowNumber}: lỗi khi tạo tài khoản cho '{student.FullName}'.");
+                }
             }
         }
 

@@ -124,18 +124,38 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
 
         var today = DateOnly.FromDateTime(DateTime.Now);
         var sub = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == student.Id, ct);
+        var isNew = sub is null;
         if (sub is null)
         {
             sub = new Submission { AssignmentId = assignmentId, StudentId = student.Id };
             context.Submissions.Add(sub);
         }
 
-        sub.Status = assignment.DueDate is not null && today > assignment.DueDate ? SubmissionStatus.Late : SubmissionStatus.Submitted;
-        sub.SubmittedOn = today;
-        sub.Link = request.Link?.Trim();
-        sub.Note = request.Note?.Trim();
+        void Apply(Submission s)
+        {
+            s.Status = assignment.DueDate is not null && today > assignment.DueDate ? SubmissionStatus.Late : SubmissionStatus.Submitted;
+            s.SubmittedOn = today;
+            s.Link = request.Link?.Trim();
+            s.Note = request.Note?.Trim();
+        }
 
-        await context.SaveChangesAsync(ct);
+        Apply(sub);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (isNew)
+        {
+            // Đua check-then-insert: bản ghi nộp đã tồn tại (vi phạm unique (AssignmentId, StudentId))
+            // → tách bản mới, nạp lại bản hiện có rồi ghi đè nội dung nộp mới nhất.
+            context.Entry(sub).State = EntityState.Detached;
+            var existing = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == student.Id, ct);
+            if (existing is null)
+                throw;
+            Apply(existing);
+            await context.SaveChangesAsync(ct);
+        }
         return Result.Success();
     }
 

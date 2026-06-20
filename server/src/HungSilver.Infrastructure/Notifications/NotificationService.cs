@@ -87,15 +87,19 @@ public sealed class NotificationService(
                     }
                     else
                     {
-                        status = await dispatcher.DispatchAsync(channel,
+                        var outcome = await dispatcher.DispatchAsync(channel,
                             new NotificationMessage(email, notification.Title, notification.Content), ct);
+                        status = outcome.Status;
+                        error = outcome.Error; // giữ lý do khi gửi email thất bại
                     }
                 }
                 else
                 {
                     // Zalo/Messenger: tạo nội dung để gửi tay.
-                    status = await dispatcher.DispatchAsync(channel,
+                    var outcome = await dispatcher.DispatchAsync(channel,
                         new NotificationMessage(s.FullName, notification.Title, notification.Content), ct);
+                    status = outcome.Status;
+                    error = outcome.Error;
                 }
 
                 var delivery = new NotificationDelivery

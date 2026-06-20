@@ -31,6 +31,7 @@ import {
 import { AssignmentsService } from '../../core/assignments.service';
 import { MaterialsService } from '../../core/materials.service';
 import { ScheduleService } from '../../core/schedule.service';
+import { toDateOnly, toTimeOnly } from '../../core/date-util';
 import { StudentsService } from '../../core/students.service';
 import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
@@ -569,7 +570,7 @@ export class ClassDetailPage implements OnInit {
     this.classesService.getOverview(id).subscribe(o => this.overview.set(o));
     const from = new Date(); from.setDate(from.getDate() - 30);
     const to = new Date(); to.setDate(to.getDate() + 60);
-    this.scheduleService.getRange(iso(from), iso(to), id).subscribe(s => this.sessions.set(s));
+    this.scheduleService.getRange(toDateOnly(from), toDateOnly(to), id).subscribe(s => this.sessions.set(s));
     if (this.auth.isAdmin()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
     this.warningsService.getWarnings(id).subscribe(w => this.warnings.set(w));
     this.loadAssignments();
@@ -604,7 +605,7 @@ export class ClassDetailPage implements OnInit {
       materialId: this.aMaterialId,
       title: this.aTitle.trim(),
       instructions: this.aInstructions || null,
-      dueDate: this.aDueDate ? iso(this.aDueDate) : null
+      dueDate: this.aDueDate ? toDateOnly(this.aDueDate) : null
     };
     this.assignBusy.set(true);
     this.assignmentsService.create(request).subscribe({
@@ -773,7 +774,7 @@ export class ClassDetailPage implements OnInit {
     if (!this.newDate) { this.message.warning('Chọn ngày.'); return; }
     this.busy.set(true);
     this.scheduleService.createSession({
-      classId: this.id(), sessionDate: iso(this.newDate), startTime: null, endTime: null,
+      classId: this.id(), sessionDate: toDateOnly(this.newDate), startTime: null, endTime: null,
       topic: this.newTopic || null, sessionNumber: null
     }).subscribe({
       next: s => { this.busy.set(false); this.createOpen.set(false); this.router.navigate(['/sessions', s.id]); },
@@ -784,7 +785,7 @@ export class ClassDetailPage implements OnInit {
   protected generate(): void {
     if (this.genRange.length !== 2) { this.message.warning('Chọn khoảng ngày.'); return; }
     this.busy.set(true);
-    this.scheduleService.generateSessions(this.id(), { fromDate: iso(this.genRange[0]), toDate: iso(this.genRange[1]) }).subscribe({
+    this.scheduleService.generateSessions(this.id(), { fromDate: toDateOnly(this.genRange[0]), toDate: toDateOnly(this.genRange[1]) }).subscribe({
       next: count => { this.busy.set(false); this.generateOpen.set(false); this.message.success(`Đã sinh ${count} buổi học.`); this.reload(); },
       error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Sinh buổi thất bại.'); }
     });
@@ -793,7 +794,7 @@ export class ClassDetailPage implements OnInit {
   protected addSlot(): void {
     if (!this.slotStart || !this.slotEnd) { this.message.warning('Chọn giờ bắt đầu và kết thúc.'); return; }
     this.scheduleService.addSlot({
-      classId: this.id(), dayOfWeek: this.slotDay, startTime: time(this.slotStart), endTime: time(this.slotEnd)
+      classId: this.id(), dayOfWeek: this.slotDay, startTime: toTimeOnly(this.slotStart), endTime: toTimeOnly(this.slotEnd)
     }).subscribe({
       next: () => { this.message.success('Đã thêm khung giờ.'); this.slotStart = null; this.slotEnd = null; this.reload(); },
       error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thất bại.')
@@ -806,11 +807,4 @@ export class ClassDetailPage implements OnInit {
       error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thất bại.')
     });
   }
-}
-
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function time(d: Date): string {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`;
 }

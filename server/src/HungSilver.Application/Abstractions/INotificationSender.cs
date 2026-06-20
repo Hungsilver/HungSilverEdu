@@ -12,8 +12,11 @@ public interface INotificationSender
     Task<Result> SendAsync(NotificationMessage message, CancellationToken ct = default);
 }
 
-/// <summary>Điều phối gửi theo kênh; trả về trạng thái giao (Sent/Failed/Manual).</summary>
+/// <summary>Kết quả giao: trạng thái (Sent/Failed/Manual) kèm lý do lỗi (nếu thất bại).</summary>
+public sealed record DispatchOutcome(NotificationDeliveryStatus Status, string? Error = null);
+
+/// <summary>Điều phối gửi theo kênh; trả về trạng thái giao + lý do lỗi.</summary>
 public interface INotificationDispatcher
 {
-    Task<NotificationDeliveryStatus> DispatchAsync(NotificationChannel channel, NotificationMessage message, CancellationToken ct = default);
+    Task<DispatchOutcome> DispatchAsync(NotificationChannel channel, NotificationMessage message, CancellationToken ct = default);
 }

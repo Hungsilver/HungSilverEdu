@@ -316,7 +316,8 @@ export class MaterialsPage {
     ctrl.updateValueAndValidity();
   }
 
-  protected customUpload = (item: NzUploadXHRArgs): Subscription => {
+  protected customUpload = (item: NzUploadXHRArgs): Subscription =>
+    // Trả subscription thật để ng-zorro theo dõi/hủy được khi component bị hủy.
     this.filesService.upload(item.file as unknown as File).subscribe({
       next: f => {
         this.uploadedFileId.set(f.id);
@@ -329,8 +330,6 @@ export class MaterialsPage {
         this.message.error(e.error?.message ?? e.message);
       }
     });
-    return new Subscription();
-  };
 
   protected save(): void {
     if (this.form.invalid) return;

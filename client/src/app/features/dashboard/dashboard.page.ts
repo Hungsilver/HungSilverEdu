@@ -2,6 +2,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { EChartsCoreOption } from 'echarts/core';
+import { forkJoin } from 'rxjs';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzGridModule } from 'ng-zorro-antd/grid';
@@ -143,8 +144,14 @@ export class DashboardPage {
     lineOption(this.charts()?.testScoreGrowth.map(x => x.month) ?? [], this.charts()?.testScoreGrowth.map(x => x.averageScore) ?? [], '#7c3aed'));
 
   constructor() {
-    this.dashboardService.getSummary().subscribe(s => this.summary.set(s));
-    this.dashboardService.getCharts().subscribe(c => this.charts.set(c));
+    // Hai request độc lập → tải song song, hiển thị cùng lúc.
+    forkJoin({
+      summary: this.dashboardService.getSummary(),
+      charts: this.dashboardService.getCharts()
+    }).subscribe(({ summary, charts }) => {
+      this.summary.set(summary);
+      this.charts.set(charts);
+    });
   }
 }
 

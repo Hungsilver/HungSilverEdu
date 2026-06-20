@@ -25,6 +25,9 @@ public sealed class ParentReportService(
 
         var fromDate = new DateOnly(year, month, 1);
         var toDate = fromDate.AddMonths(1).AddDays(-1);
+        // Khoảng DateTime của tháng (Npgsql không dịch được DateOnly.FromDateTime trong predicate).
+        var fromDt = fromDate.ToDateTime(TimeOnly.MinValue);
+        var toExclDt = fromDate.AddMonths(1).ToDateTime(TimeOnly.MinValue);
 
         var records = await (
             from r in context.StudentSessionRecords.AsNoTracking()
@@ -40,8 +43,8 @@ public sealed class ParentReportService(
 
         var points = await context.PointEntries.AsNoTracking()
             .Where(p => p.StudentId == studentId
-                        && DateOnly.FromDateTime(p.CreatedAt) >= fromDate
-                        && DateOnly.FromDateTime(p.CreatedAt) <= toDate)
+                        && p.CreatedAt >= fromDt
+                        && p.CreatedAt < toExclDt)
             .ToListAsync(ct);
         var rewardPoints = points.Where(p => p.Type == PointType.Reward).Sum(p => p.Points)
                            - points.Where(p => p.Type == PointType.Penalty).Sum(p => p.Points);
@@ -56,20 +59,22 @@ public sealed class ParentReportService(
         var content = ReportTemplates.RenderParentReport(model);
         var generatedAt = DateTime.Now;
 
-        var report = new MonthlyParentReport
+        // Upsert: tạo lại báo cáo cùng (HS, năm, tháng) ⇒ cập nhật, không nhân bản.
+        var report = await context.MonthlyParentReports
+            .FirstOrDefaultAsync(r => r.StudentId == studentId && r.Year == year && r.Month == month, ct);
+        if (report is null)
         {
-            StudentId = studentId,
-            Year = year,
-            Month = month,
-            SessionsAttended = attended,
-            SessionsTotal = total,
-            HomeworkCompletionPercent = hwPercent,
-            RewardPoints = rewardPoints,
-            AssessmentText = eval?.Comment,
-            Suggestion = model.Suggestion,
-            GeneratedContent = content
-        };
-        context.MonthlyParentReports.Add(report);
+            report = new MonthlyParentReport { StudentId = studentId, Year = year, Month = month };
+            context.MonthlyParentReports.Add(report);
+        }
+
+        report.SessionsAttended = attended;
+        report.SessionsTotal = total;
+        report.HomeworkCompletionPercent = hwPercent;
+        report.RewardPoints = rewardPoints;
+        report.AssessmentText = eval?.Comment;
+        report.Suggestion = model.Suggestion;
+        report.GeneratedContent = content;
         await context.SaveChangesAsync(ct);
 
         return new ParentReportDto(report.Id, year, month, content, generatedAt);

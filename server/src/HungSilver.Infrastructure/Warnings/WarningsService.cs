@@ -47,24 +47,36 @@ public sealed class WarningsService(
             .ToDictionaryAsync(s => s.Id, s => s.FullName, ct);
         string Name(Guid id) => names.GetValueOrDefault(id, string.Empty);
 
-        // Bản ghi buổi học của các HS trong phạm vi.
+        // Bản ghi buổi học (bỏ buổi đã hủy) — kèm ClassId để xét theo TỪNG lớp, không trộn lẫn HS học nhiều lớp.
         var recs = await (
             from r in context.StudentSessionRecords.AsNoTracking()
             join s in context.ClassSessions.AsNoTracking() on r.ClassSessionId equals s.Id
-            where studentIds.Contains(r.StudentId)
-            select new { r.StudentId, s.SessionDate, r.Attendance, r.Homework })
+            where studentIds.Contains(r.StudentId) && s.Status != SessionStatus.Cancelled
+            select new { r.StudentId, s.ClassId, s.SessionDate, s.StartTime, r.Attendance, r.Homework })
             .ToListAsync(ct);
 
         var absences = new List<WarningItem>();
         var missedHw = new List<WarningItem>();
-        foreach (var g in recs.GroupBy(r => r.StudentId))
+        var absenceFlagged = new HashSet<Guid>();
+        var hwFlagged = new HashSet<Guid>();
+        // 3 buổi gần nhất LIÊN TIẾP trong cùng một lớp; mỗi HS chỉ cảnh báo 1 lần dù dính ở nhiều lớp.
+        foreach (var g in recs.GroupBy(r => new { r.StudentId, r.ClassId }))
         {
-            var last3 = g.OrderByDescending(r => r.SessionDate).Take(3).ToList();
+            var last3 = g.OrderByDescending(r => r.SessionDate).ThenByDescending(r => r.StartTime).Take(3).ToList();
             if (last3.Count < 3) continue;
-            if (last3.All(r => r.Attendance is AttendanceStatus.ExcusedAbsence or AttendanceStatus.UnexcusedAbsence))
-                absences.Add(new WarningItem(g.Key, Name(g.Key), "Vắng 3 buổi liên tiếp"));
-            if (last3.All(r => r.Homework == HomeworkStatus.NotCompleted))
-                missedHw.Add(new WarningItem(g.Key, Name(g.Key), "Không làm bài tập 3 buổi liên tiếp"));
+            var sid = g.Key.StudentId;
+            if (!absenceFlagged.Contains(sid)
+                && last3.All(r => r.Attendance is AttendanceStatus.ExcusedAbsence or AttendanceStatus.UnexcusedAbsence))
+            {
+                absences.Add(new WarningItem(sid, Name(sid), "Vắng 3 buổi liên tiếp"));
+                absenceFlagged.Add(sid);
+            }
+            if (!hwFlagged.Contains(sid)
+                && last3.All(r => r.Homework == HomeworkStatus.NotCompleted))
+            {
+                missedHw.Add(new WarningItem(sid, Name(sid), "Không làm bài tập 3 buổi liên tiếp"));
+                hwFlagged.Add(sid);
+            }
         }
 
         // Điểm giảm mạnh: so 2 bài Periodic gần nhất.

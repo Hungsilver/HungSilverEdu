@@ -4,12 +4,15 @@ using HungSilver.Application.Files;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Identity;
+using HungSilver.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace HungSilver.Infrastructure.Account;
 
 public sealed class ProfileService(
     UserManager<AppUser> userManager,
+    AppDbContext context,
     IFileService fileService) : IProfileService
 {
     private static readonly Error UserNotFound =
@@ -71,6 +74,15 @@ public sealed class ProfileService(
         if (!result.Succeeded)
             return Result.Failure(Error.Validation(
                 "Profile.ChangePasswordFailed", string.Join(" | ", result.Errors.Select(e => e.Description))));
+
+        // Đổi mật khẩu ⇒ thu hồi mọi refresh token còn hiệu lực (đăng xuất các phiên cũ/bị lộ).
+        var activeTokens = await context.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync(ct);
+        foreach (var token in activeTokens)
+            token.RevokedAt = DateTime.Now;
+        if (activeTokens.Count > 0)
+            await context.SaveChangesAsync(ct);
 
         return Result.Success();
     }

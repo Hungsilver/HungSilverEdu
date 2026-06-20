@@ -47,8 +47,16 @@ public sealed class LocalDiskFileStorage(IOptions<FileStorageOptions> options) :
         return Task.CompletedTask;
     }
 
-    private string ResolvePath(string storagePath) =>
-        Path.Combine(GetRoot(), storagePath.Replace('/', Path.DirectorySeparatorChar));
+    private string ResolvePath(string storagePath)
+    {
+        var root = GetRoot();
+        var full = Path.GetFullPath(Path.Combine(root, storagePath.Replace('/', Path.DirectorySeparatorChar)));
+        // Rào phòng thủ: đường dẫn phải nằm trong root (chống path traversal "../").
+        var rootFull = Path.GetFullPath(root);
+        if (!full.StartsWith(rootFull + Path.DirectorySeparatorChar, StringComparison.Ordinal) && full != rootFull)
+            throw new InvalidOperationException("Đường dẫn file không hợp lệ.");
+        return full;
+    }
 
     private string GetRoot()
     {

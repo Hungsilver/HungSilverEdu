@@ -35,6 +35,11 @@ public sealed class AuthService(
     private static readonly Error InvalidRefreshToken =
         Error.Unauthorized("Auth.InvalidRefreshToken", "Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại.");
 
+    // Hash "mồi" để cân bằng thời gian phản hồi khi không tìm thấy tài khoản — vẫn băm mật khẩu
+    // (bỏ kết quả) nên kẻ tấn công không phân biệt được username tồn tại/không qua kênh thời gian.
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<AppUser>().HashPassword(new AppUser(), "timing-equalizer-7Qd!9z2#");
+
     public async Task<Result<AuthTokens>> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
     {
         if (!authFeatures.Value.AllowRegistration)
@@ -80,7 +85,11 @@ public sealed class AuthService(
         var user = await userManager.FindByNameAsync(identifier)
                    ?? await userManager.FindByEmailAsync(identifier);
         if (user is null)
+        {
+            // Băm mật khẩu giả để thời gian phản hồi không lệ thuộc việc tài khoản có tồn tại hay không.
+            userManager.PasswordHasher.VerifyHashedPassword(new AppUser(), DummyPasswordHash, request.Password);
             return Result.Failure<AuthTokens>(InvalidCredentials);
+        }
 
         var signIn = await signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
         if (signIn.IsLockedOut)
@@ -143,8 +152,25 @@ public sealed class AuthService(
 
         var tokenHash = tokenService.HashToken(refreshToken);
         var stored = await context.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
-        if (stored is null || !stored.IsActive)
+        if (stored is null)
             return Result.Failure<AuthTokens>(InvalidRefreshToken);
+
+        if (!stored.IsActive)
+        {
+            // Tái dùng token ĐÃ bị thu hồi (đã rotation) ⇒ nghi bị đánh cắp: thu hồi toàn bộ
+            // refresh token còn sống của user (token theft detection), buộc đăng nhập lại.
+            if (stored.RevokedAt is not null)
+            {
+                var family = await context.RefreshTokens
+                    .Where(t => t.UserId == stored.UserId && t.RevokedAt == null)
+                    .ToListAsync(ct);
+                foreach (var t in family)
+                    t.RevokedAt = DateTime.Now;
+                if (family.Count > 0)
+                    await context.SaveChangesAsync(ct);
+            }
+            return Result.Failure<AuthTokens>(InvalidRefreshToken);
+        }
 
         var user = await userManager.FindByIdAsync(stored.UserId.ToString());
         if (user is null)

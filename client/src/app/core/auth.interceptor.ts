@@ -28,12 +28,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       );
 
       return refreshInFlight$.pipe(
-        switchMap(() => next(withToken(req, auth.accessToken()))),
+        // Chỉ đăng xuất khi CHÍNH refresh thất bại — đặt catchError TRƯỚC switchMap để
+        // lỗi của request retry (500/404…) không bị hiểu nhầm là refresh hỏng ⇒ không đá về /login oan.
         catchError((refreshError: HttpErrorResponse) => {
           auth.clearSession();
           void router.navigate(['/login']);
           return throwError(() => refreshError);
-        })
+        }),
+        switchMap(() => next(withToken(req, auth.accessToken())))
       );
     })
   );

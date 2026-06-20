@@ -74,6 +74,10 @@ public sealed class TuitionService(
         if (!await context.Students.AnyAsync(s => s.Id == request.StudentId, ct))
             return Result.Failure<TuitionInvoiceDto>(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
 
+        // Nếu gắn lớp thì lớp phải tồn tại (toàn vẹn tham chiếu ở tầng app vì không có FK).
+        if (request.ClassId is not null && !await context.Classes.AnyAsync(c => c.Id == request.ClassId.Value, ct))
+            return Result.Failure<TuitionInvoiceDto>(Error.NotFound("Class.NotFound", "Không tìm thấy lớp học."));
+
         var invoice = new TuitionInvoice
         {
             StudentId = request.StudentId,

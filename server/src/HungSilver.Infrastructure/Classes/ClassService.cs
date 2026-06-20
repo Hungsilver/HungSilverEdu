@@ -130,6 +130,11 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure<ClassDto>(NotFoundError);
 
+        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
+        var access = await accessGuard.EnsureCanAccessClassAsync(id, ct);
+        if (access.IsFailure)
+            return Result.Failure<ClassDto>(access.Error);
+
         var teacherCheck = await ValidateTeacherAsync(request.TeacherId, ct);
         if (teacherCheck.IsFailure)
             return Result.Failure<ClassDto>(teacherCheck.Error);
@@ -154,6 +159,11 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
+        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
+        var access = await accessGuard.EnsureCanAccessClassAsync(id, ct);
+        if (access.IsFailure)
+            return access;
+
         // Không FK → tự kiểm ràng buộc: chặn xóa lớp còn học sinh đang học.
         var hasStudents = await context.Enrollments.AnyAsync(e => e.ClassId == id && e.IsActive, ct);
         if (hasStudents)
@@ -170,6 +180,11 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
+        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
+        var access = await accessGuard.EnsureCanAccessClassAsync(id, ct);
+        if (access.IsFailure)
+            return access;
+
         cls.IsDeleted = false;
         cls.DeletedAt = null;
         await context.SaveChangesAsync(ct);
@@ -181,6 +196,11 @@ public sealed class ClassService(
         var cls = await context.Classes.FirstOrDefaultAsync(c => c.Id == classId, ct);
         if (cls is null)
             return Result.Failure(NotFoundError);
+
+        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
+        var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
+        if (access.IsFailure)
+            return access;
 
         var teacherCheck = await ValidateTeacherAsync(request.TeacherId, ct);
         if (teacherCheck.IsFailure)
@@ -289,6 +309,11 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
+        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
+        var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
+        if (access.IsFailure)
+            return access;
+
         if (!await context.Students.AnyAsync(s => s.Id == request.StudentId, ct))
             return Result.Failure(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
 
@@ -309,12 +334,25 @@ public sealed class ClassService(
             IsActive = true
         });
 
-        await context.SaveChangesAsync(ct);
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Đua check-then-insert: partial unique index chặn ghi danh trùng đang hiệu lực → trả lỗi nghiệp vụ.
+            return Result.Failure(Error.Conflict("Class.AlreadyEnrolled", "Học sinh đã có trong lớp này."));
+        }
         return Result.Success();
     }
 
     public async Task<Result> WithdrawAsync(Guid classId, Guid studentId, CancellationToken ct = default)
     {
+        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
+        var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
+        if (access.IsFailure)
+            return access;
+
         var enrollment = await context.Enrollments.FirstOrDefaultAsync(
             e => e.ClassId == classId && e.StudentId == studentId && e.IsActive, ct);
         if (enrollment is null)

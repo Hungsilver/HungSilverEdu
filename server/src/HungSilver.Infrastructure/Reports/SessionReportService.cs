@@ -64,16 +64,7 @@ public sealed class SessionReportService(
         var content = ReportTemplates.RenderSessionNotice(model);
         var generatedAt = DateTime.Now;
 
-        var report = new SessionReport
-        {
-            ClassSessionId = sessionId,
-            Type = ReportType.SessionNotice,
-            GeneratedContent = content,
-            GeneratedAt = generatedAt
-        };
-        context.SessionReports.Add(report);
-        await context.SaveChangesAsync(ct);
-
+        var report = await UpsertReportAsync(sessionId, ReportType.SessionNotice, content, generatedAt, ct);
         return new GeneratedReportDto(report.Id, ReportType.SessionNotice, content, generatedAt);
     }
 
@@ -106,18 +97,27 @@ public sealed class SessionReportService(
         Guid? reportId = null;
         if (upcoming is not null)
         {
-            var report = new SessionReport
-            {
-                ClassSessionId = upcoming.Id,
-                Type = ReportType.ScheduleNotice,
-                GeneratedContent = content,
-                GeneratedAt = generatedAt
-            };
-            context.SessionReports.Add(report);
-            await context.SaveChangesAsync(ct);
+            var report = await UpsertReportAsync(upcoming.Id, ReportType.ScheduleNotice, content, generatedAt, ct);
             reportId = report.Id;
         }
 
         return new GeneratedReportDto(reportId, ReportType.ScheduleNotice, content, generatedAt);
+    }
+
+    /// <summary>Upsert theo (buổi học, loại báo cáo) — tạo lại ⇒ cập nhật, không nhân bản.</summary>
+    private async Task<SessionReport> UpsertReportAsync(
+        Guid sessionId, ReportType type, string content, DateTime generatedAt, CancellationToken ct)
+    {
+        var report = await context.SessionReports
+            .FirstOrDefaultAsync(r => r.ClassSessionId == sessionId && r.Type == type, ct);
+        if (report is null)
+        {
+            report = new SessionReport { ClassSessionId = sessionId, Type = type };
+            context.SessionReports.Add(report);
+        }
+        report.GeneratedContent = content;
+        report.GeneratedAt = generatedAt;
+        await context.SaveChangesAsync(ct);
+        return report;
     }
 }

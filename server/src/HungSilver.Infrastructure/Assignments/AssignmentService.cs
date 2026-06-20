@@ -157,21 +157,42 @@ public sealed class AssignmentService(
         if (access.IsFailure)
             return access;
 
+        var today = Today;
         var sub = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == studentId, ct);
+        var isNew = sub is null;
         if (sub is null)
         {
             sub = new Submission { AssignmentId = assignmentId, StudentId = studentId };
             context.Submissions.Add(sub);
         }
 
-        sub.Status = request.Status;
-        if (request.Status is SubmissionStatus.Submitted or SubmissionStatus.Late)
-            sub.SubmittedOn ??= Today;
+        ApplyStatus(sub, request.Status, today);
+
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException) when (isNew)
+        {
+            // Đua check-then-insert: bản ghi (AssignmentId, StudentId) đã được tạo bởi request song song
+            // (vi phạm unique index) → tách bản mới, nạp lại bản hiện có rồi cập nhật.
+            context.Entry(sub).State = EntityState.Detached;
+            var existing = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == studentId, ct);
+            if (existing is null)
+                throw;
+            ApplyStatus(existing, request.Status, today);
+            await context.SaveChangesAsync(ct);
+        }
+        return Result.Success();
+    }
+
+    private static void ApplyStatus(Submission sub, SubmissionStatus status, DateOnly today)
+    {
+        sub.Status = status;
+        if (status is SubmissionStatus.Submitted or SubmissionStatus.Late)
+            sub.SubmittedOn ??= today;
         else
             sub.SubmittedOn = null;
-
-        await context.SaveChangesAsync(ct);
-        return Result.Success();
     }
 
     /// <summary>Trạng thái hiển thị: chưa nộp + quá hạn ⇒ Muộn; còn lại theo bản ghi nộp.</summary>

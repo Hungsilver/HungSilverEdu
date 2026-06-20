@@ -18,6 +18,7 @@ import { NzTimePickerModule } from 'ng-zorro-antd/time-picker';
 import { ClassesService } from '../../core/classes.service';
 import { CalendarSession, ClassListItem, WEEKDAY_LABELS } from '../../core/models';
 import { ScheduleService } from '../../core/schedule.service';
+import { toDateOnly, toTimeOnly } from '../../core/date-util';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
@@ -167,7 +168,7 @@ export class SchedulePage {
 
   protected readonly selectedDaySessions = computed<CalendarSession[]>(() => {
     const d = this.selectedDay();
-    return d ? this.sessionsByDate()[iso(d)] ?? [] : [];
+    return d ? this.sessionsByDate()[toDateOnly(d)] ?? [] : [];
   });
 
   protected readonly dayTitle = computed(() => {
@@ -215,9 +216,9 @@ export class SchedulePage {
     this.busy.set(true);
     this.scheduleService.createSession({
       classId: this.newClassId,
-      sessionDate: iso(day),
-      startTime: this.newStart ? time(this.newStart) : null,
-      endTime: this.newEnd ? time(this.newEnd) : null,
+      sessionDate: toDateOnly(day),
+      startTime: this.newStart ? toTimeOnly(this.newStart) : null,
+      endTime: this.newEnd ? toTimeOnly(this.newEnd) : null,
       topic: this.newTopic || null,
       sessionNumber: null
     }).subscribe({
@@ -232,7 +233,7 @@ export class SchedulePage {
   }
 
   protected sessionsOn(date: Date): CalendarSession[] {
-    return this.sessionsByDate()[iso(date)] ?? [];
+    return this.sessionsByDate()[toDateOnly(date)] ?? [];
   }
 
   protected daySessions(isoDate: string): CalendarSession[] {
@@ -266,13 +267,13 @@ export class SchedulePage {
     this.weekEnd.set(end);
     this.weekDays.set(Array.from({ length: 7 }, (_, i) => {
       const d = addDays(start, i);
-      return { date: d, iso: iso(d) };
+      return { date: d, iso: toDateOnly(d) };
     }));
     this.fetch(start, end);
   }
 
   private fetch(from: Date, to: Date): void {
-    this.scheduleService.getRange(iso(from), iso(to)).subscribe(list => {
+    this.scheduleService.getRange(toDateOnly(from), toDateOnly(to)).subscribe(list => {
       const map: Record<string, CalendarSession[]> = {};
       for (const s of list) (map[s.sessionDate] ??= []).push(s);
       this.sessionsByDate.set(map);
@@ -294,10 +295,4 @@ function addDays(d: Date, n: number): Date {
 }
 function pad(n: number): string {
   return String(n).padStart(2, '0');
-}
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function time(d: Date): string {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 }

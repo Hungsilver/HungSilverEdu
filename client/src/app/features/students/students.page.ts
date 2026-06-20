@@ -22,6 +22,7 @@ import { AuthService } from '../../core/auth.service';
 import { ScreenService } from '../../core/screen.service';
 import { Student, StudentRequest } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
+import { toDateOnlyOrNull } from '../../core/date-util';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
@@ -268,7 +269,7 @@ export class StudentsPage {
     if (this.form.invalid) return;
     const v = this.form.getRawValue();
     const request: StudentRequest = {
-      fullName: v.fullName, dateOfBirth: toIsoDate(v.dateOfBirth), school: v.school, gradeLevel: null,
+      fullName: v.fullName, dateOfBirth: toDateOnlyOrNull(v.dateOfBirth), school: v.school, gradeLevel: null,
       phone: v.phone, parentName: v.parentName, parentPhone: v.parentPhone, address: v.address,
       enrollmentDate: null, englishLevel: v.englishLevel, learningGoal: v.learningGoal,
       entryScore: v.entryScore, curriculum: null, isActive: v.isActive
@@ -295,12 +296,4 @@ export class StudentsPage {
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Khôi phục thất bại.')
     });
   }
-}
-
-function toIsoDate(d: Date | null): string | null {
-  if (!d) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }

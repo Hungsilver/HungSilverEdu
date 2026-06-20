@@ -17,6 +17,7 @@ import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { AuthService } from '../../core/auth.service';
+import { toDateOnly } from '../../core/date-util';
 import { ScreenService } from '../../core/screen.service';
 import {
   CreateTuitionInvoiceRequest, Student, TuitionInvoice,
@@ -194,7 +195,7 @@ export class TuitionPage {
   protected save(): void {
     if (this.form.invalid) return;
     const v = this.form.getRawValue();
-    const dueDate = toIso(v.dueDate!);
+    const dueDate = toDateOnly(v.dueDate!);
     const editing = this.editing();
     const op = editing
       ? this.tuitionService.update(editing.id, { amount: v.amount, dueDate, note: v.note })
@@ -219,8 +220,4 @@ export class TuitionPage {
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
     });
   }
-}
-
-function toIso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

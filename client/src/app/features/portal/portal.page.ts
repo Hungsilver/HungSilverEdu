@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { EMPTY, catchError, switchMap, tap } from 'rxjs';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
@@ -128,13 +129,16 @@ export class PortalPage {
     const a = this.current();
     if (!a) return;
     this.busy.set(true);
-    this.portalService.submit(a.id, { link: this.link || null, note: this.note || null }).subscribe({
-      next: () => {
+    this.portalService.submit(a.id, { link: this.link || null, note: this.note || null }).pipe(
+      tap(() => {
         this.busy.set(false);
         this.submitOpen.set(false);
         this.message.success('Đã nộp bài.');
-        this.portalService.assignments().subscribe(x => this.assignments.set(x));
-      },
+      }),
+      // Nộp đã xong: refetch danh sách; nếu refetch lỗi thì im lặng, không báo "nộp thất bại".
+      switchMap(() => this.portalService.assignments().pipe(catchError(() => EMPTY)))
+    ).subscribe({
+      next: x => this.assignments.set(x),
       error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Nộp bài thất bại.'); }
     });
   }

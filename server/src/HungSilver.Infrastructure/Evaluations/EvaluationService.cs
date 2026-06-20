@@ -112,6 +112,8 @@ public sealed class EvaluationService(
             return new LeaderboardDto([], [], []);
 
         var weekAgo = DateOnly.FromDateTime(DateTime.Now.AddDays(-7));
+        // So sánh bằng DateTime range (Npgsql không dịch được DateOnly.FromDateTime trong predicate).
+        var weekAgoDt = weekAgo.ToDateTime(TimeOnly.MinValue);
 
         var names = await context.Students.AsNoTracking()
             .Where(s => studentIds.Contains(s.Id))
@@ -120,7 +122,7 @@ public sealed class EvaluationService(
 
         // Điểm thưởng trong tuần (reward - penalty)
         var points = await context.PointEntries.AsNoTracking()
-            .Where(p => studentIds.Contains(p.StudentId) && DateOnly.FromDateTime(p.CreatedAt) >= weekAgo)
+            .Where(p => studentIds.Contains(p.StudentId) && p.CreatedAt >= weekAgoDt)
             .ToListAsync(ct);
         var topReward = points.GroupBy(p => p.StudentId)
             .Select(g => new LeaderEntry(g.Key, Name(g.Key),

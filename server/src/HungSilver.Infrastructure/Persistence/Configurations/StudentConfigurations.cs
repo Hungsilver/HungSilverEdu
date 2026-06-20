@@ -40,7 +40,12 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
     {
         e.HasIndex(x => x.ClassId);
         e.HasIndex(x => x.StudentId);
-        // Tính duy nhất (StudentId, ClassId) còn hiệu lực được kiểm ở tầng app (vì soft-delete).
+        // Duy nhất (StudentId, ClassId) cho ghi danh CÒN HIỆU LỰC (chưa xóa mềm & đang active) —
+        // partial unique index. Filter dùng cú pháp chung hợp lệ trên cả Postgres lẫn SQLite
+        // (cột bool/integer + NOT). Tầng app vẫn kiểm trước để trả lỗi nghiệp vụ thân thiện.
+        e.HasIndex(x => new { x.StudentId, x.ClassId })
+            .IsUnique()
+            .HasFilter("\"IsActive\" AND NOT \"IsDeleted\"");
     }
 }
 

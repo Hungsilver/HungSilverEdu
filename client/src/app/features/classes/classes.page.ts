@@ -25,6 +25,7 @@ import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzUploadModule, NzUploadFile } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { ClassesService } from '../../core/classes.service';
+import { toDateOnlyOrNull } from '../../core/date-util';
 import { ScreenService } from '../../core/screen.service';
 import { SettingsService } from '../../core/settings.service';
 import { SubjectsService } from '../../core/subjects.service';
@@ -603,7 +604,7 @@ export class ClassesPage {
     const v = this.form.getRawValue();
     const request: ClassRequest = {
       name: v.name, teacherId: v.teacherId, subjectId: v.subjectId || null, gradeBand: v.gradeBand || null,
-      curriculumId: null, maxCapacity: v.maxCapacity, schedule: v.schedule, startDate: toIsoDate(v.startDate), isActive: v.isActive
+      curriculumId: null, maxCapacity: v.maxCapacity, schedule: v.schedule, startDate: toDateOnlyOrNull(v.startDate), isActive: v.isActive
     };
     const editing = this.editing();
     const op = editing ? this.classesService.update(editing.id, request) : this.classesService.create(request);
@@ -703,9 +704,4 @@ export class ClassesPage {
       error: (e: HttpErrorResponse) => { this.importBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Nhập thất bại.'); }
     });
   }
-}
-
-function toIsoDate(d: Date | null): string | null {
-  if (!d) return null;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

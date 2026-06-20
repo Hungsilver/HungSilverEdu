@@ -109,6 +109,11 @@ public sealed class StudentService(
         if (!validation.IsValid)
             return Result.Failure<StudentDto>(validation.ToError("Student.Validation"));
 
+        // Phòng thủ chiều sâu: dù endpoint là AdminOnly, service vẫn tự kiểm phạm vi.
+        var access = await accessGuard.EnsureCanAccessStudentAsync(id, ct);
+        if (access.IsFailure)
+            return Result.Failure<StudentDto>(access.Error);
+
         var student = await students.GetByIdAsync(id, ct: ct);
         if (student is null)
             return Result.Failure<StudentDto>(NotFoundError);
@@ -137,6 +142,10 @@ public sealed class StudentService(
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        var access = await accessGuard.EnsureCanAccessStudentAsync(id, ct);
+        if (access.IsFailure)
+            return access;
+
         var student = await students.GetByIdAsync(id, ct: ct);
         if (student is null)
             return Result.Failure(NotFoundError);
@@ -164,6 +173,10 @@ public sealed class StudentService(
 
         if (!await userDirectory.ExistsAsync(userId, ct))
             return Result.Failure(Error.Validation("Student.UserNotFound", "Không tìm thấy tài khoản người dùng."));
+
+        // Một tài khoản chỉ liên kết với một học sinh (Portal phân giải HS theo UserId).
+        if (await students.AnyAsync(s => s.UserId == userId && s.Id != studentId, ct))
+            return Result.Failure(Error.Conflict("Student.UserAlreadyLinked", "Tài khoản này đã liên kết với học sinh khác."));
 
         student.UserId = userId;
         students.Update(student);
