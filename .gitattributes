@@ -1,0 +1,2 @@
+# Script shell luôn dùng LF để chạy được trên VPS Linux (tránh lỗi CRLF).
+*.sh text eol=lf
