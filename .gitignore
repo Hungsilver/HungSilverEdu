@@ -23,3 +23,6 @@ dist/
 # Claude Code agent tooling (local)
 .agents/
 skills-lock.json
+
+# CodeGraph — index mã nguồn cục bộ (SQLite theo máy, không commit)
+.codegraph/
