@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
@@ -48,6 +48,7 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
             <nz-icon nzType="zoom-in" />
           </button>
         </div>
+        <p class="crop-hint">Kéo để di chuyển · dùng thanh trượt để phóng to / thu nhỏ.</p>
       </ng-container>
 
       <ng-template #footerTpl>
@@ -60,7 +61,7 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
     .crop-area {
       display: flex;
       justify-content: center;
-      background: #f0f0f0;
+      background: var(--hs-surface-2);
       border-radius: 8px;
       overflow: hidden;
       min-height: 300px;
@@ -75,6 +76,12 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
     .zoom-slider {
       flex: 1;
     }
+    .crop-hint {
+      margin: 8px 0 0;
+      text-align: center;
+      font-size: 12px;
+      color: var(--hs-text-muted);
+    }
   `
 })
 export class AvatarCropModal {
@@ -88,6 +95,15 @@ export class AvatarCropModal {
   protected readonly transform = computed<ImageTransform>(() => ({ scale: this.zoomLevel() / 100 }));
 
   protected readonly zoomFormatter = (value: number): string => `${value}%`;
+
+  constructor() {
+    // Mỗi lần chọn ảnh mới → đưa zoom về 100% và xóa kết quả crop cũ.
+    effect(() => {
+      this.imageFile();
+      this.zoomLevel.set(100);
+      this.croppedBlob.set(null);
+    });
+  }
 
   protected onImageCropped(event: ImageCroppedEvent): void {
     this.croppedBlob.set(event.blob ?? null);

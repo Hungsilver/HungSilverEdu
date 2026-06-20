@@ -9,6 +9,7 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { ProfileService } from '../../core/profile.service';
@@ -21,12 +22,51 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
   imports: [
     FormsModule,
     NzCardModule, NzAvatarModule, NzButtonModule, NzIconModule, NzUploadModule,
-    NzFormModule, NzInputModule, NzTagModule, PageHeader, AvatarCropModal
+    NzFormModule, NzInputModule, NzTagModule, NzTooltipModule, PageHeader, AvatarCropModal
   ],
   template: `
     <app-page-header title="Trang cá nhân" subtitle="Thông tin tài khoản & ảnh đại diện" icon="user" />
 
-    <div class="grid">
+    <div class="profile">
+      <!-- Hero: avatar (badge camera) + định danh -->
+      <nz-card class="hero">
+        <div class="hero-inner">
+          <div class="avatar-wrap">
+            <nz-upload
+              class="avatar-upload"
+              [nzShowUploadList]="false"
+              nzAccept="image/*"
+              [nzBeforeUpload]="onBeforeUpload"
+            >
+              <span
+                class="avatar-btn"
+                nz-tooltip
+                nzTooltipTitle="Đổi ảnh đại diện"
+                aria-label="Đổi ảnh đại diện"
+              >
+                <nz-avatar [nzSrc]="avatarUrl() ?? undefined" nzIcon="user" [nzSize]="104" />
+                <span class="avatar-overlay"><nz-icon nzType="camera" /></span>
+                @if (avatarBusy()) {
+                  <span class="avatar-loading"><nz-icon nzType="loading" nzSpin /></span>
+                }
+              </span>
+            </nz-upload>
+            <span class="cam" aria-hidden="true"><nz-icon nzType="camera" /></span>
+          </div>
+
+          <div class="hero-info">
+            <div class="hero-name">{{ user()?.fullName || user()?.email }}</div>
+            <div class="hero-mail"><nz-icon nzType="mail" /> {{ user()?.email }}</div>
+            <div class="hero-roles">
+              @for (r of user()?.roles ?? []; track r) {
+                <nz-tag nzColor="blue">{{ roleLabel(r) }}</nz-tag>
+              }
+            </div>
+          </div>
+        </div>
+      </nz-card>
+
+      <!-- Thông tin cá nhân -->
       <nz-card nzTitle="Thông tin cá nhân" [nzExtra]="infoExtra">
         <ng-template #infoExtra>
           @if (!editing()) {
@@ -36,52 +76,55 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
           }
         </ng-template>
 
-        <div class="profile-top">
-          <nz-avatar [nzSrc]="avatarUrl() ?? undefined" nzIcon="user" [nzSize]="96" />
-          <div class="info">
-            @if (editing()) {
-              <nz-form-item>
-                <nz-form-label>Họ tên</nz-form-label>
-                <nz-form-control>
-                  <input nz-input [(ngModel)]="editFullName" placeholder="Họ và tên" />
-                </nz-form-control>
-              </nz-form-item>
-              <div class="field"><span class="label">Email</span> <span>{{ user()?.email }}</span></div>
-              <nz-form-item>
-                <nz-form-label>Số điện thoại</nz-form-label>
-                <nz-form-control>
-                  <input nz-input [(ngModel)]="editPhoneNumber" placeholder="Số điện thoại" />
-                </nz-form-control>
-              </nz-form-item>
-              <div class="edit-actions">
-                <button nz-button nzType="primary" [nzLoading]="saveBusy()" (click)="saveProfile()">Lưu</button>
-                <button nz-button (click)="cancelEdit()">Hủy</button>
-              </div>
-            } @else {
-              <div class="name">{{ user()?.fullName || user()?.email }}</div>
-              <div class="field"><nz-icon nzType="mail" /> {{ user()?.email }}</div>
-              <div class="field"><nz-icon nzType="phone" /> {{ user()?.phoneNumber || 'Chưa cập nhật' }}</div>
-              <div class="roles">
-                @for (r of user()?.roles ?? []; track r) {
-                  <nz-tag nzColor="blue">{{ roleLabel(r) }}</nz-tag>
-                }
-              </div>
-            }
-            <nz-upload [nzShowUploadList]="false" nzAccept="image/*" [nzBeforeUpload]="onBeforeUpload" class="up">
-              <button nz-button [nzLoading]="avatarBusy()">
-                <nz-icon nzType="upload" /> Đổi ảnh đại diện
-              </button>
-            </nz-upload>
-            <div class="hint muted">Ảnh JPG/PNG, tối đa 10MB. Ảnh được lưu trên máy chủ.</div>
-          </div>
-        </div>
+        @if (editing()) {
+          <form nz-form nzLayout="vertical" class="edit-form">
+            <nz-form-item>
+              <nz-form-label>Họ tên</nz-form-label>
+              <nz-form-control>
+                <input nz-input name="fn" [(ngModel)]="editFullName" placeholder="Họ và tên" />
+              </nz-form-control>
+            </nz-form-item>
+            <nz-form-item>
+              <nz-form-label>Số điện thoại</nz-form-label>
+              <nz-form-control>
+                <input nz-input name="ph" [(ngModel)]="editPhoneNumber" placeholder="Số điện thoại" />
+              </nz-form-control>
+            </nz-form-item>
+            <div class="actions">
+              <button nz-button nzType="primary" [nzLoading]="saveBusy()" (click)="saveProfile()">Lưu</button>
+              <button nz-button (click)="cancelEdit()">Hủy</button>
+            </div>
+          </form>
+        } @else {
+          <ul class="fields">
+            <li>
+              <span class="k">Họ tên</span>
+              <span class="v">{{ user()?.fullName || 'Chưa cập nhật' }}</span>
+            </li>
+            <li>
+              <span class="k">Email</span>
+              <span class="v">{{ user()?.email }}</span>
+            </li>
+            <li>
+              <span class="k">Số điện thoại</span>
+              <span class="v">{{ user()?.phoneNumber || 'Chưa cập nhật' }}</span>
+            </li>
+          </ul>
+        }
       </nz-card>
 
-      <nz-card nzTitle="Đổi mật khẩu">
+      <!-- Bảo mật -->
+      <nz-card nzTitle="Bảo mật">
         @if (!pwExpanded()) {
-          <button nz-button nzType="default" (click)="pwExpanded.set(true)">
-            <nz-icon nzType="lock" /> Đổi mật khẩu
-          </button>
+          <div class="sec-row">
+            <div class="sec-text">
+              <div class="sec-title">Mật khẩu đăng nhập</div>
+              <div class="sec-sub muted">Nên dùng mật khẩu mạnh, tối thiểu 8 ký tự.</div>
+            </div>
+            <button nz-button nzType="default" (click)="pwExpanded.set(true)">
+              <nz-icon nzType="lock" /> Đổi mật khẩu
+            </button>
+          </div>
         } @else {
           <form nz-form nzLayout="vertical" class="pw-form">
             <nz-form-item>
@@ -102,7 +145,7 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
                 <input nz-input type="password" [(ngModel)]="confirmPassword" name="cf" autocomplete="new-password" />
               </nz-form-control>
             </nz-form-item>
-            <div class="pw-actions">
+            <div class="actions">
               <button nz-button nzType="primary" [nzLoading]="pwBusy()" (click)="changePassword()">
                 Đổi mật khẩu
               </button>
@@ -121,21 +164,62 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
     />
   `,
   styles: `
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-    .profile-top { display: flex; gap: 20px; align-items: flex-start; }
-    .info { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .name { font-size: 18px; font-weight: 600; }
-    .field { display: flex; align-items: center; gap: 6px; color: var(--hs-text-muted); }
-    .label { font-weight: 500; min-width: 50px; }
-    .roles { margin: 4px 0; }
-    .up { margin-top: 8px; }
-    .hint { font-size: 12px; }
+    .profile { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+    /* Hero */
+    .hero-inner { display: flex; align-items: center; gap: 24px; }
+    .avatar-wrap { position: relative; width: 104px; height: 104px; flex: 0 0 104px; }
+    .avatar-upload { display: block; line-height: 0; }
+    .avatar-btn {
+      display: block; position: relative; cursor: pointer;
+      width: 104px; height: 104px; border-radius: 50%;
+    }
+    .avatar-overlay {
+      position: absolute; inset: 0; border-radius: 50%;
+      display: grid; place-items: center; font-size: 24px; color: #fff;
+      background: rgba(0, 0, 0, 0.45); opacity: 0; transition: opacity 0.15s ease;
+    }
+    .avatar-wrap:hover .avatar-overlay { opacity: 1; }
+    .avatar-loading {
+      position: absolute; inset: 0; border-radius: 50%;
+      display: grid; place-items: center; font-size: 26px; color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    .cam {
+      position: absolute; right: 2px; bottom: 2px; width: 32px; height: 32px;
+      border-radius: 50%; background: var(--hs-primary); color: #fff;
+      display: grid; place-items: center; font-size: 16px;
+      border: 2px solid var(--hs-surface); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+      pointer-events: none;
+    }
+    .hero-info { min-width: 0; }
+    .hero-name { font-size: 20px; font-weight: 700; line-height: 1.25; word-break: break-word; }
+    .hero-mail { display: flex; align-items: center; gap: 6px; color: var(--hs-text-muted); margin-top: 4px; word-break: break-word; }
+    .hero-roles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+    /* Thông tin cá nhân */
+    .fields { list-style: none; margin: 0; padding: 0; }
+    .fields li {
+      display: flex; justify-content: space-between; gap: 16px;
+      padding: 11px 0; border-bottom: 1px solid var(--hs-border);
+    }
+    .fields li:last-child { border-bottom: none; }
+    .fields .k { color: var(--hs-text-muted); }
+    .fields .v { font-weight: 500; text-align: right; word-break: break-word; }
+
+    /* Bảo mật */
+    .sec-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .sec-title { font-weight: 600; }
+    .sec-sub { font-size: 13px; margin-top: 2px; }
     .muted { color: var(--hs-text-muted); }
-    .edit-actions, .pw-actions { display: flex; gap: 8px; margin-top: 4px; }
-    .pw-form button { margin-top: 4px; }
-    @media (max-width: 767px) {
-      .grid { grid-template-columns: 1fr; }
-      .profile-top { flex-direction: column; align-items: center; text-align: center; }
+
+    .actions { display: flex; gap: 8px; margin-top: 8px; }
+
+    @media (max-width: 575px) {
+      .hero-inner { flex-direction: column; text-align: center; gap: 16px; }
+      .hero-mail, .hero-roles { justify-content: center; }
+      .fields li { flex-direction: column; gap: 2px; }
+      .fields .v { text-align: left; }
     }
   `
 })
