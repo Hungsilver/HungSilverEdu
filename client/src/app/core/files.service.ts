@@ -49,6 +49,15 @@ export class FilesService {
     });
   }
 
+  /** Mở file cần xác thực trong tab mới qua blob URL (tránh 401 khi browser GET không có Bearer). */
+  openInNewTab(id: string): void {
+    this.http.get(`${this.apiUrl}/${id}`, { responseType: 'blob' }).subscribe(blob => {
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    });
+  }
+
   /** Kiểm tra phía client trước khi upload. Trả message lỗi tiếng Việt, hoặc null nếu hợp lệ. */
   validate(file: File): string | null {
     const dot = file.name.lastIndexOf('.');

@@ -82,7 +82,7 @@ import { PageHeader } from '../../shared/page-header';
               <div class="card-field"><span class="label">Khối</span><span>{{ m.gradeBand || '—' }}</span></div>
               <div class="card-field"><span class="label">Mô tả</span><span>{{ m.description || '—' }}</span></div>
               <div class="card-actions">
-                <a nz-button nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
+                <button nz-button nzSize="small" (click)="openMaterial(m)"><nz-icon nzType="eye" /> Mở</button>
                 <button nz-button nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /> Sửa</button>
                 <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /> Xóa</button>
               </div>
@@ -101,7 +101,7 @@ import { PageHeader } from '../../shared/page-header';
                 <td>{{ m.gradeBand || '—' }}</td>
                 <td>{{ m.description || '—' }}</td>
                 <td nzRight>
-                  <a nz-button nzType="link" nzSize="small" [href]="m.downloadUrl" target="_blank"><nz-icon nzType="eye" /> Mở</a>
+                  <button nz-button nzType="link" nzSize="small" (click)="openMaterial(m)"><nz-icon nzType="eye" /> Mở</button>
                   <button nz-button nzType="link" nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
                   <button nz-button nzType="link" nzSize="small" nzDanger
                           nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
@@ -357,6 +357,14 @@ export class MaterialsPage {
       next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success('Đã lưu tài liệu.'); this.loadMaterials(); },
       error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
     });
+  }
+
+  protected openMaterial(m: Material): void {
+    if (m.source === MaterialSource.ExternalUrl) {
+      window.open(m.url!, '_blank');
+    } else {
+      this.filesService.openInNewTab(m.storedFileId!);
+    }
   }
 
   protected remove(m: Material): void {
