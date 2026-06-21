@@ -128,7 +128,8 @@ export enum TuitionStatus {
   Pending = 'Pending',
   Paid = 'Paid',
   DueSoon = 'DueSoon',
-  Overdue = 'Overdue'
+  Overdue = 'Overdue',
+  Partial = 'Partial'
 }
 
 export enum SettingScope {
@@ -202,6 +203,7 @@ export type NotificationTargetScope = 'All' | 'Class' | 'Student';
 
 export interface Student {
   id: string;
+  studentCode: string;
   fullName: string;
   dateOfBirth: string | null;
   school: string | null;
@@ -210,19 +212,40 @@ export interface Student {
   parentName: string | null;
   parentPhone: string | null;
   address: string | null;
+  email: string | null;
+  note: string | null;
   enrollmentDate: string;
   englishLevel: string | null;
   learningGoal: string | null;
-  entryScore: number | null;
+  entryScore?: number | null;
   curriculum: string | null;
   userId: string | null;
   isActive: boolean;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string | null;
+  classes: StudentClass[];
+}
+
+export interface StudentClass {
+  classId: string;
+  classCode: string;
+  className: string;
+  teacherProfileId: string | null;
+  teacherName: string | null;
+  branchId: string | null;
+  branchCode: string | null;
+  branchName: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  gradeId: string | null;
+  gradeName: string | null;
+  tuitionFee: number;
+  enrolledOn: string;
 }
 
 export interface StudentRequest {
+  studentCode: string | null;
   fullName: string;
   dateOfBirth: string | null;
   school: string | null;
@@ -231,10 +254,11 @@ export interface StudentRequest {
   parentName: string | null;
   parentPhone: string | null;
   address: string | null;
+  email: string | null;
+  note: string | null;
   enrollmentDate: string | null;
   englishLevel: string | null;
   learningGoal: string | null;
-  entryScore: number | null;
   curriculum: string | null;
   isActive: boolean;
 }
@@ -243,12 +267,20 @@ export interface StudentRequest {
 
 export interface ClassListItem {
   id: string;
+  classCode: string;
   name: string;
-  teacherId: string;
+  teacherId?: string;
+  teacherProfileId: string | null;
   teacherName: string | null;
+  branchId: string | null;
+  branchCode: string | null;
+  branchName: string | null;
   subjectId: string | null;
   subjectName: string | null;
-  gradeBand: string | null;
+  gradeBand?: string | null;
+  gradeId: string | null;
+  gradeName: string | null;
+  tuitionFee: number;
   maxCapacity: number;
   currentSize: number;
   isActive: boolean;
@@ -258,12 +290,20 @@ export interface ClassListItem {
 
 export interface ClassDetail {
   id: string;
+  classCode: string;
   name: string;
-  teacherId: string;
+  teacherId?: string;
+  teacherProfileId: string | null;
   teacherName: string | null;
+  branchId: string | null;
+  branchCode: string | null;
+  branchName: string | null;
   subjectId: string | null;
   subjectName: string | null;
-  gradeBand: string | null;
+  gradeBand?: string | null;
+  gradeId: string | null;
+  gradeName: string | null;
+  tuitionFee: number;
   curriculumId: string | null;
   curriculumName: string | null;
   maxCapacity: number;
@@ -279,29 +319,134 @@ export interface ClassDetail {
 }
 
 export interface ClassRequest {
+  classCode: string | null;
   name: string;
-  teacherId: string;
+  teacherProfileId: string;
+  branchId: string | null;
   subjectId: string | null;
-  gradeBand: string | null;
+  gradeId: string | null;
   curriculumId: string | null;
+  tuitionFee: number;
   maxCapacity: number;
   schedule: string | null;
   startDate: string | null;
   isActive: boolean;
 }
 
+// ----------------- Cơ sở (Branch — Đợt 8) -----------------
+
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface BranchRequest {
+  code: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+// ----------------- Khối -----------------
+
+export interface Grade {
+  id: string;
+  code: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface GradeRequest {
+  code: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+// ----------------- Giáo viên -----------------
+
+export interface TeacherProfile {
+  id: string;
+  teacherCode: string;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  dateOfBirth: string | null;
+  address: string | null;
+  note: string | null;
+  userId: string | null;
+  userName: string | null;
+  isActive: boolean;
+  classCount: number;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface TeacherDetail {
+  teacher: TeacherProfile;
+  classes: ClassListItem[];
+}
+
+export interface TeacherRequest {
+  teacherCode: string | null;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  dateOfBirth: string | null;
+  address: string | null;
+  note: string | null;
+  userId: string | null;
+  isActive: boolean;
+}
+
+export interface UnlinkedUser {
+  id: string;
+  userName: string;
+  fullName: string | null;
+}
+
+export interface CreateTeacherAccountRequest {
+  teacherProfileId: string | null;
+  teacherCode: string | null;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  dateOfBirth: string | null;
+  address: string | null;
+  note: string | null;
+  userName: string;
+  loginEmail: string | null;
+  password: string;
+}
+
 // ----------------- Môn học (Subject — Đợt 7) -----------------
 
 export interface Subject {
   id: string;
+  code: string;
   name: string;
   description: string | null;
   sortOrder: number;
   isActive: boolean;
-  classCount: number;
 }
 
 export interface SubjectRequest {
+  code: string;
   name: string;
   description: string | null;
   sortOrder: number;
@@ -311,15 +456,19 @@ export interface SubjectRequest {
 export interface RosterItem {
   enrollmentId: string;
   studentId: string;
+  studentCode: string;
   fullName: string;
   phone: string | null;
   parentPhone: string | null;
+  email: string | null;
+  note: string | null;
   enrolledOn: string;
   userId: string | null;
 }
 
 /** Giáo viên tạo học sinh trong lớp (kèm tùy chọn tài khoản đăng nhập). */
 export interface CreateClassStudentRequest {
+  studentCode?: string | null;
   fullName: string;
   dateOfBirth?: string | null;
   school?: string | null;
@@ -327,6 +476,8 @@ export interface CreateClassStudentRequest {
   phone?: string | null;
   parentName?: string | null;
   parentPhone?: string | null;
+  email?: string | null;
+  note?: string | null;
   englishLevel?: string | null;
   learningGoal?: string | null;
   createAccount: boolean;
@@ -336,6 +487,7 @@ export interface CreateClassStudentRequest {
 
 export interface CreateClassStudentResult {
   studentId: string;
+  studentCode: string;
   fullName: string;
   accountCreated: boolean;
   userName: string | null;
@@ -343,6 +495,7 @@ export interface CreateClassStudentResult {
 
 export interface ClassStudentOverview {
   studentId: string;
+  studentCode: string;
   fullName: string;
   rewardBalance: number;
   attendedSessions: number;
@@ -636,12 +789,68 @@ export interface TuitionInvoice {
   periodYear: number;
   periodMonth: number;
   amount: number;
+  discountAmount: number;
+  paidAmount: number;
   dueDate: string;
   status: TuitionStatus;
   paidOn: string | null;
   note: string | null;
   isDeleted: boolean;
   createdAt: string;
+}
+
+export interface TuitionStudentListItem {
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  phone: string | null;
+  parentPhone: string | null;
+  periodYear: number;
+  periodMonth: number;
+  dueDate: string;
+  totalAmount: number;
+  discountAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: TuitionStatus;
+}
+
+export interface TuitionClassLine {
+  classId: string;
+  classCode: string;
+  className: string;
+  teacherName: string | null;
+  subjectName: string | null;
+  gradeName: string | null;
+  branchName: string | null;
+  tuitionFee: number;
+}
+
+export interface TuitionBill {
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  phone: string | null;
+  parentPhone: string | null;
+  periodYear: number;
+  periodMonth: number;
+  dueDate: string;
+  classes: TuitionClassLine[];
+  totalAmount: number;
+  discountAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: TuitionStatus;
+  invoices: TuitionInvoice[];
+}
+
+export interface PayStudentTuitionRequest {
+  periodYear: number;
+  periodMonth: number;
+  dueDate: string;
+  discountAmount: number;
+  paidAmount: number;
+  note: string | null;
 }
 
 export interface CreateTuitionInvoiceRequest {
@@ -664,14 +873,16 @@ export const TUITION_STATUS_LABELS: Record<TuitionStatus, string> = {
   [TuitionStatus.Pending]: 'Chưa tới hạn',
   [TuitionStatus.Paid]: 'Đã đóng',
   [TuitionStatus.DueSoon]: 'Sắp đến hạn',
-  [TuitionStatus.Overdue]: 'Quá hạn'
+  [TuitionStatus.Overdue]: 'Quá hạn',
+  [TuitionStatus.Partial]: 'Còn thiếu'
 };
 
 export const TUITION_STATUS_COLORS: Record<TuitionStatus, string> = {
   [TuitionStatus.Pending]: 'default',
   [TuitionStatus.Paid]: 'green',
   [TuitionStatus.DueSoon]: 'gold',
-  [TuitionStatus.Overdue]: 'red'
+  [TuitionStatus.Overdue]: 'red',
+  [TuitionStatus.Partial]: 'orange'
 };
 
 // ----------------- Kho tài liệu -----------------
@@ -717,27 +928,54 @@ export interface UpdateMaterialRequest {
 
 // ----------------- Nhập danh sách lớp từ Excel (Đợt 7) -----------------
 
-export interface ClassImportRow {
-  rowNumber: number;
+export interface ClassImportClassPreview {
+  previewId: string;
+  classCode: string | null;
   name: string;
+  existingClassId: string | null;
+  branchId: string | null;
+  branchCode: string | null;
+  branchName: string | null;
+  subjectId: string | null;
   subjectName: string | null;
-  gradeBand: string | null;
-  teacher: string | null;
-  maxCapacity: string | null;
-  startDate: string | null;
-  curriculum: string | null;
+  gradeId: string | null;
+  gradeName: string | null;
+  teacherProfileId: string | null;
+  teacherName: string | null;
+  tuitionFee: number;
+  isValid: boolean;
+  error: string | null;
+}
+
+export interface ClassImportStudentPreview {
+  rowNumber: number;
+  previewClassId: string;
+  studentCode: string | null;
+  fullName: string;
+  parentPhone: string | null;
+  phone: string | null;
+  note: string | null;
   isValid: boolean;
   error: string | null;
 }
 
 export interface ClassImportPreview {
-  rows: ClassImportRow[];
-  validCount: number;
+  classes: ClassImportClassPreview[];
+  students: ClassImportStudentPreview[];
+  validClassCount: number;
+  validStudentCount: number;
   invalidCount: number;
 }
 
+export interface ClassImportCommitRequest {
+  classes: ClassImportClassPreview[];
+  students: ClassImportStudentPreview[];
+}
+
 export interface ClassImportResult {
-  created: number;
+  classesCreated: number;
+  studentsCreated: number;
+  enrollmentsCreated: number;
   skipped: number;
   errors: string[];
 }

@@ -69,6 +69,8 @@ import { PageHeader } from '../../shared/page-header';
             <nz-card nzTitle="Báo cáo phụ huynh" class="mt">
               <button nz-button (click)="reportOpen.set(true)"><nz-icon nzType="file-text" /> Tạo báo cáo tháng</button>
             </nz-card>
+          }
+          @if (auth.isAdmin()) {
             <nz-card nzTitle="Tài khoản học sinh" class="mt">
               @if (s.userId) {
                 <nz-tag nzColor="green">Đã liên kết tài khoản (portal)</nz-tag>
@@ -147,7 +149,7 @@ export class StudentDetailPage implements OnInit {
   private readonly studentsService = inject(StudentsService);
   private readonly usersService = inject(UsersService);
   private readonly warningsService = inject(WarningsService);
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly message = inject(NzMessageService);
 
   protected readonly warnings = signal<Warnings | null>(null);

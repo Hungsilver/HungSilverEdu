@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -42,7 +42,7 @@ import { PageHeader } from '../../shared/page-header';
           <label nz-radio-button nzValue="class">Theo lớp</label>
           <label nz-radio-button nzValue="library">Thư viện</label>
         </nz-radio-group>
-        @if (auth.isAdmin()) {
+        @if (canManage()) {
           <button nz-button (click)="openCatManager()"><nz-icon nzType="setting" /> Danh mục</button>
         }
       </div>
@@ -214,6 +214,7 @@ export class MaterialsPage {
   private readonly filesService = inject(FilesService);
   private readonly settingsService = inject(SettingsService);
   private readonly message = inject(NzMessageService);
+  protected readonly canManage = computed(() => this.auth.isAdmin() || this.auth.isTeacher());
 
   protected readonly MaterialSource = MaterialSource;
   protected readonly typeLabels = MATERIAL_TYPE_LABELS;

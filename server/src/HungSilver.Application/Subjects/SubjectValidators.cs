@@ -6,6 +6,7 @@ public sealed class CreateSubjectRequestValidator : AbstractValidator<CreateSubj
 {
     public CreateSubjectRequestValidator()
     {
+        RuleFor(x => x.Code).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Description).MaximumLength(500);
     }
@@ -15,6 +16,7 @@ public sealed class UpdateSubjectRequestValidator : AbstractValidator<UpdateSubj
 {
     public UpdateSubjectRequestValidator()
     {
+        RuleFor(x => x.Code).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Description).MaximumLength(500);
     }

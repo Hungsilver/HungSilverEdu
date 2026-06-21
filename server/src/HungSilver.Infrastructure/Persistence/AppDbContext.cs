@@ -14,6 +14,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     // Nghiệp vụ trung tâm (lớp ClassRoom map sang bảng "Classes").
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<GradeCategory> GradeCategories => Set<GradeCategory>();
+    public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Curriculum> Curriculums => Set<Curriculum>();
     public DbSet<Subject> Subjects => Set<Subject>();

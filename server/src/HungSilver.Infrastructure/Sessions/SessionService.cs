@@ -12,6 +12,7 @@ namespace HungSilver.Infrastructure.Sessions;
 public sealed class SessionService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     ICurrentUser currentUser) : ISessionService
 {
     private static readonly Error SessionNotFound = Error.NotFound("Session.NotFound", "Không tìm thấy buổi học.");
@@ -82,9 +83,7 @@ public sealed class SessionService(
             return access;
 
         // Chỉ chấp nhận học sinh đang ghi danh trong lớp của buổi học (tránh ghi cho HS lớp khác).
-        var rosterIds = await context.Enrollments
-            .Where(e => e.ClassId == session.ClassId && e.IsActive)
-            .Select(e => e.StudentId).ToListAsync(ct);
+        var rosterIds = await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([session.ClassId], ct);
         var entries = request.Entries.Where(e => rosterIds.Contains(e.StudentId)).ToList();
 
         var studentIds = entries.Select(e => e.StudentId).ToList();
@@ -138,8 +137,8 @@ public sealed class SessionService(
         if (access.IsFailure)
             return Result.Failure<PointEntryDto>(access.Error);
 
-        var inClass = await context.Enrollments.AnyAsync(
-            e => e.ClassId == session.ClassId && e.StudentId == request.StudentId && e.IsActive, ct);
+        var inClass = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([session.ClassId], ct))
+            .Contains(request.StudentId);
         if (!inClass)
             return Result.Failure<PointEntryDto>(Error.Validation("Point.NotInClass", "Học sinh không thuộc lớp của buổi học."));
 

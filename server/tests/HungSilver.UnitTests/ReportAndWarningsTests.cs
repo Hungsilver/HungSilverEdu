@@ -6,6 +6,7 @@ using HungSilver.Domain.Entities;
 using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.Infrastructure.Persistence.Interceptors;
+using HungSilver.Infrastructure.Common;
 using HungSilver.Infrastructure.Reports;
 using HungSilver.Infrastructure.Warnings;
 using Microsoft.Data.Sqlite;
@@ -51,7 +52,7 @@ public sealed class ReportAndWarningsTests : IDisposable
         var classId = await AddClassAsync("Lớp A");
         var session = await AddSessionAsync(classId, number: 1, daysAgo: 0);
 
-        var service = new SessionReportService(_context, new AdminGuard());
+        var service = new SessionReportService(_context, new CurrentRelationCleanupService(_context), new AdminGuard());
 
         var first = await service.GenerateSessionNoticeAsync(session);
         var second = await service.GenerateSessionNoticeAsync(session);
@@ -130,7 +131,7 @@ public sealed class ReportAndWarningsTests : IDisposable
     // ---------- Helpers ----------
 
     private Task<Result<WarningsDto>> GetWarningsAsync() =>
-        new WarningsService(_context, new AdminGuard(), new DefaultSettings()).GetWarningsAsync(classId: null);
+        new WarningsService(_context, new AdminGuard(), new CurrentRelationCleanupService(_context), new DefaultSettings()).GetWarningsAsync(classId: null);
 
     private async Task<Guid> AddClassAsync(string name)
     {
@@ -142,7 +143,7 @@ public sealed class ReportAndWarningsTests : IDisposable
 
     private async Task<Guid> AddStudentAsync(string fullName)
     {
-        var student = new Student { FullName = fullName };
+        var student = new Student { StudentCode = HungSilver.Domain.Common.UniqueCodeGenerator.Next("HS"), FullName = fullName };
         _context.Students.Add(student);
         await _context.SaveChangesAsync();
         return student.Id;
@@ -190,7 +191,7 @@ public sealed class ReportAndWarningsTests : IDisposable
     private sealed class AdminGuard : IClassAccessGuard
     {
         public bool IsAdmin => true;
-        public Guid? TeacherScopeId => null;
+        public Task<Guid?> GetTeacherScopeIdAsync(CancellationToken ct = default) => Task.FromResult<Guid?>(null);
         public Task<Result> EnsureCanAccessClassAsync(Guid classId, CancellationToken ct = default) => Task.FromResult(Result.Success());
         public Task<bool> CanAccessClassAsync(Guid classId, CancellationToken ct = default) => Task.FromResult(true);
         public Task<Result> EnsureCanAccessStudentAsync(Guid studentId, CancellationToken ct = default) => Task.FromResult(Result.Success());

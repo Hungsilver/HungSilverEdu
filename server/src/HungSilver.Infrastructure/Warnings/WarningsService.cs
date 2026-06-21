@@ -11,6 +11,7 @@ namespace HungSilver.Infrastructure.Warnings;
 public sealed class WarningsService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     ISettingsResolver settings) : IWarningsService
 {
     public async Task<Result<WarningsDto>> GetWarningsAsync(Guid? classId, Guid? studentId = null, CancellationToken ct = default)
@@ -34,9 +35,7 @@ public sealed class WarningsService(
             }
 
             var classIds = await ScopeClassIdsAsync(classId, ct);
-            studentIds = await context.Enrollments.AsNoTracking()
-                .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-                .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+            studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct)).ToList();
         }
 
         if (studentIds.Count == 0)
@@ -113,8 +112,11 @@ public sealed class WarningsService(
         if (classId is not null)
             return [classId.Value];
         var q = context.Classes.AsNoTracking().AsQueryable();
-        if (!accessGuard.IsAdmin)
-            q = q.Where(c => c.TeacherId == accessGuard.TeacherScopeId);
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is not null)
+        {
+            q = q.Where(c => c.TeacherProfileId == scopeId);
+        }
         return await q.Select(c => c.Id).ToListAsync(ct);
     }
 

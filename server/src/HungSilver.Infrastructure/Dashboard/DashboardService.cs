@@ -11,6 +11,7 @@ namespace HungSilver.Infrastructure.Dashboard;
 public sealed class DashboardService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     ISettingsResolver settings) : IDashboardService
 {
     public async Task<Result<DashboardSummaryDto>> GetSummaryAsync(CancellationToken ct = default)
@@ -18,11 +19,7 @@ public sealed class DashboardService(
         var classIds = await GetScopeClassIdsAsync(ct);
         var today = await GetTodayAsync(ct);
 
-        var studentIds = await context.Enrollments.AsNoTracking()
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .Select(e => e.StudentId)
-            .Distinct()
-            .ToListAsync(ct);
+        var studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct)).ToList();
 
         var todaySchedule = await (
             from s in context.ClassSessions.AsNoTracking()
@@ -117,11 +114,7 @@ public sealed class DashboardService(
     {
         var classIds = await GetScopeClassIdsAsync(ct);
 
-        var studentIds = await context.Enrollments.AsNoTracking()
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .Select(e => e.StudentId)
-            .Distinct()
-            .ToListAsync(ct);
+        var studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct)).ToList();
 
         var recs = await (
             from r in context.StudentSessionRecords.AsNoTracking()
@@ -183,8 +176,9 @@ public sealed class DashboardService(
     private async Task<List<Guid>> GetScopeClassIdsAsync(CancellationToken ct)
     {
         var q = context.Classes.AsNoTracking().AsQueryable();
-        if (!accessGuard.IsAdmin)
-            q = q.Where(c => c.TeacherId == accessGuard.TeacherScopeId);
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is not null)
+            q = q.Where(c => c.TeacherProfileId == scopeId);
         return await q.Select(c => c.Id).ToListAsync(ct);
     }
 

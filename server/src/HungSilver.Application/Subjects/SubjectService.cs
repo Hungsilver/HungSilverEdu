@@ -3,7 +3,6 @@ using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
-using System.Linq.Expressions;
 
 namespace HungSilver.Application.Subjects;
 
@@ -19,7 +18,6 @@ public interface ISubjectService
 public sealed class SubjectService(
     IRepository<Subject> subjects,
     IRepository<ClassRoom> classes,
-    IClassAccessGuard accessGuard,
     IUnitOfWork unitOfWork,
     IValidator<CreateSubjectRequest> createValidator,
     IValidator<UpdateSubjectRequest> updateValidator) : ISubjectService
@@ -30,18 +28,9 @@ public sealed class SubjectService(
     {
         var items = await subjects.FindAsync(s => includeInactive || s.IsActive, ct);
 
-        // Đếm số lớp theo môn (không FK → group thủ công). Teacher chỉ đếm lớp của mình.
-        var ids = items.Select(s => s.Id).ToList();
-        var teacherId = accessGuard.TeacherScopeId;
-        Expression<Func<ClassRoom, bool>> scope = accessGuard.IsAdmin
-            ? c => c.SubjectId != null && ids.Contains(c.SubjectId.Value)
-            : c => c.SubjectId != null && ids.Contains(c.SubjectId.Value) && c.TeacherId == teacherId;
-        var classList = await classes.FindAsync(scope, ct);
-        var counts = classList.GroupBy(c => c.SubjectId!.Value).ToDictionary(g => g.Key, g => g.Count());
-
         return items
             .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
-            .Select(s => ToDto(s, counts.GetValueOrDefault(s.Id)))
+            .Select(ToDto)
             .ToList();
     }
 
@@ -51,8 +40,13 @@ public sealed class SubjectService(
         if (!validation.IsValid)
             return Result.Failure<SubjectDto>(validation.ToError("Subject.Validation"));
 
+        var code = NormalizeCode(request.Code);
+        if (await subjects.AnyAsync(s => s.Code == code, ct))
+            return Result.Failure<SubjectDto>(Error.Conflict("Subject.DuplicateCode", $"Mã môn học '{request.Code}' đã tồn tại."));
+
         var subject = new Subject
         {
+            Code = code,
             Name = request.Name.Trim(),
             Description = request.Description?.Trim(),
             SortOrder = request.SortOrder,
@@ -60,7 +54,7 @@ public sealed class SubjectService(
         };
         await subjects.AddAsync(subject, ct);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(subject, 0);
+        return ToDto(subject);
     }
 
     public async Task<Result<SubjectDto>> UpdateAsync(Guid id, UpdateSubjectRequest request, CancellationToken ct = default)
@@ -73,6 +67,11 @@ public sealed class SubjectService(
         if (subject is null)
             return Result.Failure<SubjectDto>(NotFoundError);
 
+        var code = NormalizeCode(request.Code);
+        if (subject.Code != code && await subjects.AnyAsync(s => s.Code == code, ct))
+            return Result.Failure<SubjectDto>(Error.Conflict("Subject.DuplicateCode", $"Mã môn học '{request.Code}' đã tồn tại."));
+
+        subject.Code = code;
         subject.Name = request.Name.Trim();
         subject.Description = request.Description?.Trim();
         subject.SortOrder = request.SortOrder;
@@ -80,8 +79,7 @@ public sealed class SubjectService(
         subjects.Update(subject);
         await unitOfWork.SaveChangesAsync(ct);
 
-        var count = (await classes.FindAsync(c => c.SubjectId == subject.Id, ct)).Count;
-        return ToDto(subject, count);
+        return ToDto(subject);
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
@@ -99,6 +97,8 @@ public sealed class SubjectService(
         return Result.Success();
     }
 
-    private static SubjectDto ToDto(Subject s, int classCount) =>
-        new(s.Id, s.Name, s.Description, s.SortOrder, s.IsActive, classCount);
+    private static string NormalizeCode(string code) => code.Trim().ToUpperInvariant().Replace(" ", "_");
+
+    private static SubjectDto ToDto(Subject s) =>
+        new(s.Id, s.Code, s.Name, s.Description, s.SortOrder, s.IsActive);
 }

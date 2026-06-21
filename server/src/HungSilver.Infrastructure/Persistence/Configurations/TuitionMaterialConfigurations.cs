@@ -10,8 +10,11 @@ public sealed class TuitionInvoiceConfiguration : IEntityTypeConfiguration<Tuiti
     public void Configure(EntityTypeBuilder<TuitionInvoice> e)
     {
         e.Property(x => x.Amount).HasPrecision(18, 2);
+        e.Property(x => x.DiscountAmount).HasPrecision(18, 2);
+        e.Property(x => x.PaidAmount).HasPrecision(18, 2);
         e.Property(x => x.Note).HasMaxLength(500);
         e.HasIndex(x => x.StudentId);
+        e.HasIndex(x => x.ClassId);
         e.HasIndex(x => new { x.Status, x.DueDate });
     }
 }

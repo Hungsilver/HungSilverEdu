@@ -12,6 +12,7 @@ namespace HungSilver.Infrastructure.Assignments;
 public sealed class AssignmentService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     ICurrentUser currentUser) : IAssignmentService
 {
     private static readonly Error NotFoundError = Error.NotFound("Assignment.NotFound", "Không tìm thấy bài tập.");
@@ -45,10 +46,7 @@ public sealed class AssignmentService(
         var classIds = items.Select(a => a.ClassId).Distinct().ToList();
         var materialIds = items.Where(a => a.MaterialId.HasValue).Select(a => a.MaterialId!.Value).Distinct().ToList();
 
-        var totals = await context.Enrollments.AsNoTracking()
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .GroupBy(e => e.ClassId).Select(g => new { ClassId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.ClassId, x => x.Count, ct);
+        var totals = await relationCleanup.LoadValidClassSizesAsync(classIds, ct);
 
         var submitted = await context.Submissions.AsNoTracking()
             .Where(s => ids.Contains(s.AssignmentId) && s.SubmittedOn != null)
@@ -77,6 +75,21 @@ public sealed class AssignmentService(
         if (string.IsNullOrWhiteSpace(request.Title))
             return Result.Failure<AssignmentDto>(Error.Validation("Assignment.TitleRequired", "Tiêu đề bài tập bắt buộc."));
 
+        if (request.ClassSessionId is not null)
+        {
+            var sessionClassId = await context.ClassSessions.AsNoTracking()
+                .Where(s => s.Id == request.ClassSessionId.Value)
+                .Select(s => (Guid?)s.ClassId)
+                .FirstOrDefaultAsync(ct);
+            if (sessionClassId is null)
+                return Result.Failure<AssignmentDto>(Error.NotFound("Session.NotFound", "Không tìm thấy buổi học."));
+            if (sessionClassId.Value != request.ClassId)
+                return Result.Failure<AssignmentDto>(Error.Validation("Assignment.SessionClassMismatch", "Buổi học không thuộc lớp của bài tập."));
+        }
+
+        if (request.MaterialId is not null && !await context.LearningMaterials.AnyAsync(m => m.Id == request.MaterialId.Value, ct))
+            return Result.Failure<AssignmentDto>(Error.NotFound("Material.NotFound", "Không tìm thấy học liệu."));
+
         var assignment = new Assignment
         {
             ClassId = request.ClassId,
@@ -91,7 +104,7 @@ public sealed class AssignmentService(
         context.Assignments.Add(assignment);
         await context.SaveChangesAsync(ct);
 
-        var total = await context.Enrollments.CountAsync(e => e.ClassId == assignment.ClassId && e.IsActive, ct);
+        var total = (await relationCleanup.LoadValidClassSizesAsync([assignment.ClassId], ct)).GetValueOrDefault(assignment.ClassId);
         string? materialTitle = assignment.MaterialId.HasValue
             ? (await context.LearningMaterials.AsNoTracking().FirstOrDefaultAsync(m => m.Id == assignment.MaterialId, ct))?.Title
             : null;
@@ -156,6 +169,10 @@ public sealed class AssignmentService(
         var access = await accessGuard.EnsureCanAccessClassAsync(assignment.ClassId, ct);
         if (access.IsFailure)
             return access;
+
+        var classStudentIds = await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([assignment.ClassId], ct);
+        if (!classStudentIds.Contains(studentId))
+            return Result.Failure(Error.Validation("Assignment.NotInClass", "Học sinh không thuộc lớp của bài tập."));
 
         var today = Today;
         var sub = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == studentId, ct);

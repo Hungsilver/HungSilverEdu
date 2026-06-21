@@ -2,7 +2,23 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { CreateTuitionInvoiceRequest, PagedResult, TuitionInvoice, UpdateTuitionInvoiceRequest } from './models';
+import {
+  CreateTuitionInvoiceRequest, PagedResult, PayStudentTuitionRequest, TuitionBill,
+  TuitionInvoice, TuitionStudentListItem, UpdateTuitionInvoiceRequest
+} from './models';
+
+export interface TuitionStudentQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  periodYear: number;
+  periodMonth: number;
+  dueDate?: string | null;
+  branchId?: string;
+  subjectId?: string;
+  gradeId?: string;
+  teacherProfileId?: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class TuitionService {
@@ -17,6 +33,31 @@ export class TuitionService {
 
   getByStudent(studentId: string): Observable<TuitionInvoice[]> {
     return this.http.get<TuitionInvoice[]>(`${this.apiUrl}/students/${studentId}`);
+  }
+
+  getStudents(query: TuitionStudentQuery): Observable<PagedResult<TuitionStudentListItem>> {
+    let params = new HttpParams()
+      .set('page', query.page)
+      .set('pageSize', query.pageSize)
+      .set('periodYear', query.periodYear)
+      .set('periodMonth', query.periodMonth);
+    if (query.search) params = params.set('search', query.search);
+    if (query.dueDate) params = params.set('dueDate', query.dueDate);
+    if (query.branchId) params = params.set('branchId', query.branchId);
+    if (query.subjectId) params = params.set('subjectId', query.subjectId);
+    if (query.gradeId) params = params.set('gradeId', query.gradeId);
+    if (query.teacherProfileId) params = params.set('teacherProfileId', query.teacherProfileId);
+    return this.http.get<PagedResult<TuitionStudentListItem>>(`${this.apiUrl}/students`, { params });
+  }
+
+  getBill(studentId: string, periodYear: number, periodMonth: number, dueDate?: string | null): Observable<TuitionBill> {
+    let params = new HttpParams().set('periodYear', periodYear).set('periodMonth', periodMonth);
+    if (dueDate) params = params.set('dueDate', dueDate);
+    return this.http.get<TuitionBill>(`${this.apiUrl}/students/${studentId}/bill`, { params });
+  }
+
+  payStudent(studentId: string, request: PayStudentTuitionRequest): Observable<TuitionBill> {
+    return this.http.post<TuitionBill>(`${this.apiUrl}/students/${studentId}/pay`, request);
   }
 
   create(request: CreateTuitionInvoiceRequest): Observable<TuitionInvoice> {

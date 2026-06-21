@@ -3,7 +3,7 @@ using HungSilver.Domain.Common.Results;
 namespace HungSilver.Application.Students;
 
 /// <summary>
-/// Cấp/quản lý tài khoản đăng nhập của học sinh — do giáo viên (trong phạm vi lớp của mình) hoặc
+/// Cấp/quản lý tài khoản đăng nhập của học sinh — do giáo viên hoặc
 /// admin thực hiện. Hiện thực ở Infrastructure vì cần UserManager của Identity.
 /// </summary>
 public interface IStudentAccountService

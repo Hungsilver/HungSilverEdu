@@ -4,7 +4,7 @@ namespace HungSilver.Application.Dashboard;
 
 public interface IDashboardService
 {
-    /// <summary>Số liệu tổng quan (Admin = toàn trung tâm; Teacher = lớp của mình).</summary>
+    /// <summary>Số liệu tổng quan (Admin/Teacher = toàn trung tâm).</summary>
     Task<Result<DashboardSummaryDto>> GetSummaryAsync(CancellationToken ct = default);
 
     Task<Result<DashboardChartsDto>> GetChartsAsync(CancellationToken ct = default);

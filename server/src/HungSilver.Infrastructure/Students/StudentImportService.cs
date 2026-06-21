@@ -4,6 +4,7 @@ using HungSilver.Application.Students;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
+using static HungSilver.Domain.Common.UniqueCodeGenerator;
 using HungSilver.Infrastructure.Identity;
 using HungSilver.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -60,6 +61,7 @@ public sealed class StudentImportService(
 
             var student = new Student
             {
+                StudentCode = Next("HS"),
                 FullName = row.FullName!.Trim(),
                 DateOfBirth = ParseDate(row.DateOfBirth),
                 School = Clean(row.School),

@@ -5,7 +5,7 @@ namespace HungSilver.Application.Classes;
 
 public interface IClassService
 {
-    Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? subjectId = null, string? gradeBand = null, CancellationToken ct = default);
+    Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? branchId = null, Guid? subjectId = null, Guid? gradeId = null, Guid? teacherProfileId = null, CancellationToken ct = default);
     Task<Result<ClassDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Result<ClassDto>> CreateAsync(CreateClassRequest request, CancellationToken ct = default);
     Task<Result<ClassDto>> UpdateAsync(Guid id, UpdateClassRequest request, CancellationToken ct = default);
@@ -16,4 +16,5 @@ public interface IClassService
     Task<Result<List<ClassStudentOverviewDto>>> GetOverviewAsync(Guid classId, CancellationToken ct = default);
     Task<Result> EnrollAsync(Guid classId, EnrollStudentRequest request, CancellationToken ct = default);
     Task<Result> WithdrawAsync(Guid classId, Guid studentId, CancellationToken ct = default);
+    Task<Result<byte[]>> ExportAsync(string? search = null, Guid? branchId = null, Guid? subjectId = null, Guid? gradeId = null, Guid? teacherProfileId = null, CancellationToken ct = default);
 }

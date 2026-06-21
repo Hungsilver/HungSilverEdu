@@ -1,4 +1,5 @@
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
 
@@ -14,6 +15,7 @@ public interface IMaterialCategoryService
 
 public sealed class MaterialCategoryService(
     IRepository<MaterialCategory> categories,
+    ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork) : IMaterialCategoryService
 {
     private static readonly Error NotFoundError = Error.NotFound("MaterialCategory.NotFound", "Không tìm thấy danh mục.");
@@ -62,6 +64,10 @@ public sealed class MaterialCategoryService(
         var category = await categories.GetByIdAsync(id, ct: ct);
         if (category is null)
             return Result.Failure(NotFoundError);
+
+        var inUse = await relationCleanup.EnsureMaterialCategoryNotInUseAsync(id, ct);
+        if (inUse.IsFailure)
+            return inUse;
 
         categories.SoftDelete(category);
         await unitOfWork.SaveChangesAsync(ct);

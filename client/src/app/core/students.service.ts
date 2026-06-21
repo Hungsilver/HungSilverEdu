@@ -9,6 +9,10 @@ export interface StudentQuery {
   pageSize: number;
   search?: string;
   includeDeleted?: boolean;
+  branchId?: string;
+  subjectId?: string;
+  gradeId?: string;
+  teacherProfileId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -20,6 +24,10 @@ export class StudentsService {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.search) params = params.set('search', query.search);
     if (query.includeDeleted) params = params.set('includeDeleted', true);
+    if (query.branchId) params = params.set('branchId', query.branchId);
+    if (query.subjectId) params = params.set('subjectId', query.subjectId);
+    if (query.gradeId) params = params.set('gradeId', query.gradeId);
+    if (query.teacherProfileId) params = params.set('teacherProfileId', query.teacherProfileId);
     return this.http.get<PagedResult<Student>>(this.apiUrl, { params });
   }
 

@@ -12,6 +12,7 @@ namespace HungSilver.Infrastructure.Notifications;
 public sealed class NotificationService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     INotificationDispatcher dispatcher,
     ICurrentUser currentUser) : INotificationService
 {
@@ -36,15 +37,15 @@ public sealed class NotificationService(
                 if (request.ClassId is null) return Bad("Thiếu lớp.");
                 var ca = await accessGuard.EnsureCanAccessClassAsync(request.ClassId.Value, ct);
                 if (ca.IsFailure) return Result.Failure<NotificationResultDto>(ca.Error);
-                studentIds = await context.Enrollments.Where(e => e.ClassId == request.ClassId && e.IsActive)
-                    .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+                studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([request.ClassId.Value], ct)).ToList();
                 break;
             default:
-                var classIds = accessGuard.IsAdmin
-                    ? await context.Classes.Select(c => c.Id).ToListAsync(ct)
-                    : await context.Classes.Where(c => c.TeacherId == accessGuard.TeacherScopeId).Select(c => c.Id).ToListAsync(ct);
-                studentIds = await context.Enrollments.Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-                    .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+                var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+                var classQuery = context.Classes.AsQueryable();
+                if (scopeId is not null)
+                    classQuery = classQuery.Where(c => c.TeacherProfileId == scopeId);
+                var classIds = await classQuery.Select(c => c.Id).ToListAsync(ct);
+                studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct)).ToList();
                 break;
         }
 

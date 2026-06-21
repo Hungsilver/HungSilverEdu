@@ -20,6 +20,7 @@ public sealed class MaterialService(
     IRepository<LearningMaterial> materials,
     IRepository<MaterialCategory> categories,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IValidator<CreateMaterialRequest> createValidator,
@@ -134,6 +135,7 @@ public sealed class MaterialService(
                 return access;
         }
 
+        await relationCleanup.NullAssignmentsForMaterialAsync(id, ct);
         materials.SoftDelete(material);
         await unitOfWork.SaveChangesAsync(ct);
         return Result.Success();

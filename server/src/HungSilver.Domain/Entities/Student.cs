@@ -5,6 +5,9 @@ namespace HungSilver.Domain.Entities;
 /// <summary>Hồ sơ học sinh (Module 2, 3, 14). Không dùng FK — các tham chiếu là Guid thuần.</summary>
 public class Student : BaseEntity
 {
+    /// <summary>Mã học sinh duy nhất, tự sinh khi tạo (vd "HS1RJZ4K5M").</summary>
+    public string StudentCode { get; set; } = string.Empty;
+
     // Thông tin cá nhân
     public string FullName { get; set; } = string.Empty;
     public DateOnly? DateOfBirth { get; set; }
@@ -14,6 +17,8 @@ public class Student : BaseEntity
     public string? ParentName { get; set; }
     public string? ParentPhone { get; set; }
     public string? Address { get; set; }
+    public string? Email { get; set; }
+    public string? Note { get; set; }
     public DateOnly EnrollmentDate { get; set; }
 
     // Thông tin học tập

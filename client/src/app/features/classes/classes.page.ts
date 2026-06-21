@@ -1,12 +1,8 @@
+import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { NzAlertModule } from 'ng-zorro-antd/alert';
-import { NzBreadCrumbModule } from 'ng-zorro-antd/breadcrumb';
 import { NzButtonModule } from 'ng-zorro-antd/button';
-import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
@@ -16,692 +12,575 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
-import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
-import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzTableModule } from 'ng-zorro-antd/table';
+import { NzTabsModule } from 'ng-zorro-antd/tabs';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { NzUploadModule, NzUploadFile } from 'ng-zorro-antd/upload';
-import { AuthService } from '../../core/auth.service';
+import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
+import { BranchesService } from '../../core/branches.service';
 import { ClassesService } from '../../core/classes.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
-import { ScreenService } from '../../core/screen.service';
-import { SettingsService } from '../../core/settings.service';
-import { SubjectsService } from '../../core/subjects.service';
+import { GradesService } from '../../core/grades.service';
 import {
-  ClassImportPreview, ClassImportResult, ClassListItem, ClassRequest, ROLE_ADMIN, ROLE_TEACHER,
-  Subject, UserListItem
+  Branch, BranchRequest, ClassDetail, ClassImportClassPreview, ClassImportPreview,
+  ClassImportStudentPreview, ClassListItem, ClassRequest, Grade, GradeRequest,
+  RosterItem, Subject, SubjectRequest, TeacherProfile
 } from '../../core/models';
-import { UsersService } from '../../core/users.service';
+import { SubjectsService } from '../../core/subjects.service';
+import { TeachersService } from '../../core/teachers.service';
 import { PageHeader } from '../../shared/page-header';
-
-const NO_BAND = '__none__';
 
 @Component({
   selector: 'app-classes-page',
   imports: [
-    FormsModule, ReactiveFormsModule, RouterLink,
-    NzTableModule, NzButtonModule, NzIconModule, NzInputModule, NzTagModule, NzSelectModule,
-    NzModalModule, NzFormModule, NzInputNumberModule, NzSwitchModule, NzDatePickerModule,
-    NzPopconfirmModule, NzCheckboxModule, NzCardModule, NzPaginationModule, NzBreadCrumbModule,
-    NzEmptyModule, NzUploadModule, NzAlertModule, PageHeader
+    DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader,
+    NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzEmptyModule, NzFormModule, NzIconModule,
+    NzInputModule, NzInputNumberModule, NzModalModule, NzPopconfirmModule, NzSelectModule,
+    NzTableModule, NzTabsModule, NzTagModule, NzUploadModule
   ],
   template: `
-    <app-page-header title="Lớp học" [subtitle]="headerSubtitle()" icon="book">
-      <div class="actions">
-        @if (level() === 'subjects') {
-          @if (auth.isAdmin()) {
-            <button nz-button (click)="openSubjectManager()"><nz-icon nzType="appstore" /> Quản lý môn</button>
-            <button nz-button (click)="openClassImport()"><nz-icon nzType="file-excel" /> Nhập Excel lớp</button>
-          }
-        } @else if (level() !== 'grades') {
-          <input nz-input placeholder="Tìm theo tên lớp..." class="search"
-                 [ngModel]="search()" (ngModelChange)="onSearch($event)" />
-          @if (auth.isAdmin()) {
-            <label nz-checkbox [ngModel]="includeDeleted()" (ngModelChange)="onIncludeDeleted($event)">Hiện đã xóa</label>
-            <button nz-button nzType="primary" (click)="openCreate()"><nz-icon nzType="plus" /> Thêm lớp</button>
-          }
-        }
-      </div>
+    <app-page-header title="Lớp học" subtitle="Quản lý lớp, danh mục và import Excel" icon="book">
+      <button nz-button nzType="primary" (click)="openClassForm()"><nz-icon nzType="plus" /> Thêm lớp</button>
+      <button nz-button (click)="openImportModal()"><nz-icon nzType="file-excel" /> Import Excel</button>
+      <button nz-button (click)="exportClasses()"><nz-icon nzType="download" /> Export Excel</button>
     </app-page-header>
 
-    @if (level() !== 'subjects') {
-      <nz-breadcrumb class="crumb">
-        <nz-breadcrumb-item><a (click)="goSubjects()">Môn học</a></nz-breadcrumb-item>
-        @if (view() === 'all') {
-          <nz-breadcrumb-item>Tất cả lớp</nz-breadcrumb-item>
-        } @else {
-          <nz-breadcrumb-item><a (click)="openSubjectId(subjectId())">{{ currentSubjectName() }}</a></nz-breadcrumb-item>
-          @if (gradeBand()) { <nz-breadcrumb-item>{{ gradeLabel(gradeBand()!) }}</nz-breadcrumb-item> }
-        }
-      </nz-breadcrumb>
-    }
+    <nz-tabs class="module-tabs" nzType="line">
+      <nz-tab nzTitle="Lớp học">
+        <div class="filters">
+          <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="branchId" (ngModelChange)="loadClasses()">
+            @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
+          </nz-select>
+          <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Môn học" [(ngModel)]="subjectId" (ngModelChange)="loadClasses()">
+            @for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }
+          </nz-select>
+          <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId" (ngModelChange)="loadClasses()">
+            @for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }
+          </nz-select>
+          <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId" (ngModelChange)="loadClasses()">
+            @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
+          </nz-select>
+          <input nz-input placeholder="Mã lớp, tên lớp, giáo viên" [(ngModel)]="search" (ngModelChange)="onSearch()" />
+        </div>
 
-    @switch (level()) {
-      @case ('subjects') {
-        <div class="tile-grid">
-          @for (s of visibleSubjects(); track s.id) {
-            <nz-card class="tile" (click)="openSubject(s)">
-              <span class="tile-badge"><nz-icon nzType="book" /></span>
-              <div class="tile-name">{{ s.name }}</div>
-              <div class="tile-sub">{{ s.classCount }} lớp</div>
-            </nz-card>
-          }
-          <nz-card class="tile tile-all" (click)="openAll()">
-            <span class="tile-badge alt"><nz-icon nzType="appstore" /></span>
-            <div class="tile-name">Tất cả lớp</div>
-            <div class="tile-sub">Xem toàn bộ</div>
-          </nz-card>
-        </div>
-        @if (subjects().length === 0 && auth.isAdmin()) {
-          <p class="muted">Chưa có môn học. Bấm <strong>Quản lý môn</strong> để thêm.</p>
-        }
-      }
-      @case ('grades') {
-        <div class="tile-grid">
-          @for (g of gradeGroups(); track g.key) {
-            <nz-card class="tile" (click)="openGrade(g.key)">
-              <span class="tile-badge"><nz-icon nzType="apartment" /></span>
-              <div class="tile-name">{{ g.label }}</div>
-              <div class="tile-sub">{{ g.count }} lớp</div>
-            </nz-card>
-          } @empty {
-            <nz-empty nzNotFoundContent="Môn này chưa có lớp nào." />
-          }
-        </div>
-      }
-      @default {
-        @if (screen.isMobile()) {
-          <div class="mobile-card-list">
-            @for (c of displayedClasses(); track c.id) {
-              <nz-card>
-                <div class="card-header">
-                  <a class="card-title" [routerLink]="['/classes', c.id]" [class.text-deleted]="c.isDeleted">{{ c.name }}</a>
-                  @if (c.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
-                  @else if (c.isActive) { <nz-tag nzColor="green">Đang mở</nz-tag> }
-                  @else { <nz-tag>Đóng</nz-tag> }
-                </div>
-                <div class="card-field"><span class="label">Môn / Khối</span><span>{{ c.subjectName || '—' }}@if (c.gradeBand) { · {{ c.gradeBand }} }</span></div>
-                <div class="card-field"><span class="label">Giáo viên</span><span>{{ c.teacherName || '—' }}</span></div>
-                <div class="card-field"><span class="label">Sĩ số</span><span>{{ c.currentSize }}/{{ c.maxCapacity }}</span></div>
-                @if (auth.isAdmin()) {
-                  <div class="card-actions">
-                    @if (!c.isDeleted) {
-                      <button nz-button nzSize="small" (click)="openEdit(c)"><nz-icon nzType="edit" /> Sửa</button>
-                      <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa mềm lớp này?" (nzOnConfirm)="remove(c)"><nz-icon nzType="delete" /> Xóa</button>
-                    } @else {
-                      <button nz-button nzSize="small" (click)="restore(c)"><nz-icon nzType="undo" /> Khôi phục</button>
-                    }
-                  </div>
-                }
-              </nz-card>
-            } @empty { <nz-empty nzNotFoundContent="Chưa có lớp nào." /> }
-          </div>
-        } @else {
-          <nz-table #table [nzData]="displayedClasses()" [nzLoading]="loading()" [nzFrontPagination]="false"
-            [nzShowPagination]="false" [nzScroll]="{ x: '760px' }">
-            <thead>
-              <tr>
-                <th nzLeft>Tên lớp</th>
-                <th>Môn</th>
-                <th>Khối</th>
-                <th>Giáo viên</th>
-                <th>Sĩ số</th>
-                <th>Trạng thái</th>
-                @if (auth.isAdmin()) { <th nzRight class="actions-col">Thao tác</th> }
+        <nz-table #classTable [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
+          [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
+          (nzPageIndexChange)="page.set($event); loadClasses()" [nzScroll]="{ x: '1100px' }">
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Mã lớp</th>
+              <th>Tên lớp</th>
+              <th>Giáo viên</th>
+              <th>Môn học</th>
+              <th>Khối</th>
+              <th>Mã cơ sở</th>
+              <th>Tên cơ sở</th>
+              <th>Học phí</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of classTable.data; track c.id; let i = $index) {
+              <tr class="clickable" (click)="openClassDetail(c)">
+                <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
+                <td>{{ c.classCode }}</td>
+                <td>{{ c.name }}</td>
+                <td>{{ c.teacherName || '—' }}</td>
+                <td>{{ c.subjectName || '—' }}</td>
+                <td>{{ c.gradeName || '—' }}</td>
+                <td>{{ c.branchCode || '—' }}</td>
+                <td>{{ c.branchName || '—' }}</td>
+                <td>{{ c.tuitionFee | number:'1.0-0' }}</td>
+                <td (click)="$event.stopPropagation()">
+                  <button nz-button nzType="link" nzSize="small" (click)="openClassForm(c)"><nz-icon nzType="edit" /></button>
+                  <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
+                    (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /></button>
+                </td>
               </tr>
-            </thead>
+            }
+          </tbody>
+        </nz-table>
+      </nz-tab>
+
+      <nz-tab nzTitle="Danh mục">
+        <div class="catalog-grid">
+          <section>
+            <h3>Môn học</h3>
+            <form nz-form nzLayout="inline">
+              <input nz-input placeholder="Mã" [(ngModel)]="subjectCode" name="subjectCode" />
+              <input nz-input placeholder="Tên môn" [(ngModel)]="subjectName" name="subjectName" />
+              <nz-input-number [(ngModel)]="subjectSort" name="subjectSort" [nzMin]="0" />
+              <button nz-button nzType="primary" (click)="saveSubject()">{{ editingSubject() ? 'Cập nhật' : 'Thêm' }}</button>
+              @if (editingSubject()) { <button nz-button (click)="resetSubject()">Hủy</button> }
+            </form>
+            <nz-table [nzData]="subjects()" [nzFrontPagination]="false" nzSize="small">
+              <thead><tr><th>STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
+              <tbody>
+                @for (s of subjects(); track s.id; let i = $index) {
+                  <tr><td>{{ i + 1 }}</td><td>{{ s.code }}</td><td>{{ s.name }}</td><td>
+                    <button nz-button nzType="link" nzSize="small" (click)="editSubject(s)">Sửa</button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa môn?"
+                      (nzOnConfirm)="deleteSubject(s)">Xóa</button>
+                  </td></tr>
+                }
+              </tbody>
+            </nz-table>
+          </section>
+
+          <section>
+            <h3>Khối</h3>
+            <form nz-form nzLayout="inline">
+              <input nz-input placeholder="Mã" [(ngModel)]="gradeCode" name="gradeCode" />
+              <input nz-input placeholder="Tên khối" [(ngModel)]="gradeName" name="gradeName" />
+              <nz-input-number [(ngModel)]="gradeSort" name="gradeSort" [nzMin]="0" />
+              <button nz-button nzType="primary" (click)="saveGrade()">{{ editingGrade() ? 'Cập nhật' : 'Thêm' }}</button>
+              @if (editingGrade()) { <button nz-button (click)="resetGrade()">Hủy</button> }
+            </form>
+            <nz-table [nzData]="grades()" [nzFrontPagination]="false" nzSize="small">
+              <thead><tr><th>STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
+              <tbody>
+                @for (g of grades(); track g.id; let i = $index) {
+                  <tr><td>{{ i + 1 }}</td><td>{{ g.code }}</td><td>{{ g.name }}</td><td>
+                    <button nz-button nzType="link" nzSize="small" (click)="editGrade(g)">Sửa</button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khối?"
+                      (nzOnConfirm)="deleteGrade(g)">Xóa</button>
+                  </td></tr>
+                }
+              </tbody>
+            </nz-table>
+          </section>
+
+          <section>
+            <h3>Cơ sở</h3>
+            <form nz-form nzLayout="inline">
+              <input nz-input placeholder="Mã" [(ngModel)]="branchCode" name="branchCode" />
+              <input nz-input placeholder="Tên cơ sở" [(ngModel)]="branchName" name="branchName" />
+              <nz-input-number [(ngModel)]="branchSort" name="branchSort" [nzMin]="0" />
+              <button nz-button nzType="primary" (click)="saveBranch()">{{ editingBranch() ? 'Cập nhật' : 'Thêm' }}</button>
+              @if (editingBranch()) { <button nz-button (click)="resetBranch()">Hủy</button> }
+            </form>
+            <nz-table [nzData]="branches()" [nzFrontPagination]="false" nzSize="small">
+              <thead><tr><th>STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
+              <tbody>
+                @for (b of branches(); track b.id; let i = $index) {
+                  <tr><td>{{ i + 1 }}</td><td>{{ b.code }}</td><td>{{ b.name }}</td><td>
+                    <button nz-button nzType="link" nzSize="small" (click)="editBranch(b)">Sửa</button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa cơ sở?"
+                      (nzOnConfirm)="deleteBranch(b)">Xóa</button>
+                  </td></tr>
+                }
+              </tbody>
+            </nz-table>
+          </section>
+        </div>
+      </nz-tab>
+
+      <nz-tab nzTitle="Cấu hình">
+        <nz-empty nzNotFoundContent="Chưa có cấu hình" />
+      </nz-tab>
+    </nz-tabs>
+
+    <nz-modal [nzVisible]="classModalOpen()" [nzTitle]="editingClass() ? 'Sửa lớp' : 'Thêm lớp'" [nzWidth]="720"
+      (nzOnCancel)="classModalOpen.set(false)" (nzOnOk)="saveClass()">
+      <ng-container *nzModalContent>
+        <form nz-form [formGroup]="classForm" nzLayout="vertical">
+          <div class="form-grid">
+            <nz-form-item><nz-form-label>Mã lớp</nz-form-label><nz-form-control><input nz-input formControlName="classCode" placeholder="Trống để tự sinh" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label nzRequired>Tên lớp</nz-form-label><nz-form-control><input nz-input formControlName="name" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label nzRequired>Giáo viên</nz-form-label><nz-form-control><nz-select formControlName="teacherProfileId" nzShowSearch>@for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }</nz-select></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Cơ sở</nz-form-label><nz-form-control><nz-select formControlName="branchId" nzAllowClear nzShowSearch>@for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }</nz-select></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Môn học</nz-form-label><nz-form-control><nz-select formControlName="subjectId" nzAllowClear nzShowSearch>@for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }</nz-select></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Khối</nz-form-label><nz-form-control><nz-select formControlName="gradeId" nzAllowClear nzShowSearch>@for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }</nz-select></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Học phí</nz-form-label><nz-form-control><nz-input-number formControlName="tuitionFee" [nzMin]="0" class="full" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Sĩ số tối đa</nz-form-label><nz-form-control><nz-input-number formControlName="maxCapacity" [nzMin]="1" class="full" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Ngày bắt đầu</nz-form-label><nz-form-control><nz-date-picker formControlName="startDate" class="full" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Lịch học</nz-form-label><nz-form-control><input nz-input formControlName="schedule" /></nz-form-control></nz-form-item>
+          </div>
+          <label nz-checkbox formControlName="isActive">Đang mở</label>
+        </form>
+      </ng-container>
+    </nz-modal>
+
+    <nz-modal [nzVisible]="detailOpen()" nzTitle="Chi tiết lớp" [nzWidth]="980" [nzFooter]="null" (nzOnCancel)="detailOpen.set(false)">
+      <ng-container *nzModalContent>
+        @if (detail(); as d) {
+          <div class="detail-grid">
+            <div><b>Mã lớp</b><span>{{ d.classCode }}</span></div>
+            <div><b>Tên lớp</b><span>{{ d.name }}</span></div>
+            <div><b>Giáo viên</b><span>{{ d.teacherName || '—' }}</span></div>
+            <div><b>Môn / Khối</b><span>{{ d.subjectName || '—' }} / {{ d.gradeName || '—' }}</span></div>
+            <div><b>Cơ sở</b><span>{{ d.branchCode || '—' }} · {{ d.branchName || '—' }}</span></div>
+            <div><b>Học phí</b><span>{{ d.tuitionFee | number:'1.0-0' }}</span></div>
+          </div>
+          <div class="detail-actions">
+            <button nz-button nzType="primary" (click)="openStudentInClass()"><nz-icon nzType="plus" /> Thêm học viên</button>
+          </div>
+          <nz-table [nzData]="roster()" [nzFrontPagination]="false" nzSize="small">
+            <thead><tr><th>Mã HV</th><th>Học viên</th><th>SĐT</th><th>SĐT PH</th><th>Ghi chú</th><th></th></tr></thead>
             <tbody>
-              @for (c of table.data; track c.id) {
+              @for (r of roster(); track r.enrollmentId) {
                 <tr>
-                  <td nzLeft [class.text-deleted]="c.isDeleted"><a [routerLink]="['/classes', c.id]">{{ c.name }}</a></td>
-                  <td>{{ c.subjectName || '—' }}</td>
-                  <td>{{ c.gradeBand || '—' }}</td>
-                  <td>{{ c.teacherName || '—' }}</td>
-                  <td>{{ c.currentSize }}/{{ c.maxCapacity }}</td>
-                  <td>
-                    @if (c.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
-                    @else if (c.isActive) { <nz-tag nzColor="green">Đang mở</nz-tag> }
-                    @else { <nz-tag>Đóng</nz-tag> }
-                  </td>
-                  @if (auth.isAdmin()) {
-                    <td nzRight>
-                      @if (!c.isDeleted) {
-                        <button nz-button nzType="link" nzSize="small" (click)="openEdit(c)"><nz-icon nzType="edit" /></button>
-                        <button nz-button nzType="link" nzSize="small" nzDanger
-                                nz-popconfirm nzPopconfirmTitle="Xóa mềm lớp này?" (nzOnConfirm)="remove(c)">
-                          <nz-icon nzType="delete" />
-                        </button>
-                      } @else {
-                        <button nz-button nzType="link" nzSize="small" (click)="restore(c)"><nz-icon nzType="undo" /> Khôi phục</button>
-                      }
-                    </td>
-                  }
+                  <td>{{ r.studentCode }}</td><td>{{ r.fullName }}</td><td>{{ r.phone || '—' }}</td><td>{{ r.parentPhone || '—' }}</td><td>{{ r.note || '—' }}</td>
+                  <td><button nz-button nzType="link" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdrawStudent(r)">Xóa</button></td>
                 </tr>
               }
             </tbody>
           </nz-table>
-          @if (displayedClasses().length === 0) { <nz-empty nzNotFoundContent="Chưa có lớp nào." /> }
         }
-        @if (view() === 'all') {
-          <nz-pagination class="pager" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()"
-            (nzPageIndexChange)="onPageChange($event)" />
-        }
-      }
-    }
+      </ng-container>
+    </nz-modal>
 
-    <!-- Thêm/sửa lớp -->
-    <nz-modal [nzVisible]="modalOpen()" [nzTitle]="editing() ? 'Sửa lớp' : 'Thêm lớp'"
-      [nzOkLoading]="saving()" [nzOkDisabled]="form.invalid" (nzOnOk)="save()" (nzOnCancel)="closeModal()">
+    <nz-modal [nzVisible]="studentModalOpen()" nzTitle="Thêm học viên vào lớp" [nzWidth]="560"
+      (nzOnCancel)="studentModalOpen.set(false)" (nzOnOk)="saveStudentInClass()">
       <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical" [formGroup]="form">
-          <nz-form-item>
-            <nz-form-label nzRequired>Tên lớp</nz-form-label>
-            <nz-form-control nzErrorTip="Vui lòng nhập tên lớp"><input nz-input formControlName="name" /></nz-form-control>
-          </nz-form-item>
-          <div nz-row [nzGutter]="12">
-            <div nz-col [nzXs]="24" [nzSm]="12">
-              <nz-form-item>
-                <nz-form-label>Môn học</nz-form-label>
-                <nz-form-control>
-                  <nz-select formControlName="subjectId" nzAllowClear nzShowSearch nzPlaceHolder="Chọn môn" class="full">
-                    @for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }
-                  </nz-select>
-                </nz-form-control>
-              </nz-form-item>
-            </div>
-            <div nz-col [nzXs]="24" [nzSm]="12">
-              <nz-form-item>
-                <nz-form-label>Khối</nz-form-label>
-                <nz-form-control>
-                  <nz-select formControlName="gradeBand" nzAllowClear nzShowSearch nzPlaceHolder="Chọn khối" class="full">
-                    @for (b of gradeBands(); track b) { <nz-option [nzValue]="b" [nzLabel]="b" /> }
-                  </nz-select>
-                </nz-form-control>
-              </nz-form-item>
-            </div>
-          </div>
-          <nz-form-item>
-            <nz-form-label nzRequired>Giáo viên</nz-form-label>
-            <nz-form-control nzErrorTip="Chọn giáo viên">
-              <nz-select formControlName="teacherId" nzPlaceHolder="Chọn giáo viên" class="full" nzShowSearch>
-                @for (t of teachers(); track t.id) {
-                  <nz-option [nzValue]="t.id" [nzLabel]="(t.fullName || t.email)" />
-                }
-              </nz-select>
-            </nz-form-control>
-          </nz-form-item>
-          <nz-form-item>
-            <nz-form-label nzRequired>Sĩ số tối đa</nz-form-label>
-            <nz-form-control><nz-input-number formControlName="maxCapacity" [nzMin]="1" class="full" /></nz-form-control>
-          </nz-form-item>
-          <nz-form-item>
-            <nz-form-label>Lịch học (mô tả)</nz-form-label>
-            <nz-form-control><input nz-input formControlName="schedule" placeholder="VD: Thứ 2, 4 - 19:00" /></nz-form-control>
-          </nz-form-item>
-          <nz-form-item>
-            <nz-form-label>Ngày khai giảng</nz-form-label>
-            <nz-form-control><nz-date-picker formControlName="startDate" nzFormat="dd/MM/yyyy" class="full" /></nz-form-control>
-          </nz-form-item>
-          <nz-form-item>
-            <nz-form-label>Đang mở</nz-form-label>
-            <nz-form-control><nz-switch formControlName="isActive" /></nz-form-control>
-          </nz-form-item>
+        <form nz-form [formGroup]="studentForm" nzLayout="vertical">
+          <nz-form-item><nz-form-label>Mã học viên</nz-form-label><nz-form-control><input nz-input formControlName="studentCode" placeholder="Trống để tự sinh" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label nzRequired>Tên học viên</nz-form-label><nz-form-control><input nz-input formControlName="fullName" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>SĐT học viên</nz-form-label><nz-form-control><input nz-input formControlName="phone" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>SĐT phụ huynh</nz-form-label><nz-form-control><input nz-input formControlName="parentPhone" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Email</nz-form-label><nz-form-control><input nz-input formControlName="email" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Ghi chú</nz-form-label><nz-form-control><textarea nz-input formControlName="note" rows="3"></textarea></nz-form-control></nz-form-item>
         </form>
       </ng-container>
     </nz-modal>
 
-    <!-- Quản lý môn học -->
-    <nz-modal [nzVisible]="subjectModalOpen()" nzTitle="Quản lý môn học" [nzWidth]="640" [nzFooter]="null"
-      (nzOnCancel)="subjectModalOpen.set(false)">
+    <nz-modal [nzVisible]="importOpen()" nzTitle="Import lớp học" [nzWidth]="1080"
+      (nzOnCancel)="importOpen.set(false)" [nzOkText]="importPreview() ? 'Xác nhận import' : null"
+      [nzOkDisabled]="!importPreview()" (nzOnOk)="commitImport()">
       <ng-container *nzModalContent>
-        <form nz-form nzLayout="inline" class="subj-form">
-          <input nz-input [(ngModel)]="subName" name="sjn" placeholder="Tên môn" class="sj-name" />
-          <nz-input-number [(ngModel)]="subSort" name="sjo" [nzMin]="0" nzPlaceHolder="Thứ tự" />
-          <button nz-button nzType="primary" (click)="saveSubject()">
-            {{ editingSubject() ? 'Cập nhật' : 'Thêm' }}
-          </button>
-          @if (editingSubject()) { <button nz-button (click)="resetSubjectForm()">Hủy</button> }
-        </form>
-        <nz-table [nzData]="subjects()" [nzFrontPagination]="false" nzSize="small" class="mt">
-          <thead><tr><th>Môn</th><th>Số lớp</th><th>Thứ tự</th><th nzRight></th></tr></thead>
-          <tbody>
-            @for (s of subjects(); track s.id) {
-              <tr>
-                <td>{{ s.name }}</td>
-                <td>{{ s.classCount }}</td>
-                <td>{{ s.sortOrder }}</td>
-                <td nzRight>
-                  <button nz-button nzType="link" nzSize="small" (click)="editSubject(s)"><nz-icon nzType="edit" /></button>
-                  <button nz-button nzType="link" nzSize="small" nzDanger
-                          nz-popconfirm nzPopconfirmTitle="Xóa môn này?" (nzOnConfirm)="deleteSubject(s)">
-                    <nz-icon nzType="delete" />
-                  </button>
-                </td>
-              </tr>
-            } @empty { <tr><td colspan="4"><span class="muted">Chưa có môn nào.</span></td></tr> }
-          </tbody>
-        </nz-table>
-      </ng-container>
-    </nz-modal>
-
-    <!-- Nhập danh sách lớp từ Excel -->
-    <nz-modal [nzVisible]="importOpen()" nzTitle="Nhập danh sách lớp từ Excel" [nzWidth]="720" [nzFooter]="null"
-      (nzOnCancel)="importOpen.set(false)">
-      <ng-container *nzModalContent>
-        <div class="imp-bar">
-          <button nz-button (click)="downloadClassTemplate()"><nz-icon nzType="file-excel" /> Tải file mẫu</button>
-          <nz-upload [nzBeforeUpload]="beforeUploadClasses" [nzShowUploadList]="false" nzAccept=".xlsx">
+        <div style="margin-bottom:14px;display:flex;gap:12px;align-items:center">
+          <button nz-button (click)="downloadImportTemplate()"><nz-icon nzType="download" /> Tải file mẫu</button>
+          <nz-upload [nzShowUploadList]="false" [nzBeforeUpload]="beforeImportUpload">
             <button nz-button nzType="primary"><nz-icon nzType="upload" /> Chọn file Excel</button>
           </nz-upload>
         </div>
-        <p class="muted">Cột: Tên lớp · Môn · Khối · Giáo viên (email/username) · Sĩ số · Ngày khai giảng · Giáo trình.</p>
-
         @if (importPreview(); as p) {
-          <p class="muted">Hợp lệ: <strong>{{ p.validCount }}</strong> · Lỗi: <strong>{{ p.invalidCount }}</strong></p>
-          <nz-table [nzData]="p.rows" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ y: '260px', x: '560px' }">
-            <thead><tr><th>Dòng</th><th>Tên lớp</th><th>Môn</th><th>Khối</th><th>GV</th><th>Trạng thái</th></tr></thead>
-            <tbody>
-              @for (r of p.rows; track r.rowNumber) {
-                <tr>
-                  <td>{{ r.rowNumber }}</td>
-                  <td>{{ r.name || '—' }}</td>
-                  <td>{{ r.subjectName || '—' }}</td>
-                  <td>{{ r.gradeBand || '—' }}</td>
-                  <td>{{ r.teacher || '—' }}</td>
-                  <td>
-                    @if (r.isValid) { <nz-tag nzColor="green">OK</nz-tag> }
-                    @else { <nz-tag nzColor="red">{{ r.error }}</nz-tag> }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </nz-table>
-          <div class="imp-actions">
-            <button nz-button nzType="primary" [nzLoading]="importBusy()" [disabled]="p.validCount === 0" (click)="doClassImport()">
-              Nhập {{ p.validCount }} lớp
-            </button>
+          <div class="import-grid">
+            <nz-table [nzData]="p.classes" [nzFrontPagination]="false" nzSize="small">
+              <thead><tr><th>Lớp</th><th>Giáo viên</th><th>Lỗi</th></tr></thead>
+              <tbody>
+                @for (c of p.classes; track c.previewId) {
+                  <tr [class.selected]="selectedImportClass() === c.previewId" (click)="selectedImportClass.set(c.previewId)">
+                    <td>{{ c.classCode || 'Tự sinh' }} · {{ c.name }}</td><td>{{ c.teacherName || '—' }}</td><td>{{ c.error || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </nz-table>
+            <nz-table [nzData]="selectedImportStudents()" [nzFrontPagination]="false" nzSize="small">
+              <thead><tr><th>Dòng</th><th>Mã HV</th><th>Học viên</th><th>SĐT PH</th><th>Lỗi</th></tr></thead>
+              <tbody>
+                @for (s of selectedImportStudents(); track s.rowNumber) {
+                  <tr><td>{{ s.rowNumber }}</td><td>{{ s.studentCode || 'Tự sinh' }}</td><td>{{ s.fullName }}</td><td>{{ s.parentPhone || '—' }}</td><td>{{ s.error || '—' }}</td></tr>
+                }
+              </tbody>
+            </nz-table>
           </div>
-        }
-
-        @if (importResult(); as res) {
-          <nz-alert nzType="success" class="mt"
-            [nzMessage]="'Đã nhập ' + res.created + ' lớp' + (res.skipped ? (' · bỏ qua ' + res.skipped + ' dòng lỗi') : '') + '.'" />
-          @if (res.errors.length) {
-            <ul class="err-list">@for (e of res.errors; track e) { <li>{{ e }}</li> }</ul>
-          }
         }
       </ng-container>
     </nz-modal>
   `,
   styles: `
-    .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .search { width: 240px; max-width: 60vw; }
+    .module-tabs { margin-top: 4px; }
+    .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .clickable { cursor: pointer; }
+    .catalog-grid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 16px; }
+    section { border: 1px solid var(--hs-border); border-radius: 8px; padding: 14px; }
+    section h3 { margin: 0 0 12px; font-size: 16px; }
+    form[nz-form] { gap: 8px; margin-bottom: 12px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; }
     .full { width: 100%; }
-    .crumb { margin-bottom: 16px; }
-    .crumb a { cursor: pointer; }
-    .muted { color: var(--hs-text-muted); }
-    .pager { margin-top: 16px; text-align: right; }
-    .mt { margin-top: 16px; }
-
-    .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
-    .tile { cursor: pointer; text-align: center; transition: transform .12s, box-shadow .12s; }
-    .tile:hover { transform: translateY(-2px); box-shadow: var(--hs-shadow); }
-    .tile-badge {
-      width: 44px; height: 44px; border-radius: 12px; margin: 4px auto 10px;
-      display: grid; place-items: center; font-size: 22px; color: #fff;
-      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    .detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+    .detail-grid div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; }
+    .detail-grid b { display: block; color: var(--hs-text-muted); font-size: 12px; margin-bottom: 4px; }
+    .detail-actions { margin-bottom: 12px; }
+    .import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .selected td { background: var(--hs-surface-2); }
+    @media (max-width: 900px) {
+      .filters, .catalog-grid, .form-grid, .detail-grid, .import-grid { grid-template-columns: 1fr; }
     }
-    .tile-badge.alt { background: linear-gradient(135deg, #16a34a, #0ea5e9); }
-    .tile-name { font-weight: 600; font-size: 15px; }
-    .tile-sub { color: var(--hs-text-muted); font-size: 13px; margin-top: 2px; }
-
-    .subj-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .sj-name { width: 200px; }
-    .imp-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-    .imp-actions { margin-top: 12px; text-align: right; }
-    .err-list { margin-top: 8px; color: var(--hs-text-muted); font-size: 13px; }
-
-    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; }
-    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .card-title { font-weight: 600; }
-    .card-field { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--hs-border); font-size: 13px; }
-    .card-field:last-of-type { border-bottom: none; }
-    .card-field .label { color: var(--hs-text-muted); }
-    .card-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-    .text-deleted { text-decoration: line-through; color: var(--hs-text-muted); }
   `
 })
 export class ClassesPage {
-  protected readonly auth = inject(AuthService);
-  protected readonly screen = inject(ScreenService);
   private readonly classesService = inject(ClassesService);
+  private readonly branchesService = inject(BranchesService);
   private readonly subjectsService = inject(SubjectsService);
-  private readonly settingsService = inject(SettingsService);
-  private readonly usersService = inject(UsersService);
+  private readonly gradesService = inject(GradesService);
+  private readonly teachersService = inject(TeachersService);
   private readonly message = inject(NzMessageService);
-  private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
 
-  // ----- Điều hướng Môn → Khối → Lớp (qua query params) -----
-  protected readonly subjectId = signal<string | null>(null);
-  protected readonly gradeBand = signal<string | null>(null);
-  protected readonly view = signal<string | null>(null);
-
-  protected readonly level = computed<'subjects' | 'grades' | 'classes'>(() => {
-    if (this.view() === 'all') return 'classes';
-    if (!this.subjectId()) return 'subjects';
-    if (!this.gradeBand()) return 'grades';
-    return 'classes';
-  });
-
-  // ----- Dữ liệu -----
+  protected readonly classes = signal<ClassListItem[]>([]);
+  protected readonly branches = signal<Branch[]>([]);
   protected readonly subjects = signal<Subject[]>([]);
-  protected readonly gradeBands = signal<string[]>([]);
-  protected readonly subjectClasses = signal<ClassListItem[]>([]); // toàn bộ lớp của môn đang chọn
-  protected readonly allClasses = signal<ClassListItem[]>([]);      // chế độ "Tất cả lớp" (phân trang server)
+  protected readonly grades = signal<Grade[]>([]);
+  protected readonly teachers = signal<TeacherProfile[]>([]);
+  protected readonly loading = signal(false);
   protected readonly total = signal(0);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
-  protected readonly search = signal('');
-  protected readonly includeDeleted = signal(false);
-  protected readonly loading = signal(false);
-  protected readonly teachers = signal<UserListItem[]>([]);
-  private loadedSubjectId: string | null = null;
 
-  // ----- Modal lớp -----
-  protected readonly modalOpen = signal(false);
-  protected readonly saving = signal(false);
-  protected readonly editing = signal<ClassListItem | null>(null);
-  protected readonly form = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+  protected search = '';
+  protected branchId: string | null = null;
+  protected subjectId: string | null = null;
+  protected gradeId: string | null = null;
+  protected teacherProfileId: string | null = null;
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  protected readonly classModalOpen = signal(false);
+  protected readonly editingClass = signal<ClassListItem | null>(null);
+  protected readonly classForm = new FormGroup({
+    classCode: new FormControl<string | null>(null),
+    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    teacherProfileId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    branchId: new FormControl<string | null>(null),
     subjectId: new FormControl<string | null>(null),
-    gradeBand: new FormControl<string | null>(null),
-    teacherId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    maxCapacity: new FormControl(15, { nonNullable: true, validators: [Validators.required, Validators.min(1)] }),
+    gradeId: new FormControl<string | null>(null),
+    tuitionFee: new FormControl(0, { nonNullable: true }),
+    maxCapacity: new FormControl(20, { nonNullable: true }),
     schedule: new FormControl<string | null>(null),
     startDate: new FormControl<Date | null>(null),
     isActive: new FormControl(true, { nonNullable: true })
   });
 
-  // ----- Modal quản lý môn -----
-  protected readonly subjectModalOpen = signal(false);
-  protected readonly editingSubject = signal<Subject | null>(null);
-  protected subName = '';
-  protected subSort = 0;
+  protected readonly detailOpen = signal(false);
+  protected readonly detail = signal<ClassDetail | null>(null);
+  protected readonly roster = signal<RosterItem[]>([]);
 
-  // ----- Modal nhập Excel lớp -----
+  protected readonly studentModalOpen = signal(false);
+  protected readonly studentForm = new FormGroup({
+    studentCode: new FormControl<string | null>(null),
+    fullName: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    phone: new FormControl<string | null>(null),
+    parentPhone: new FormControl<string | null>(null),
+    email: new FormControl<string | null>(null),
+    note: new FormControl<string | null>(null)
+  });
+
   protected readonly importOpen = signal(false);
-  protected readonly importBusy = signal(false);
   protected readonly importPreview = signal<ClassImportPreview | null>(null);
-  protected readonly importResult = signal<ClassImportResult | null>(null);
-  private importFile: File | null = null;
-
-  private searchDebounce?: ReturnType<typeof setTimeout>;
-
-  protected readonly currentSubjectName = computed(() =>
-    this.subjects().find(s => s.id === this.subjectId())?.name ?? 'Môn');
-
-  // Admin thấy mọi môn; Giáo viên chỉ thấy môn có lớp của mình.
-  protected readonly visibleSubjects = computed(() =>
-    this.auth.isAdmin() ? this.subjects() : this.subjects().filter(s => s.classCount > 0));
-
-  protected readonly headerSubtitle = computed(() => {
-    switch (this.level()) {
-      case 'subjects': return 'Chọn môn học';
-      case 'grades': return `${this.currentSubjectName()} · chọn khối`;
-      default: return this.view() === 'all' ? 'Tất cả lớp' : `${this.currentSubjectName()} · ${this.gradeBand() ? this.gradeLabel(this.gradeBand()!) : ''}`;
-    }
+  protected readonly selectedImportClass = signal<string | null>(null);
+  protected readonly selectedImportStudents = computed(() => {
+    const id = this.selectedImportClass();
+    return this.importPreview()?.students.filter(s => s.previewClassId === id) ?? [];
   });
 
-  protected readonly gradeGroups = computed(() => {
-    const order = this.gradeBands();
-    const counts = new Map<string, number>();
-    for (const c of this.subjectClasses()) {
-      const key = c.gradeBand && c.gradeBand.trim() ? c.gradeBand : NO_BAND;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    const groups = [...counts.entries()].map(([key, count]) => ({
-      key, count, label: key === NO_BAND ? 'Chưa phân khối' : key
-    }));
-    groups.sort((a, b) => {
-      if (a.key === NO_BAND) return 1;
-      if (b.key === NO_BAND) return -1;
-      const ia = order.indexOf(a.key), ib = order.indexOf(b.key);
-      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-    });
-    return groups;
-  });
-
-  protected readonly displayedClasses = computed(() => {
-    if (this.view() === 'all') return this.allClasses();
-    const gb = this.gradeBand();
-    const term = this.search().trim().toLowerCase();
-    return this.subjectClasses().filter(c => {
-      const key = c.gradeBand && c.gradeBand.trim() ? c.gradeBand : NO_BAND;
-      if (gb && key !== gb) return false;
-      if (term && !c.name.toLowerCase().includes(term)) return false;
-      return true;
-    });
-  });
+  protected readonly editingSubject = signal<Subject | null>(null);
+  protected subjectCode = '';
+  protected subjectName = '';
+  protected subjectSort = 0;
+  protected readonly editingGrade = signal<Grade | null>(null);
+  protected gradeCode = '';
+  protected gradeName = '';
+  protected gradeSort = 0;
+  protected readonly editingBranch = signal<Branch | null>(null);
+  protected branchCode = '';
+  protected branchName = '';
+  protected branchSort = 0;
 
   constructor() {
-    this.loadSubjects();
-    this.loadGradeBands();
-    if (this.auth.isAdmin()) this.loadTeachers();
-
-    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(pm => {
-      this.subjectId.set(pm.get('subjectId'));
-      this.gradeBand.set(pm.get('gradeBand'));
-      this.view.set(pm.get('view'));
-      this.onRouteChanged();
-    });
+    this.loadLookups();
+    this.loadClasses();
   }
 
-  private onRouteChanged(): void {
-    if (this.view() === 'all') {
-      this.loadAllClasses();
-      return;
-    }
-    const sid = this.subjectId();
-    if (sid && this.level() !== 'subjects' && sid !== this.loadedSubjectId) {
-      this.loadSubjectClasses(sid);
-    }
-  }
-
-  private loadSubjects(): void {
-    this.subjectsService.getAll().subscribe(s => this.subjects.set(s));
-  }
-
-  private loadGradeBands(): void {
-    this.settingsService.getEffective().subscribe(eff => {
-      const raw = eff.values?.['Class.GradeBands'] ?? '';
-      this.gradeBands.set(raw.split(/[\n,]/).map(x => x.trim()).filter(Boolean));
-    });
-  }
-
-  private loadTeachers(): void {
-    this.usersService.getPaged(1, 200).subscribe({
-      next: r => this.teachers.set(r.items.filter(u => !u.isDeleted && (u.roles.includes(ROLE_TEACHER) || u.roles.includes(ROLE_ADMIN))))
-    });
-  }
-
-  private loadSubjectClasses(subjectId: string): void {
-    this.loading.set(true);
-    this.classesService.getPaged({ page: 1, pageSize: 500, subjectId, includeDeleted: this.includeDeleted() }).subscribe({
-      next: r => { this.subjectClasses.set(r.items); this.loadedSubjectId = subjectId; this.loading.set(false); },
-      error: () => this.loading.set(false)
-    });
-  }
-
-  private loadAllClasses(): void {
+  protected loadClasses(): void {
     this.loading.set(true);
     this.classesService.getPaged({
-      page: this.page(), pageSize: this.pageSize(),
-      search: this.search() || undefined, includeDeleted: this.includeDeleted()
+      page: this.page(), pageSize: this.pageSize(), search: this.search,
+      branchId: this.branchId ?? undefined, subjectId: this.subjectId ?? undefined,
+      gradeId: this.gradeId ?? undefined, teacherProfileId: this.teacherProfileId ?? undefined
     }).subscribe({
-      next: r => { this.allClasses.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
+      next: r => { this.classes.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
       error: () => this.loading.set(false)
     });
   }
 
-  // ----- Điều hướng -----
-  protected goSubjects(): void { this.loadSubjects(); this.navigate({}); }
-  protected openSubject(s: Subject): void { this.search.set(''); this.navigate({ subjectId: s.id }); }
-  protected openSubjectId(id: string | null): void { if (id) this.navigate({ subjectId: id }); }
-  protected openGrade(key: string): void { this.navigate({ subjectId: this.subjectId(), gradeBand: key }); }
-  protected openAll(): void { this.search.set(''); this.page.set(1); this.navigate({ view: 'all' }); }
-
-  private navigate(queryParams: Record<string, string | null>): void {
-    this.router.navigate([], { relativeTo: this.route, queryParams });
+  protected onSearch(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.page.set(1); this.loadClasses(); }, 250);
   }
 
-  protected gradeLabel(key: string): string { return key === NO_BAND ? 'Chưa phân khối' : key; }
-
-  protected onSearch(value: string): void {
-    this.search.set(value);
-    if (this.view() === 'all') {
-      clearTimeout(this.searchDebounce);
-      this.searchDebounce = setTimeout(() => { this.page.set(1); this.loadAllClasses(); }, 350);
-    }
+  private loadLookups(): void {
+    this.branchesService.getAll().subscribe(x => this.branches.set(x));
+    this.subjectsService.getAll().subscribe(x => this.subjects.set(x));
+    this.gradesService.getAll().subscribe(x => this.grades.set(x));
+    this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
   }
 
-  protected onIncludeDeleted(value: boolean): void {
-    this.includeDeleted.set(value);
-    this.page.set(1);
-    if (this.view() === 'all') this.loadAllClasses();
-    else if (this.subjectId()) this.loadSubjectClasses(this.subjectId()!);
-  }
-
-  protected onPageChange(p: number): void { this.page.set(p); this.loadAllClasses(); }
-
-  // ----- CRUD lớp -----
-  protected openCreate(): void {
-    this.editing.set(null);
-    const sid = this.view() === 'all' ? null : this.subjectId();
-    const gb = this.gradeBand() && this.gradeBand() !== NO_BAND ? this.gradeBand() : null;
-    this.form.reset({ name: '', subjectId: sid, gradeBand: gb, teacherId: '', maxCapacity: 15, schedule: null, startDate: null, isActive: true });
-    this.modalOpen.set(true);
-  }
-
-  protected openEdit(c: ClassListItem): void {
-    this.editing.set(c);
-    this.classesService.getById(c.id).subscribe(detail => {
-      this.form.reset({
-        name: detail.name, subjectId: detail.subjectId, gradeBand: detail.gradeBand, teacherId: detail.teacherId,
-        maxCapacity: detail.maxCapacity, schedule: detail.schedule,
-        startDate: detail.startDate ? new Date(detail.startDate) : null, isActive: detail.isActive
-      });
+  protected openClassForm(item?: ClassListItem): void {
+    this.editingClass.set(item ?? null);
+    this.classForm.reset({
+      classCode: item?.classCode ?? null,
+      name: item?.name ?? '',
+      teacherProfileId: item?.teacherProfileId ?? '',
+      branchId: item?.branchId ?? null,
+      subjectId: item?.subjectId ?? null,
+      gradeId: item?.gradeId ?? null,
+      tuitionFee: item?.tuitionFee ?? 0,
+      maxCapacity: item?.maxCapacity ?? 20,
+      schedule: null,
+      startDate: null,
+      isActive: item?.isActive ?? true
     });
-    this.modalOpen.set(true);
+    this.classModalOpen.set(true);
   }
 
-  protected closeModal(): void { this.modalOpen.set(false); }
-
-  protected save(): void {
-    if (this.form.invalid) return;
-    const v = this.form.getRawValue();
+  protected saveClass(): void {
+    if (this.classForm.invalid) return;
+    const v = this.classForm.getRawValue();
     const request: ClassRequest = {
-      name: v.name, teacherId: v.teacherId, subjectId: v.subjectId || null, gradeBand: v.gradeBand || null,
-      curriculumId: null, maxCapacity: v.maxCapacity, schedule: v.schedule, startDate: toDateOnlyOrNull(v.startDate), isActive: v.isActive
+      classCode: v.classCode || null,
+      name: v.name,
+      teacherProfileId: v.teacherProfileId,
+      branchId: v.branchId || null,
+      subjectId: v.subjectId || null,
+      gradeId: v.gradeId || null,
+      tuitionFee: v.tuitionFee,
+      curriculumId: null,
+      maxCapacity: v.maxCapacity,
+      schedule: v.schedule,
+      startDate: toDateOnlyOrNull(v.startDate),
+      isActive: v.isActive
     };
-    const editing = this.editing();
+    const editing = this.editingClass();
     const op = editing ? this.classesService.update(editing.id, request) : this.classesService.create(request);
-    this.saving.set(true);
     op.subscribe({
-      next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success(editing ? 'Đã cập nhật lớp.' : 'Đã thêm lớp.'); this.refresh(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ?? 'Lưu thất bại.'); }
+      next: () => { this.message.success('Đã lưu lớp.'); this.classModalOpen.set(false); this.loadClasses(); this.loadLookups(); },
+      error: err => this.showError(err, 'Lưu lớp thất bại.')
     });
   }
 
-  protected remove(c: ClassListItem): void {
+  protected deleteClass(c: ClassListItem): void {
     this.classesService.delete(c.id).subscribe({
-      next: () => { this.message.success('Đã xóa (mềm).'); this.refresh(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
+      next: () => { this.message.success('Đã xóa lớp.'); this.loadClasses(); },
+      error: err => this.showError(err, 'Xóa lớp thất bại.')
     });
   }
 
-  protected restore(c: ClassListItem): void {
-    this.classesService.restore(c.id).subscribe({
-      next: () => { this.message.success('Đã khôi phục.'); this.refresh(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Khôi phục thất bại.')
+  protected openClassDetail(c: ClassListItem): void {
+    this.classesService.getById(c.id).subscribe(x => this.detail.set(x));
+    this.classesService.getRoster(c.id).subscribe(x => this.roster.set(x));
+    this.detailOpen.set(true);
+  }
+
+  protected openStudentInClass(): void {
+    this.studentForm.reset({ studentCode: null, fullName: '', phone: null, parentPhone: null, email: null, note: null });
+    this.studentModalOpen.set(true);
+  }
+
+  protected saveStudentInClass(): void {
+    const d = this.detail();
+    if (!d || this.studentForm.invalid) return;
+    const v = this.studentForm.getRawValue();
+    this.classesService.createStudent(d.id, { ...v, createAccount: false }).subscribe({
+      next: () => { this.message.success('Đã thêm học viên.'); this.studentModalOpen.set(false); this.openClassDetail({ ...d, currentSize: d.currentSize } as ClassListItem); },
+      error: err => this.showError(err, 'Thêm học viên thất bại.')
     });
   }
 
-  /** Làm mới danh sách theo mức hiện tại + cập nhật số lớp của môn. */
-  private refresh(): void {
-    this.loadSubjects();
-    if (this.view() === 'all') this.loadAllClasses();
-    else if (this.subjectId()) this.loadSubjectClasses(this.subjectId()!);
-  }
-
-  // ----- Quản lý môn -----
-  protected openSubjectManager(): void { this.resetSubjectForm(); this.subjectModalOpen.set(true); }
-
-  protected resetSubjectForm(): void { this.editingSubject.set(null); this.subName = ''; this.subSort = 0; }
-
-  protected editSubject(s: Subject): void { this.editingSubject.set(s); this.subName = s.name; this.subSort = s.sortOrder; }
-
-  protected saveSubject(): void {
-    if (!this.subName.trim()) { this.message.warning('Nhập tên môn.'); return; }
-    const req = { name: this.subName.trim(), description: null, sortOrder: this.subSort ?? 0, isActive: true };
-    const editing = this.editingSubject();
-    const op = editing ? this.subjectsService.update(editing.id, req) : this.subjectsService.create(req);
-    op.subscribe({
-      next: () => { this.message.success(editing ? 'Đã cập nhật môn.' : 'Đã thêm môn.'); this.resetSubjectForm(); this.loadSubjects(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Lưu môn thất bại.')
+  protected withdrawStudent(r: RosterItem): void {
+    const d = this.detail();
+    if (!d) return;
+    this.classesService.withdraw(d.id, r.studentId).subscribe({
+      next: () => { this.message.success('Đã xóa khỏi lớp.'); this.openClassDetail({ ...d, currentSize: d.currentSize } as ClassListItem); },
+      error: err => this.showError(err, 'Xóa học viên khỏi lớp thất bại.')
     });
   }
 
-  protected deleteSubject(s: Subject): void {
-    this.subjectsService.delete(s.id).subscribe({
-      next: () => { this.message.success('Đã xóa môn.'); this.loadSubjects(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa môn thất bại.')
-    });
-  }
-
-  // ----- Nhập Excel lớp -----
-  protected openClassImport(): void {
-    this.importFile = null;
+  protected openImportModal(): void {
     this.importPreview.set(null);
-    this.importResult.set(null);
+    this.selectedImportClass.set(null);
     this.importOpen.set(true);
   }
 
-  protected downloadClassTemplate(): void {
+  protected exportClasses(): void {
+    this.classesService.exportClasses({
+      search: this.search || undefined,
+      branchId: this.branchId ?? undefined,
+      subjectId: this.subjectId ?? undefined,
+      gradeId: this.gradeId ?? undefined,
+      teacherProfileId: this.teacherProfileId ?? undefined
+    }).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'danh-sach-lop.xlsx'; a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: err => this.showError(err, 'Export thất bại.')
+    });
+  }
+
+  protected downloadImportTemplate(): void {
     this.classesService.downloadClassImportTemplate().subscribe(blob => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'mau-danh-sach-lop.xlsx';
-      a.click();
+      a.href = url; a.download = 'mau-import-lop-hoc.xlsx'; a.click();
       URL.revokeObjectURL(url);
     });
   }
 
-  protected beforeUploadClasses = (file: NzUploadFile): boolean => {
-    this.importFile = file as unknown as File;
-    this.importResult.set(null);
-    this.classesService.importClassesPreview(this.importFile).subscribe({
-      next: p => this.importPreview.set(p),
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Đọc file thất bại.')
+  protected readonly beforeImportUpload = (file: NzUploadFile): boolean => {
+    const raw = file as unknown as File;
+    this.classesService.importClassesPreview(raw).subscribe({
+      next: p => {
+        this.importPreview.set(p);
+        this.selectedImportClass.set(p.classes[0]?.previewId ?? null);
+        this.importOpen.set(true);
+      },
+      error: err => this.showError(err, 'Không đọc được file import.')
     });
     return false;
   };
 
-  protected doClassImport(): void {
-    if (!this.importFile) return;
-    this.importBusy.set(true);
-    this.classesService.importClassesCommit(this.importFile).subscribe({
-      next: res => {
-        this.importBusy.set(false);
-        this.importResult.set(res);
-        this.importPreview.set(null);
-        this.message.success(`Đã nhập ${res.created} lớp.`);
-        this.refresh();
+  protected commitImport(): void {
+    const preview = this.importPreview();
+    if (!preview) return;
+    this.classesService.importClassesCommit({ classes: preview.classes, students: preview.students }).subscribe({
+      next: r => {
+        this.message.success(`Đã tạo ${r.classesCreated} lớp, ${r.studentsCreated} học viên.`);
+        this.importOpen.set(false);
+        this.loadClasses();
+        this.loadLookups();
       },
-      error: (e: HttpErrorResponse) => { this.importBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Nhập thất bại.'); }
+      error: err => this.showError(err, 'Import thất bại.')
     });
+  }
+
+  protected saveSubject(): void {
+    const req: SubjectRequest = { code: this.subjectCode.trim(), name: this.subjectName.trim(), description: null, sortOrder: this.subjectSort, isActive: true };
+    if (!req.code || !req.name) return;
+    const editing = this.editingSubject();
+    const op = editing ? this.subjectsService.update(editing.id, req) : this.subjectsService.create(req);
+    op.subscribe({ next: () => { this.resetSubject(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu môn thất bại.') });
+  }
+  protected editSubject(s: Subject): void { this.editingSubject.set(s); this.subjectCode = s.code; this.subjectName = s.name; this.subjectSort = s.sortOrder; }
+  protected resetSubject(): void { this.editingSubject.set(null); this.subjectCode = ''; this.subjectName = ''; this.subjectSort = 0; }
+  protected deleteSubject(s: Subject): void { this.subjectsService.delete(s.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa môn thất bại.') }); }
+
+  protected saveGrade(): void {
+    const req: GradeRequest = { code: this.gradeCode.trim(), name: this.gradeName.trim(), sortOrder: this.gradeSort, isActive: true };
+    if (!req.code || !req.name) return;
+    const editing = this.editingGrade();
+    const op = editing ? this.gradesService.update(editing.id, req) : this.gradesService.create(req);
+    op.subscribe({ next: () => { this.resetGrade(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu khối thất bại.') });
+  }
+  protected editGrade(g: Grade): void { this.editingGrade.set(g); this.gradeCode = g.code; this.gradeName = g.name; this.gradeSort = g.sortOrder; }
+  protected resetGrade(): void { this.editingGrade.set(null); this.gradeCode = ''; this.gradeName = ''; this.gradeSort = 0; }
+  protected deleteGrade(g: Grade): void { this.gradesService.delete(g.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa khối thất bại.') }); }
+
+  protected saveBranch(): void {
+    const req: BranchRequest = { code: this.branchCode.trim(), name: this.branchName.trim(), address: null, phone: null, sortOrder: this.branchSort, isActive: true };
+    if (!req.code || !req.name) return;
+    const editing = this.editingBranch();
+    const op = editing ? this.branchesService.update(editing.id, req) : this.branchesService.create(req);
+    op.subscribe({ next: () => { this.resetBranch(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu cơ sở thất bại.') });
+  }
+  protected editBranch(b: Branch): void { this.editingBranch.set(b); this.branchCode = b.code; this.branchName = b.name; this.branchSort = b.sortOrder; }
+  protected resetBranch(): void { this.editingBranch.set(null); this.branchCode = ''; this.branchName = ''; this.branchSort = 0; }
+  protected deleteBranch(b: Branch): void { this.branchesService.delete(b.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa cơ sở thất bại.') }); }
+
+  private showError(err: HttpErrorResponse, fallback: string): void {
+    this.message.error(err.error?.message ?? err.message ?? fallback);
   }
 }

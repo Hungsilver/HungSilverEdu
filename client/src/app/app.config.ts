@@ -10,9 +10,11 @@ import {
 } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import {
+  ApartmentOutline,
   AppstoreOutline,
   ArrowLeftOutline,
   AuditOutline,
+  BankOutline,
   BarChartOutline,
   BellOutline,
   BookOutline,
@@ -28,6 +30,7 @@ import {
   DownOutline,
   EditOutline,
   EyeOutline,
+  FileExcelOutline,
   FileTextOutline,
   GiftOutline,
   IdcardOutline,
@@ -50,6 +53,7 @@ import {
   TeamOutline,
   TrophyOutline,
   UndoOutline,
+  UploadOutline,
   UserOutline,
   WarningOutline
 } from '@ant-design/icons-angular/icons';
@@ -79,7 +83,8 @@ export const appConfig: ApplicationConfig = {
       LineChartOutline, DollarOutline, BellOutline, WarningOutline, LinkOutline,
       MailOutline, CopyOutline, SaveOutline, CheckOutline, CloseOutline, MinusOutline,
       EyeOutline, AppstoreOutline, SettingOutline, MenuOutline, ArrowLeftOutline,
-      ReloadOutline, GiftOutline, TrophyOutline, BulbOutline, CameraOutline, LoadingOutline
+      ReloadOutline, GiftOutline, TrophyOutline, BulbOutline, CameraOutline, LoadingOutline,
+      BankOutline, ApartmentOutline, FileExcelOutline, UploadOutline
     ]),
     // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
     provideNzConfig({

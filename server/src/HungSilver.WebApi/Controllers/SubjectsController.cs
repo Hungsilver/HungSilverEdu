@@ -16,17 +16,14 @@ public class SubjectsController(ISubjectService subjectService) : ControllerBase
         (await subjectService.GetAllAsync(includeInactive, ct)).ToActionResult();
 
     [HttpPost]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<SubjectDto>> Create(CreateSubjectRequest request, CancellationToken ct) =>
         (await subjectService.CreateAsync(request, ct)).ToActionResult();
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<SubjectDto>> Update(Guid id, UpdateSubjectRequest request, CancellationToken ct) =>
         (await subjectService.UpdateAsync(id, request, ct)).ToActionResult();
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct) =>
         (await subjectService.DeleteAsync(id, ct)).ToActionResult();
 }

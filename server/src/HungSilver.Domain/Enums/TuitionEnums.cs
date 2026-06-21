@@ -6,5 +6,6 @@ public enum TuitionStatus
     Pending = 0,   // Chưa tới hạn
     Paid = 1,      // Đã đóng
     DueSoon = 2,   // Sắp đến hạn
-    Overdue = 3    // Quá hạn
+    Overdue = 3,   // Quá hạn
+    Partial = 4    // Đã đóng một phần
 }

@@ -53,7 +53,7 @@ import { PageHeader } from '../../shared/page-header';
         <div class="actions">
           <a nz-button routerLink="/evaluations"><nz-icon nzType="audit" /> Đánh giá tháng</a>
           <button nz-button nzType="primary" (click)="openCreateSession()"><nz-icon nzType="plus" /> Tạo buổi học</button>
-          @if (auth.isAdmin()) {
+          @if (canManage()) {
             <button nz-button (click)="generateOpen.set(true)"><nz-icon nzType="calendar" /> Sinh buổi theo lịch</button>
             <button nz-button (click)="openImport()"><nz-icon nzType="file-text" /> Nhập Excel</button>
           }
@@ -80,7 +80,7 @@ import { PageHeader } from '../../shared/page-header';
               <button nz-button nzType="primary" (click)="openCreateStudent()">
                 <nz-icon nzType="user-add" /> Tạo học sinh
               </button>
-              @if (auth.isAdmin()) {
+              @if (canManage()) {
                 <nz-select class="enroll-select" nzShowSearch nzPlaceHolder="Chọn học viên để thêm"
                   [(ngModel)]="enrollStudentId">
                   @for (s of enrollableStudents(); track s.id) {
@@ -109,7 +109,7 @@ import { PageHeader } from '../../shared/page-header';
                       } @else {
                         <span class="muted" style="font-size:12px">Chưa có TK</span>
                       }
-                      @if (auth.isAdmin()) {
+                      @if (canManage()) {
                         <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
                       }
                     </div>
@@ -143,7 +143,7 @@ import { PageHeader } from '../../shared/page-header';
                         } @else {
                           <span class="muted no-acc">Chưa có TK</span>
                         }
-                        @if (auth.isAdmin()) {
+                        @if (canManage()) {
                           <button nz-button nzType="link" nzSize="small" nzDanger
                                   nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
                         }
@@ -168,7 +168,7 @@ import { PageHeader } from '../../shared/page-header';
             } @empty { <p class="muted">Chưa có buổi học.</p> }
           </nz-card>
 
-          @if (auth.isAdmin()) {
+          @if (canManage()) {
             <nz-card nzTitle="Khung giờ lặp tuần" class="mt">
               @for (slot of slots(); track slot.id) {
                 <div class="row-item">
@@ -471,6 +471,7 @@ export class ClassDetailPage implements OnInit {
   private readonly warningsService = inject(WarningsService);
   private readonly message = inject(NzMessageService);
   private readonly router = inject(Router);
+  protected readonly canManage = computed(() => this.auth.isAdmin() || this.auth.isTeacher());
 
   protected readonly weekdays = WEEKDAY_LABELS;
   protected readonly statuses = [SubmissionStatus.NotSubmitted, SubmissionStatus.Submitted, SubmissionStatus.Late];
@@ -558,7 +559,7 @@ export class ClassDetailPage implements OnInit {
 
   ngOnInit(): void {
     this.reload();
-    if (this.auth.isAdmin()) {
+    if (this.canManage()) {
       this.studentsService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.allStudents.set(r.items));
     }
   }
@@ -571,7 +572,7 @@ export class ClassDetailPage implements OnInit {
     const from = new Date(); from.setDate(from.getDate() - 30);
     const to = new Date(); to.setDate(to.getDate() + 60);
     this.scheduleService.getRange(toDateOnly(from), toDateOnly(to), id).subscribe(s => this.sessions.set(s));
-    if (this.auth.isAdmin()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
+    if (this.canManage()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
     this.warningsService.getWarnings(id).subscribe(w => this.warnings.set(w));
     this.loadAssignments();
     this.loadMaterials();

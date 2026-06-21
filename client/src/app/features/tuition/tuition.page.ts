@@ -1,7 +1,7 @@
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -10,214 +10,225 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
-import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
-import { NzCardModule } from 'ng-zorro-antd/card';
-import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import { AuthService } from '../../core/auth.service';
-import { toDateOnly } from '../../core/date-util';
-import { ScreenService } from '../../core/screen.service';
+import { BranchesService } from '../../core/branches.service';
+import { toDateOnlyOrNull } from '../../core/date-util';
+import { GradesService } from '../../core/grades.service';
 import {
-  CreateTuitionInvoiceRequest, Student, TuitionInvoice,
+  Branch, Grade, Subject, TeacherProfile, TuitionBill, TuitionStudentListItem,
   TUITION_STATUS_COLORS, TUITION_STATUS_LABELS
 } from '../../core/models';
-import { StudentsService } from '../../core/students.service';
+import { SubjectsService } from '../../core/subjects.service';
+import { TeachersService } from '../../core/teachers.service';
 import { TuitionService } from '../../core/tuition.service';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-tuition-page',
   imports: [
-    FormsModule, ReactiveFormsModule, CurrencyPipe, DatePipe,
-    NzTableModule, NzButtonModule, NzIconModule, NzTagModule, NzSelectModule,
-    NzModalModule, NzFormModule, NzInputModule, NzInputNumberModule, NzDatePickerModule, NzPopconfirmModule, PageHeader,
-    NzCardModule, NzPaginationModule
+    CurrencyPipe, DatePipe, FormsModule, ReactiveFormsModule, PageHeader,
+    NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
+    NzInputNumberModule, NzModalModule, NzSelectModule, NzTableModule, NzTagModule
   ],
   template: `
-    <app-page-header title="Học phí" subtitle="Hóa đơn theo tháng & trạng thái đóng" icon="dollar">
-      @if (auth.isAdmin()) {
-        <button nz-button nzType="primary" (click)="openCreate()"><nz-icon nzType="plus" /> Tạo hóa đơn</button>
-      }
-    </app-page-header>
+    <app-page-header title="Học phí" subtitle="Quản lý học phí theo học viên" icon="dollar" />
 
-    @if (screen.isMobile()) {
-      <div class="mobile-card-list">
-        @for (t of invoices(); track t.id) {
-          <nz-card>
-            <div class="card-header">
-              <span class="card-title">{{ t.studentName }}</span>
-              <nz-tag [nzColor]="statusColors[t.status]">{{ statusLabels[t.status] }}</nz-tag>
-            </div>
-            <div class="card-field"><span class="label">Kỳ</span><span>{{ t.periodMonth }}/{{ t.periodYear }}</span></div>
-            <div class="card-field"><span class="label">Số tiền</span><span>{{ t.amount | currency: 'VND' }}</span></div>
-            <div class="card-field"><span class="label">Hạn đóng</span><span>{{ t.dueDate | date: 'dd/MM/yyyy' }}</span></div>
-            @if (auth.isAdmin()) {
-              <div class="card-actions">
-                @if (!t.paidOn) {
-                  <button nz-button nzSize="small" (click)="markPaid(t)">Đã đóng</button>
-                  <button nz-button nzSize="small" (click)="openEdit(t)"><nz-icon nzType="edit" /> Sửa</button>
-                }
-                <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa hóa đơn này?" (nzOnConfirm)="remove(t)"><nz-icon nzType="delete" /> Xóa</button>
-              </div>
-            }
-          </nz-card>
-        }
-      </div>
-      <nz-pagination class="mobile-pagination" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()" (nzPageIndexChange)="onPageChange($event)" />
-    } @else {
-      <nz-table #table [nzData]="invoices()" [nzLoading]="loading()" [nzFrontPagination]="false"
-        [nzTotal]="total()" [nzPageIndex]="page()" [nzPageSize]="pageSize()"
-        (nzPageIndexChange)="onPageChange($event)" [nzScroll]="{ x: '720px' }">
-        <thead>
-          <tr>
-            <th nzLeft>Học sinh</th><th>Kỳ</th><th>Số tiền</th><th>Hạn đóng</th><th>Trạng thái</th>
-            @if (auth.isAdmin()) { <th nzRight>Thao tác</th> }
+    <div class="filters">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="branchId" (ngModelChange)="load()">
+        @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
+      </nz-select>
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Môn học" [(ngModel)]="subjectId" (ngModelChange)="load()">
+        @for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }
+      </nz-select>
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId" (ngModelChange)="load()">
+        @for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }
+      </nz-select>
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId" (ngModelChange)="load()">
+        @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
+      </nz-select>
+      <input nz-input placeholder="Tên, mã, SĐT" [(ngModel)]="search" (ngModelChange)="onSearch()" />
+      <nz-date-picker [(ngModel)]="periodDate" (ngModelChange)="onPeriodChange()" nzMode="month" />
+      <nz-date-picker [(ngModel)]="dueDate" (ngModelChange)="load()" nzPlaceHolder="Hạn đóng" />
+    </div>
+
+    <nz-table #table [nzData]="items()" [nzLoading]="loading()" [nzFrontPagination]="false"
+      [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
+      (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '900px' }">
+      <thead><tr><th>STT</th><th>Tên học viên</th><th>Kỳ</th><th>Hạn đóng</th><th>Tổng</th><th>Đã đóng</th><th>Còn thiếu</th><th>Trạng thái</th></tr></thead>
+      <tbody>
+        @for (row of table.data; track row.studentId; let i = $index) {
+          <tr class="clickable" (click)="openBill(row)">
+            <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
+            <td>{{ row.studentName }}</td>
+            <td>{{ row.periodMonth }}/{{ row.periodYear }}</td>
+            <td>{{ row.dueDate | date:'dd/MM/yyyy' }}</td>
+            <td>{{ row.totalAmount | currency:'VND' }}</td>
+            <td>{{ row.paidAmount | currency:'VND' }}</td>
+            <td>{{ row.remainingAmount | currency:'VND' }}</td>
+            <td><nz-tag [nzColor]="statusColors[row.status]">{{ statusLabels[row.status] }}</nz-tag></td>
           </tr>
-        </thead>
-        <tbody>
-          @for (t of table.data; track t.id) {
-            <tr>
-              <td nzLeft>{{ t.studentName }}</td>
-              <td>{{ t.periodMonth }}/{{ t.periodYear }}</td>
-              <td>{{ t.amount | currency: 'VND' }}</td>
-              <td>{{ t.dueDate | date: 'dd/MM/yyyy' }}</td>
-              <td><nz-tag [nzColor]="statusColors[t.status]">{{ statusLabels[t.status] }}</nz-tag></td>
-              @if (auth.isAdmin()) {
-                <td nzRight>
-                  @if (!t.paidOn) {
-                    <button nz-button nzType="link" nzSize="small" (click)="markPaid(t)">Đã đóng</button>
-                    <button nz-button nzType="link" nzSize="small" (click)="openEdit(t)"><nz-icon nzType="edit" /></button>
-                  }
-                  <button nz-button nzType="link" nzSize="small" nzDanger
-                          nz-popconfirm nzPopconfirmTitle="Xóa hóa đơn này?" (nzOnConfirm)="remove(t)"><nz-icon nzType="delete" /></button>
-                </td>
-              }
-            </tr>
-          }
-        </tbody>
-      </nz-table>
-    }
+        }
+      </tbody>
+    </nz-table>
 
-    <nz-modal [nzVisible]="modalOpen()" [nzTitle]="editing() ? 'Sửa hóa đơn' : 'Tạo hóa đơn học phí'"
-      [nzOkLoading]="saving()" [nzOkDisabled]="form.invalid" (nzOnOk)="save()" (nzOnCancel)="modalOpen.set(false)">
+    <nz-modal [nzVisible]="billOpen()" nzTitle="Chi tiết học phí" [nzWidth]="900"
+      (nzOnCancel)="billOpen.set(false)" (nzOnOk)="pay()">
       <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical" [formGroup]="form">
-          @if (!editing()) {
-            <nz-form-item><nz-form-label nzRequired>Học sinh</nz-form-label>
-              <nz-form-control nzErrorTip="Chọn học sinh">
-                <nz-select formControlName="studentId" nzShowSearch nzPlaceHolder="Chọn học sinh" class="full">
-                  @for (s of students(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.fullName" /> }
-                </nz-select>
-              </nz-form-control>
-            </nz-form-item>
-            <nz-form-item><nz-form-label nzRequired>Kỳ (tháng/năm)</nz-form-label>
-              <nz-form-control>
-                <nz-input-number formControlName="periodMonth" [nzMin]="1" [nzMax]="12" nzPlaceHolder="Tháng" />
-                <nz-input-number formControlName="periodYear" [nzMin]="2000" [nzMax]="2100" nzPlaceHolder="Năm" class="ml" />
-              </nz-form-control>
-            </nz-form-item>
-          }
-          <nz-form-item><nz-form-label nzRequired>Số tiền</nz-form-label>
-            <nz-form-control><nz-input-number formControlName="amount" [nzMin]="0" [nzStep]="100000" class="full" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label nzRequired>Hạn đóng</nz-form-label>
-            <nz-form-control><nz-date-picker formControlName="dueDate" nzFormat="dd/MM/yyyy" class="full" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Ghi chú</nz-form-label>
-            <nz-form-control><input nz-input formControlName="note" /></nz-form-control></nz-form-item>
-        </form>
+        @if (bill(); as b) {
+          <div class="bill-head">
+            <div><b>Học viên</b><span>{{ b.studentCode }} · {{ b.studentName }}</span></div>
+            <div><b>Kỳ</b><span>{{ b.periodMonth }}/{{ b.periodYear }}</span></div>
+            <div><b>Hạn đóng</b><span>{{ b.dueDate | date:'dd/MM/yyyy' }}</span></div>
+          </div>
+          <nz-table [nzData]="b.classes" [nzFrontPagination]="false" nzSize="small">
+            <thead><tr><th>Mã lớp</th><th>Lớp</th><th>Giáo viên</th><th>Môn</th><th>Khối</th><th>Học phí</th></tr></thead>
+            <tbody>
+              @for (c of b.classes; track c.classId) {
+                <tr><td>{{ c.classCode }}</td><td>{{ c.className }}</td><td>{{ c.teacherName || '—' }}</td><td>{{ c.subjectName || '—' }}</td><td>{{ c.gradeName || '—' }}</td><td>{{ c.tuitionFee | currency:'VND' }}</td></tr>
+              }
+            </tbody>
+          </nz-table>
+          <form nz-form [formGroup]="payForm" nzLayout="vertical" class="pay-form">
+            <nz-form-item><nz-form-label>Giảm giá</nz-form-label><nz-form-control><nz-input-number formControlName="discountAmount" [nzMin]="0" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Số tiền đóng</nz-form-label><nz-form-control><nz-input-number formControlName="paidAmount" [nzMin]="0" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Ghi chú</nz-form-label><nz-form-control><input nz-input formControlName="note" /></nz-form-control></nz-form-item>
+          </form>
+          <div class="totals">
+            <span>Tổng: <b>{{ b.totalAmount | currency:'VND' }}</b></span>
+            <span>Giảm: <b>{{ payForm.value.discountAmount || 0 | currency:'VND' }}</b></span>
+            <span>Đã đóng: <b>{{ payForm.value.paidAmount || 0 | currency:'VND' }}</b></span>
+          </div>
+          <button nz-button (click)="downloadBill()"><nz-icon nzType="download" /> Tải bill</button>
+        }
       </ng-container>
     </nz-modal>
   `,
   styles: `
-    .full { width: 100%; }
-    .ml { margin-left: 8px; }
+    .filters { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .clickable { cursor: pointer; }
+    .bill-head { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+    .bill-head div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; }
+    .bill-head b { display: block; color: var(--hs-text-muted); font-size: 12px; margin-bottom: 4px; }
+    .pay-form { display: grid; grid-template-columns: 180px 180px 1fr; gap: 12px; margin-top: 12px; }
+    .totals { display: flex; gap: 18px; justify-content: flex-end; margin: 12px 0; }
+    @media (max-width: 900px) { .filters, .bill-head, .pay-form { grid-template-columns: 1fr; } .totals { flex-direction: column; } }
   `
 })
 export class TuitionPage {
-  protected readonly auth = inject(AuthService);
-  protected readonly screen = inject(ScreenService);
   private readonly tuitionService = inject(TuitionService);
-  private readonly studentsService = inject(StudentsService);
+  private readonly branchesService = inject(BranchesService);
+  private readonly subjectsService = inject(SubjectsService);
+  private readonly gradesService = inject(GradesService);
+  private readonly teachersService = inject(TeachersService);
   private readonly message = inject(NzMessageService);
 
   protected readonly statusLabels = TUITION_STATUS_LABELS;
   protected readonly statusColors = TUITION_STATUS_COLORS;
-
-  protected readonly invoices = signal<TuitionInvoice[]>([]);
-  protected readonly total = signal(0);
+  protected readonly items = signal<TuitionStudentListItem[]>([]);
+  protected readonly branches = signal<Branch[]>([]);
+  protected readonly subjects = signal<Subject[]>([]);
+  protected readonly grades = signal<Grade[]>([]);
+  protected readonly teachers = signal<TeacherProfile[]>([]);
+  protected readonly loading = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
-  protected readonly loading = signal(false);
-  protected readonly students = signal<Student[]>([]);
+  protected readonly total = signal(0);
+  protected search = '';
+  protected branchId: string | null = null;
+  protected subjectId: string | null = null;
+  protected gradeId: string | null = null;
+  protected teacherProfileId: string | null = null;
+  protected periodDate = new Date();
+  protected dueDate: Date | null = new Date();
+  private timer?: ReturnType<typeof setTimeout>;
 
-  protected readonly modalOpen = signal(false);
-  protected readonly saving = signal(false);
-  protected readonly editing = signal<TuitionInvoice | null>(null);
-
-  protected readonly form = new FormGroup({
-    studentId: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    periodMonth: new FormControl(1, { nonNullable: true, validators: [Validators.required] }),
-    periodYear: new FormControl(new Date().getFullYear(), { nonNullable: true, validators: [Validators.required] }),
-    amount: new FormControl(0, { nonNullable: true, validators: [Validators.required, Validators.min(0)] }),
-    dueDate: new FormControl<Date | null>(null, { validators: [Validators.required] }),
+  protected readonly billOpen = signal(false);
+  protected readonly bill = signal<TuitionBill | null>(null);
+  protected readonly payForm = new FormGroup({
+    discountAmount: new FormControl(0, { nonNullable: true }),
+    paidAmount: new FormControl(0, { nonNullable: true }),
     note: new FormControl<string | null>(null)
   });
 
   constructor() {
+    this.loadLookups();
     this.load();
-    if (this.auth.isAdmin()) this.studentsService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.students.set(r.items));
   }
 
   protected load(): void {
     this.loading.set(true);
-    this.tuitionService.getPaged(this.page(), this.pageSize()).subscribe({
-      next: r => { this.invoices.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
+    this.tuitionService.getStudents({
+      page: this.page(), pageSize: this.pageSize(), search: this.search,
+      periodYear: this.periodDate.getFullYear(), periodMonth: this.periodDate.getMonth() + 1,
+      dueDate: toDateOnlyOrNull(this.dueDate),
+      branchId: this.branchId ?? undefined, subjectId: this.subjectId ?? undefined,
+      gradeId: this.gradeId ?? undefined, teacherProfileId: this.teacherProfileId ?? undefined
+    }).subscribe({
+      next: r => { this.items.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
       error: () => this.loading.set(false)
     });
   }
 
-  protected onPageChange(p: number): void { this.page.set(p); this.load(); }
-
-  protected openCreate(): void {
-    this.editing.set(null);
-    this.form.reset({ studentId: '', periodMonth: new Date().getMonth() + 1, periodYear: new Date().getFullYear(), amount: 0, dueDate: null, note: null });
-    this.form.controls.studentId.enable();
-    this.modalOpen.set(true);
+  protected onSearch(): void {
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.page.set(1); this.load(); }, 250);
   }
 
-  protected openEdit(t: TuitionInvoice): void {
-    this.editing.set(t);
-    this.form.reset({ studentId: t.studentId, periodMonth: t.periodMonth, periodYear: t.periodYear, amount: t.amount, dueDate: new Date(t.dueDate), note: t.note });
-    this.modalOpen.set(true);
+  protected onPeriodChange(): void {
+    this.page.set(1);
+    this.load();
   }
 
-  protected save(): void {
-    if (this.form.invalid) return;
-    const v = this.form.getRawValue();
-    const dueDate = toDateOnly(v.dueDate!);
-    const editing = this.editing();
-    const op = editing
-      ? this.tuitionService.update(editing.id, { amount: v.amount, dueDate, note: v.note })
-      : this.tuitionService.create({ studentId: v.studentId, classId: null, periodYear: v.periodYear, periodMonth: v.periodMonth, amount: v.amount, dueDate, note: v.note } as CreateTuitionInvoiceRequest);
-    this.saving.set(true);
-    op.subscribe({
-      next: () => { this.saving.set(false); this.modalOpen.set(false); this.message.success('Đã lưu hóa đơn.'); this.load(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ??'Lưu thất bại.'); }
+  private loadLookups(): void {
+    this.branchesService.getAll().subscribe(x => this.branches.set(x));
+    this.subjectsService.getAll().subscribe(x => this.subjects.set(x));
+    this.gradesService.getAll().subscribe(x => this.grades.set(x));
+    this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
+  }
+
+  protected openBill(row: TuitionStudentListItem): void {
+    this.tuitionService.getBill(row.studentId, row.periodYear, row.periodMonth, row.dueDate).subscribe({
+      next: b => {
+        this.bill.set(b);
+        this.payForm.reset({ discountAmount: b.discountAmount, paidAmount: b.paidAmount || Math.max(0, b.totalAmount - b.discountAmount), note: null });
+        this.billOpen.set(true);
+      },
+      error: err => this.showError(err, 'Không tải được bill.')
     });
   }
 
-  protected markPaid(t: TuitionInvoice): void {
-    this.tuitionService.markPaid(t.id, null).subscribe({
-      next: () => { this.message.success('Đã ghi nhận đóng học phí.'); this.load(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Thất bại.')
+  protected pay(): void {
+    const b = this.bill();
+    if (!b) return;
+    const v = this.payForm.getRawValue();
+    this.tuitionService.payStudent(b.studentId, {
+      periodYear: b.periodYear,
+      periodMonth: b.periodMonth,
+      dueDate: b.dueDate,
+      discountAmount: v.discountAmount,
+      paidAmount: v.paidAmount,
+      note: v.note
+    }).subscribe({
+      next: updated => { this.bill.set(updated); this.message.success('Đã ghi nhận thanh toán.'); this.load(); },
+      error: err => this.showError(err, 'Thanh toán thất bại.')
     });
   }
 
-  protected remove(t: TuitionInvoice): void {
-    this.tuitionService.delete(t.id).subscribe({
-      next: () => { this.message.success('Đã xóa.'); this.load(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ??'Xóa thất bại.')
-    });
+  protected downloadBill(): void {
+    const b = this.bill();
+    if (!b) return;
+    const rows = b.classes.map(c => `<tr><td>${c.classCode}</td><td>${c.className}</td><td>${c.tuitionFee.toLocaleString('vi-VN')}</td></tr>`).join('');
+    const html = `<!doctype html><meta charset="utf-8"><title>Bill học phí</title><h2>Bill học phí</h2><p>${b.studentCode} - ${b.studentName}</p><p>Kỳ ${b.periodMonth}/${b.periodYear}</p><table border="1" cellspacing="0" cellpadding="6"><tr><th>Mã lớp</th><th>Lớp</th><th>Học phí</th></tr>${rows}</table><p>Tổng: ${b.totalAmount.toLocaleString('vi-VN')}</p><p>Giảm giá: ${(this.payForm.value.discountAmount || 0).toLocaleString('vi-VN')}</p><p>Đã đóng: ${(this.payForm.value.paidAmount || 0).toLocaleString('vi-VN')}</p>`;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `bill-${b.studentCode}-${b.periodMonth}-${b.periodYear}.html`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private showError(err: HttpErrorResponse, fallback: string): void {
+    this.message.error(err.error?.message ?? err.message ?? fallback);
   }
 }

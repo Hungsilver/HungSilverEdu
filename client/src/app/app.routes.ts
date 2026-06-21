@@ -48,6 +48,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/classes/classes.page').then(m => m.ClassesPage)
       },
       {
+        path: 'teachers',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/teachers/teachers.page').then(m => m.TeachersPage)
+      },
+      {
         path: 'classes/:id',
         canActivate: [roleGuard],
         data: teacherOrAdmin,

@@ -14,6 +14,7 @@ namespace HungSilver.Infrastructure.Tuition;
 public sealed class TuitionService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     ISettingsResolver settings,
     IValidator<CreateTuitionInvoiceRequest> createValidator,
     IValidator<UpdateTuitionInvoiceRequest> updateValidator) : ITuitionService
@@ -23,28 +24,75 @@ public sealed class TuitionService(
     public async Task<Result<PagedResult<TuitionInvoiceDto>>> GetPagedAsync(PagedRequest request, Guid? studentId = null, CancellationToken ct = default)
     {
         var query = context.TuitionInvoices.AsNoTracking().AsQueryable();
-
-        if (!accessGuard.IsAdmin)
-        {
-            var allowed = await TeacherStudentIdsAsync(ct);
-            query = query.Where(t => allowed.Contains(t.StudentId));
-        }
-
+        var scopeStudentIds = await TeacherStudentIdsAsync(ct);
+        if (scopeStudentIds is not null)
+            query = query.Where(t => scopeStudentIds.Contains(t.StudentId));
         if (studentId is not null)
             query = query.Where(t => t.StudentId == studentId);
 
         var total = await query.CountAsync(ct);
         var page = Math.Max(request.Page, 1);
-        var items = await query
-            .OrderByDescending(t => t.DueDate)
+        var items = await query.OrderByDescending(t => t.DueDate)
             .Skip((page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(ct);
 
-        var dtos = await ToDtosAsync(items, ct);
         return new PagedResult<TuitionInvoiceDto>
         {
-            Items = dtos,
+            Items = await ToDtosAsync(items, ct),
+            Page = page,
+            PageSize = request.PageSize,
+            TotalCount = total
+        };
+    }
+
+    public async Task<Result<PagedResult<TuitionStudentListItemDto>>> GetStudentsAsync(
+        PagedRequest request,
+        int periodYear,
+        int periodMonth,
+        DateOnly? dueDate = null,
+        Guid? branchId = null,
+        Guid? subjectId = null,
+        Guid? gradeId = null,
+        Guid? teacherProfileId = null,
+        CancellationToken ct = default)
+    {
+        var studentIds = await FilterStudentIdsAsync(branchId, subjectId, gradeId, teacherProfileId, ct);
+        var query = context.Students.AsNoTracking().AsQueryable();
+        if (studentIds is not null)
+            query = query.Where(s => studentIds.Contains(s.Id));
+        var scopeAllowed = await TeacherStudentIdsAsync(ct);
+        if (scopeAllowed is not null)
+            query = query.Where(s => scopeAllowed.Contains(s.Id));
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var term = request.Search.Trim().ToLower();
+            query = query.Where(s => s.StudentCode.ToLower().Contains(term)
+                                     || s.FullName.ToLower().Contains(term)
+                                     || (s.Phone != null && s.Phone.Contains(term))
+                                     || (s.ParentPhone != null && s.ParentPhone.Contains(term)));
+        }
+
+        var total = await query.CountAsync(ct);
+        var page = Math.Max(request.Page, 1);
+        var students = await query.OrderByDescending(s => s.CreatedAt)
+            .Skip((page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(ct);
+
+        var items = new List<TuitionStudentListItemDto>();
+        foreach (var student in students)
+        {
+            var bill = await BuildBillAsync(student, periodYear, periodMonth, dueDate, ct);
+            items.Add(new TuitionStudentListItemDto(
+                student.Id, student.StudentCode, student.FullName, student.Phone, student.ParentPhone,
+                periodYear, periodMonth, bill.DueDate, bill.TotalAmount, bill.DiscountAmount,
+                bill.PaidAmount, bill.RemainingAmount, bill.Status));
+        }
+
+        return new PagedResult<TuitionStudentListItemDto>
+        {
+            Items = items,
             Page = page,
             PageSize = request.PageSize,
             TotalCount = total
@@ -65,6 +113,70 @@ public sealed class TuitionService(
         return await ToDtosAsync(items, ct);
     }
 
+    public async Task<Result<TuitionBillDto>> GetStudentBillAsync(Guid studentId, int periodYear, int periodMonth, DateOnly? dueDate = null, CancellationToken ct = default)
+    {
+        var access = await accessGuard.EnsureCanAccessStudentAsync(studentId, ct);
+        if (access.IsFailure)
+            return Result.Failure<TuitionBillDto>(access.Error);
+
+        var student = await context.Students.AsNoTracking().FirstOrDefaultAsync(s => s.Id == studentId, ct);
+        if (student is null)
+            return Result.Failure<TuitionBillDto>(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
+
+        return await BuildBillAsync(student, periodYear, periodMonth, dueDate, ct);
+    }
+
+    public async Task<Result<TuitionBillDto>> PayStudentAsync(Guid studentId, PayStudentTuitionRequest request, CancellationToken ct = default)
+    {
+        var access = await accessGuard.EnsureCanAccessStudentAsync(studentId, ct);
+        if (access.IsFailure)
+            return Result.Failure<TuitionBillDto>(access.Error);
+
+        if (request.DiscountAmount < 0 || request.PaidAmount < 0)
+            return Result.Failure<TuitionBillDto>(Error.Validation("Tuition.InvalidAmount", "Số tiền giảm/đã đóng không hợp lệ."));
+
+        var student = await context.Students.FirstOrDefaultAsync(s => s.Id == studentId, ct);
+        if (student is null)
+            return Result.Failure<TuitionBillDto>(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
+
+        var lines = await LoadTuitionLinesAsync(studentId, ct);
+        if (lines.Count == 0)
+            return Result.Failure<TuitionBillDto>(Error.Validation("Tuition.NoClass", "Học viên chưa có lớp đang học."));
+
+        var total = lines.Sum(x => x.TuitionFee);
+        var net = Math.Max(0, total - request.DiscountAmount);
+        var paid = Math.Min(request.PaidAmount, net);
+        var status = paid >= net ? TuitionStatus.Paid : paid > 0 ? TuitionStatus.Partial : EffectiveStatus(null, request.DueDate, await GetDueSoonDaysAsync(ct));
+
+        var oldInvoices = await context.TuitionInvoices
+            .Where(t => t.StudentId == studentId && t.PeriodYear == request.PeriodYear && t.PeriodMonth == request.PeriodMonth)
+            .ToListAsync(ct);
+        foreach (var invoice in oldInvoices)
+            context.TuitionInvoices.Remove(invoice);
+
+        foreach (var line in lines)
+        {
+            var ratio = total > 0 ? line.TuitionFee / total : 0;
+            context.TuitionInvoices.Add(new TuitionInvoice
+            {
+                StudentId = studentId,
+                ClassId = line.ClassId,
+                PeriodYear = request.PeriodYear,
+                PeriodMonth = request.PeriodMonth,
+                Amount = line.TuitionFee,
+                DiscountAmount = Math.Round(request.DiscountAmount * ratio, 2),
+                PaidAmount = Math.Round(paid * ratio, 2),
+                DueDate = request.DueDate,
+                Status = status,
+                PaidOn = paid > 0 ? DateOnly.FromDateTime(DateTime.Now) : null,
+                Note = request.Note?.Trim()
+            });
+        }
+
+        await context.SaveChangesAsync(ct);
+        return await BuildBillAsync(student, request.PeriodYear, request.PeriodMonth, request.DueDate, ct);
+    }
+
     public async Task<Result<TuitionInvoiceDto>> CreateAsync(CreateTuitionInvoiceRequest request, CancellationToken ct = default)
     {
         var validation = await createValidator.ValidateAsync(request, ct);
@@ -73,8 +185,6 @@ public sealed class TuitionService(
 
         if (!await context.Students.AnyAsync(s => s.Id == request.StudentId, ct))
             return Result.Failure<TuitionInvoiceDto>(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
-
-        // Nếu gắn lớp thì lớp phải tồn tại (toàn vẹn tham chiếu ở tầng app vì không có FK).
         if (request.ClassId is not null && !await context.Classes.AnyAsync(c => c.Id == request.ClassId.Value, ct))
             return Result.Failure<TuitionInvoiceDto>(Error.NotFound("Class.NotFound", "Không tìm thấy lớp học."));
 
@@ -91,7 +201,6 @@ public sealed class TuitionService(
         };
         context.TuitionInvoices.Add(invoice);
         await context.SaveChangesAsync(ct);
-
         return (await ToDtosAsync([invoice], ct))[0];
     }
 
@@ -109,7 +218,6 @@ public sealed class TuitionService(
         invoice.DueDate = request.DueDate;
         invoice.Note = request.Note?.Trim();
         await context.SaveChangesAsync(ct);
-
         return (await ToDtosAsync([invoice], ct))[0];
     }
 
@@ -119,10 +227,10 @@ public sealed class TuitionService(
         if (invoice is null)
             return Result.Failure<TuitionInvoiceDto>(NotFoundError);
 
-        invoice.PaidOn = request.PaidOn ?? await TodayAsync(ct);
+        invoice.PaidOn = request.PaidOn ?? DateOnly.FromDateTime(DateTime.Now);
+        invoice.PaidAmount = Math.Max(0, invoice.Amount - invoice.DiscountAmount);
         invoice.Status = TuitionStatus.Paid;
         await context.SaveChangesAsync(ct);
-
         return (await ToDtosAsync([invoice], ct))[0];
     }
 
@@ -149,14 +257,48 @@ public sealed class TuitionService(
         return Result.Success();
     }
 
+    private async Task<TuitionBillDto> BuildBillAsync(Student student, int periodYear, int periodMonth, DateOnly? dueDate, CancellationToken ct)
+    {
+        var lines = await LoadTuitionLinesAsync(student.Id, ct);
+        var invoices = await context.TuitionInvoices.AsNoTracking()
+            .Where(t => t.StudentId == student.Id && t.PeriodYear == periodYear && t.PeriodMonth == periodMonth)
+            .ToListAsync(ct);
+
+        var total = lines.Sum(x => x.TuitionFee);
+        var discount = invoices.Sum(x => x.DiscountAmount);
+        var paid = invoices.Sum(x => x.PaidAmount);
+        var remaining = Math.Max(0, total - discount - paid);
+        var billDueDate = invoices.FirstOrDefault()?.DueDate ?? dueDate ?? DateOnly.FromDateTime(DateTime.Now);
+        var status = remaining <= 0 && total > 0
+            ? TuitionStatus.Paid
+            : paid > 0
+                ? TuitionStatus.Partial
+                : EffectiveStatus(null, billDueDate, await GetDueSoonDaysAsync(ct));
+
+        return new TuitionBillDto(
+            student.Id, student.StudentCode, student.FullName, student.Phone, student.ParentPhone,
+            periodYear, periodMonth, billDueDate, lines, total, discount, paid, remaining, status,
+            await ToDtosAsync(invoices, ct));
+    }
+
+    private async Task<List<TuitionClassLineDto>> LoadTuitionLinesAsync(Guid studentId, CancellationToken ct)
+    {
+        return await (
+            from e in context.Enrollments.AsNoTracking()
+            join c in context.Classes.AsNoTracking() on e.ClassId equals c.Id
+            where e.StudentId == studentId && e.IsActive
+            orderby c.Name
+            select new TuitionClassLineDto(
+                c.Id, c.ClassCode, c.Name, c.TeacherName, c.SubjectName, c.GradeName, c.BranchName, c.TuitionFee))
+            .ToListAsync(ct);
+    }
+
     private async Task<List<TuitionInvoiceDto>> ToDtosAsync(List<TuitionInvoice> items, CancellationToken ct)
     {
         if (items.Count == 0)
             return [];
-
-        var today = await TodayAsync(ct);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var dueSoonDays = await GetDueSoonDaysAsync(ct);
-
         var studentIds = items.Select(i => i.StudentId).Distinct().ToList();
         var names = await context.Students.AsNoTracking()
             .Where(s => studentIds.Contains(s.Id))
@@ -164,29 +306,57 @@ public sealed class TuitionService(
 
         return items.Select(i => new TuitionInvoiceDto(
             i.Id, i.StudentId, names.GetValueOrDefault(i.StudentId, string.Empty), i.ClassId,
-            i.PeriodYear, i.PeriodMonth, i.Amount, i.DueDate,
+            i.PeriodYear, i.PeriodMonth, i.Amount, i.DiscountAmount, i.PaidAmount, i.DueDate,
             EffectiveStatus(i, today, dueSoonDays), i.PaidOn, i.Note, i.IsDeleted, i.CreatedAt)).ToList();
     }
 
-    private static TuitionStatus EffectiveStatus(TuitionInvoice i, DateOnly today, int dueSoonDays)
+    private static TuitionStatus EffectiveStatus(TuitionInvoice? invoice, DateOnly todayOrDueDate, int dueSoonDays)
     {
-        if (i.PaidOn is not null)
-            return TuitionStatus.Paid;
-        if (i.DueDate < today)
+        if (invoice is not null)
+        {
+            var net = Math.Max(0, invoice.Amount - invoice.DiscountAmount);
+            if (invoice.PaidAmount >= net && net > 0)
+                return TuitionStatus.Paid;
+            if (invoice.PaidAmount > 0)
+                return TuitionStatus.Partial;
+            if (invoice.DueDate < todayOrDueDate)
+                return TuitionStatus.Overdue;
+            if (invoice.DueDate <= todayOrDueDate.AddDays(dueSoonDays))
+                return TuitionStatus.DueSoon;
+            return TuitionStatus.Pending;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        if (todayOrDueDate < today)
             return TuitionStatus.Overdue;
-        if (i.DueDate <= today.AddDays(dueSoonDays))
+        if (todayOrDueDate <= today.AddDays(dueSoonDays))
             return TuitionStatus.DueSoon;
         return TuitionStatus.Pending;
     }
 
-    private async Task<List<Guid>> TeacherStudentIdsAsync(CancellationToken ct)
+    private async Task<HashSet<Guid>?> FilterStudentIdsAsync(Guid? branchId, Guid? subjectId, Guid? gradeId, Guid? teacherProfileId, CancellationToken ct)
     {
+        if (branchId is null && subjectId is null && gradeId is null && teacherProfileId is null)
+            return null;
         var classIds = await context.Classes.AsNoTracking()
-            .Where(c => c.TeacherId == accessGuard.TeacherScopeId)
-            .Select(c => c.Id).ToListAsync(ct);
-        return await context.Enrollments.AsNoTracking()
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+            .Where(c => (branchId == null || c.BranchId == branchId)
+                        && (subjectId == null || c.SubjectId == subjectId)
+                        && (gradeId == null || c.GradeId == gradeId)
+                        && (teacherProfileId == null || c.TeacherProfileId == teacherProfileId))
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+        return await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct);
+    }
+
+    private async Task<List<Guid>?> TeacherStudentIdsAsync(CancellationToken ct)
+    {
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is null) return null;
+        var classIds = await context.Classes.AsNoTracking()
+            .Where(c => c.TeacherProfileId == scopeId)
+            .Select(c => c.Id)
+            .ToListAsync(ct);
+        return (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct)).ToList();
     }
 
     private async Task<int> GetDueSoonDaysAsync(CancellationToken ct)
@@ -194,7 +364,4 @@ public sealed class TuitionService(
         var v = await settings.GetEffectiveValueAsync(SettingKeys.TuitionDueSoonDays, ct: ct);
         return int.TryParse(v, out var n) ? n : 7;
     }
-
-    private Task<DateOnly> TodayAsync(CancellationToken ct) =>
-        Task.FromResult(DateOnly.FromDateTime(DateTime.Now));
 }

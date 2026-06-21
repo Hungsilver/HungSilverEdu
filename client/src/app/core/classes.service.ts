@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  ClassDetail, ClassImportPreview, ClassImportResult, ClassListItem, ClassRequest, ClassStudentOverview,
+  ClassDetail, ClassImportCommitRequest, ClassImportPreview, ClassImportResult, ClassListItem, ClassRequest, ClassStudentOverview,
   CreateClassStudentRequest, CreateClassStudentResult, PagedResult, RosterItem, StudentImportPreview, StudentImportResult
 } from './models';
 
@@ -12,8 +12,10 @@ export interface ClassQuery {
   pageSize: number;
   search?: string;
   includeDeleted?: boolean;
+  branchId?: string;
   subjectId?: string;
-  gradeBand?: string;
+  gradeId?: string;
+  teacherProfileId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -25,8 +27,10 @@ export class ClassesService {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.search) params = params.set('search', query.search);
     if (query.includeDeleted) params = params.set('includeDeleted', true);
+    if (query.branchId) params = params.set('branchId', query.branchId);
     if (query.subjectId) params = params.set('subjectId', query.subjectId);
-    if (query.gradeBand) params = params.set('gradeBand', query.gradeBand);
+    if (query.gradeId) params = params.set('gradeId', query.gradeId);
+    if (query.teacherProfileId) params = params.set('teacherProfileId', query.teacherProfileId);
     return this.http.get<PagedResult<ClassListItem>>(this.apiUrl, { params });
   }
 
@@ -58,8 +62,8 @@ export class ClassesService {
     return this.http.post<void>(`${this.apiUrl}/${id}/restore`, {});
   }
 
-  assignTeacher(id: string, teacherId: string): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/${id}/teacher`, { teacherId });
+  assignTeacher(id: string, teacherProfileId: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/${id}/teacher`, { teacherProfileId });
   }
 
   enroll(id: string, studentId: string): Observable<void> {
@@ -104,9 +108,18 @@ export class ClassesService {
     return this.http.post<ClassImportPreview>(`${this.apiUrl}/import-classes/preview`, fd);
   }
 
-  importClassesCommit(file: File): Observable<ClassImportResult> {
-    const fd = new FormData();
-    fd.append('file', file);
-    return this.http.post<ClassImportResult>(`${this.apiUrl}/import-classes`, fd);
+  importClassesCommit(request: ClassImportCommitRequest): Observable<ClassImportResult> {
+    return this.http.post<ClassImportResult>(`${this.apiUrl}/import-classes`, request);
+  }
+
+  // ---- Export Excel ----
+  exportClasses(query?: Partial<ClassQuery>): Observable<Blob> {
+    let params = new HttpParams();
+    if (query?.search) params = params.set('search', query.search);
+    if (query?.branchId) params = params.set('branchId', query.branchId);
+    if (query?.subjectId) params = params.set('subjectId', query.subjectId);
+    if (query?.gradeId) params = params.set('gradeId', query.gradeId);
+    if (query?.teacherProfileId) params = params.set('teacherProfileId', query.teacherProfileId);
+    return this.http.get(`${this.apiUrl}/export`, { params, responseType: 'blob' });
   }
 }

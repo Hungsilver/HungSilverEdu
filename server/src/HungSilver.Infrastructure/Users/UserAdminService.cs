@@ -1,8 +1,10 @@
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
 using HungSilver.Application.Users;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
+using HungSilver.Domain.Entities;
 using HungSilver.Infrastructure.Identity;
 using HungSilver.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -13,6 +15,7 @@ namespace HungSilver.Infrastructure.Users;
 public sealed class UserAdminService(
     UserManager<AppUser> userManager,
     AppDbContext context,
+    ICurrentRelationCleanupService relationCleanup,
     ICurrentUser currentUser) : IUserAdminService
 {
     private static readonly Error UserNotFound =
@@ -111,6 +114,20 @@ public sealed class UserAdminService(
             return Result.Failure<UserListItemDto>(Error.Failure(
                 "Users.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
 
+        if (role == AppRoles.Teacher)
+        {
+            var teacherCode = UniqueCodeGenerator.Next("GV");
+            context.TeacherProfiles.Add(new TeacherProfile
+            {
+                TeacherCode = teacherCode,
+                FullName = user.FullName ?? userName,
+                Email = string.Equals(email, $"{userName}@hedu.local", StringComparison.OrdinalIgnoreCase) ? null : email,
+                UserId = user.Id,
+                IsActive = true
+            });
+            await context.SaveChangesAsync(ct);
+        }
+
         return new UserListItemDto(user.Id, user.UserName!, user.Email!, user.FullName, [role], user.IsDeleted, user.CreatedAt);
     }
 
@@ -169,6 +186,8 @@ public sealed class UserAdminService(
             var guard = await EnsureNotLastAdminAsync(ct);
             if (guard.IsFailure) return guard;
         }
+
+        await relationCleanup.UnlinkUserRelationsAsync(userId, ct);
 
         // Remove → AuditSaveChangesInterceptor chuyển thành soft delete.
         context.Users.Remove(user);

@@ -21,7 +21,7 @@ public sealed class StudentAccountService(
     public async Task<Result<CreateClassStudentResultDto>> CreateInClassAsync(
         Guid classId, CreateClassStudentRequest request, CancellationToken ct = default)
     {
-        // Giáo viên chỉ thao tác được trên lớp của mình; admin mọi lớp.
+        // Admin/Teacher thao tác nghiệp vụ toàn trung tâm; guard vẫn kiểm lớp tồn tại/quyền hợp lệ.
         var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
         if (access.IsFailure)
             return Result.Failure<CreateClassStudentResultDto>(access.Error);
@@ -41,8 +41,15 @@ public sealed class StudentAccountService(
                 return Result.Failure<CreateClassStudentResultDto>(Error.Validation("Student.PasswordRequired", "Vui lòng nhập mật khẩu cho học sinh."));
         }
 
+        var studentCode = string.IsNullOrWhiteSpace(request.StudentCode)
+            ? UniqueCodeGenerator.Next("HS")
+            : request.StudentCode.Trim().ToUpperInvariant();
+        if (await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == studentCode, ct))
+            return Result.Failure<CreateClassStudentResultDto>(Error.Conflict("Student.DuplicateCode", $"Mã học viên '{studentCode}' đã tồn tại."));
+
         var student = new Student
         {
+            StudentCode = studentCode,
             FullName = request.FullName.Trim(),
             DateOfBirth = request.DateOfBirth,
             School = Clean(request.School),
@@ -50,6 +57,8 @@ public sealed class StudentAccountService(
             Phone = Clean(request.Phone),
             ParentName = Clean(request.ParentName),
             ParentPhone = Clean(request.ParentPhone),
+            Email = Clean(request.Email),
+            Note = Clean(request.Note),
             EnglishLevel = Clean(request.EnglishLevel),
             LearningGoal = Clean(request.LearningGoal),
             EnrollmentDate = DateOnly.FromDateTime(DateTime.Now),
@@ -68,7 +77,7 @@ public sealed class StudentAccountService(
         await context.SaveChangesAsync(ct);
 
         if (!request.CreateAccount)
-            return new CreateClassStudentResultDto(student.Id, student.FullName, false, null);
+            return new CreateClassStudentResultDto(student.Id, student.StudentCode, student.FullName, false, null);
 
         var userName = request.UserName!.Trim();
         var email = userName.Contains('@') ? userName : $"{userName}@hocvien.local";
@@ -89,7 +98,7 @@ public sealed class StudentAccountService(
         context.Students.Update(student);
         await context.SaveChangesAsync(ct);
 
-        return new CreateClassStudentResultDto(student.Id, student.FullName, true, userName);
+        return new CreateClassStudentResultDto(student.Id, student.StudentCode, student.FullName, true, userName);
     }
 
     public async Task<Result> ResetPasswordAsync(Guid studentId, string newPassword, CancellationToken ct = default)
@@ -97,7 +106,7 @@ public sealed class StudentAccountService(
         if (string.IsNullOrWhiteSpace(newPassword))
             return Result.Failure(Error.Validation("Student.PasswordRequired", "Vui lòng nhập mật khẩu mới."));
 
-        // Giáo viên chỉ đổi mật khẩu học sinh trong lớp của mình; admin mọi học sinh.
+        // Admin/Teacher được đổi mật khẩu học sinh trong phạm vi nghiệp vụ toàn trung tâm.
         var access = await accessGuard.EnsureCanAccessStudentAsync(studentId, ct);
         if (access.IsFailure)
             return Result.Failure(access.Error);

@@ -10,7 +10,7 @@ namespace HungSilver.WebApi.Controllers;
 [Authorize(Policy = "TeacherOrAdmin")]
 public class ScheduleController(IScheduleService scheduleService) : ControllerBase
 {
-    /// <summary>Buổi học trong khoảng ngày (lịch tháng/tuần). Teacher tự lọc lớp của mình.</summary>
+    /// <summary>Buổi học trong khoảng ngày (lịch tháng/tuần). Admin/Teacher xem toàn bộ nghiệp vụ.</summary>
     [HttpGet]
     public async Task<ActionResult<List<CalendarSessionDto>>> GetRange(
         [FromQuery] DateOnly from,
@@ -24,17 +24,14 @@ public class ScheduleController(IScheduleService scheduleService) : ControllerBa
         (await scheduleService.GetSlotsAsync(classId, ct)).ToActionResult();
 
     [HttpPost("slots")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ScheduleSlotDto>> AddSlot(CreateSlotRequest request, CancellationToken ct) =>
         (await scheduleService.AddSlotAsync(request, ct)).ToActionResult();
 
     [HttpDelete("slots/{slotId:guid}")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> RemoveSlot(Guid slotId, CancellationToken ct) =>
         (await scheduleService.RemoveSlotAsync(slotId, ct)).ToActionResult();
 
     [HttpPost("classes/{classId:guid}/generate-sessions")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<int>> GenerateSessions(Guid classId, GenerateSessionsRequest request, CancellationToken ct) =>
         (await scheduleService.GenerateSessionsAsync(classId, request, ct)).ToActionResult();
 

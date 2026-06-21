@@ -18,14 +18,17 @@ public class SettingsController(ISettingsService settingsService) : ControllerBa
 
     /// <summary>Danh sách cấu hình thô của một scope (kiểm quyền theo scope).</summary>
     [HttpGet("scope/{scope}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<List<SettingDto>>> GetScope(SettingScope scope, [FromQuery] Guid? scopeId, CancellationToken ct) =>
         (await settingsService.GetScopeAsync(scope, scopeId, ct)).ToActionResult();
 
     [HttpPut]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<SettingDto>> Upsert(UpsertSettingRequest request, CancellationToken ct) =>
         (await settingsService.UpsertAsync(request, ct)).ToActionResult();
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct) =>
         (await settingsService.DeleteAsync(id, ct)).ToActionResult();
 }

@@ -1,4 +1,5 @@
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Common;
 using HungSilver.Application.Portal;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
@@ -8,7 +9,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HungSilver.Infrastructure.Portal;
 
-public sealed class PortalService(AppDbContext context, ICurrentUser currentUser) : IPortalService
+public sealed class PortalService(
+    AppDbContext context,
+    ICurrentRelationCleanupService relationCleanup,
+    ICurrentUser currentUser) : IPortalService
 {
     public async Task<Result<PortalProfileDto>> GetMyProfileAsync(CancellationToken ct = default)
     {
@@ -33,9 +37,7 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
         var redeemed = await context.RewardRedemptions.AsNoTracking().Where(r => r.StudentId == student.Id).SumAsync(r => (int?)r.PointsSpent, ct) ?? 0;
         var balance = reward - penalty - redeemed;
 
-        var classIds = await context.Enrollments.AsNoTracking()
-            .Where(e => e.StudentId == student.Id && e.IsActive)
-            .Select(e => e.ClassId).ToListAsync(ct);
+        var classIds = await LoadStudentClassIdsAsync(student.Id, ct);
 
         var today = DateOnly.FromDateTime(DateTime.Now);
         var upcoming = await (
@@ -58,9 +60,7 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
             return Result.Failure<List<PortalAssignmentDto>>(studentResult.Error);
         var student = studentResult.Value;
 
-        var classIds = await context.Enrollments.AsNoTracking()
-            .Where(e => e.StudentId == student.Id && e.IsActive)
-            .Select(e => e.ClassId).ToListAsync(ct);
+        var classIds = await LoadStudentClassIdsAsync(student.Id, ct);
         if (classIds.Count == 0)
             return new List<PortalAssignmentDto>();
 
@@ -117,8 +117,8 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
         if (assignment is null)
             return Result.Failure(Error.NotFound("Assignment.NotFound", "Không tìm thấy bài tập."));
 
-        var enrolled = await context.Enrollments.AnyAsync(
-            e => e.ClassId == assignment.ClassId && e.StudentId == student.Id && e.IsActive, ct);
+        var enrolled = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([assignment.ClassId], ct))
+            .Contains(student.Id);
         if (!enrolled)
             return Result.Failure(Error.Forbidden("Assignment.NotInClass", "Bài tập không thuộc lớp của bạn."));
 
@@ -170,5 +170,19 @@ public sealed class PortalService(AppDbContext context, ICurrentUser currentUser
             return Result.Failure<Student>(Error.NotFound("Portal.NotLinked", "Tài khoản chưa được liên kết với hồ sơ học sinh."));
 
         return student;
+    }
+
+    private async Task<List<Guid>> LoadStudentClassIdsAsync(Guid studentId, CancellationToken ct)
+    {
+        var rows = await (
+            from e in context.Enrollments.AsNoTracking()
+            join s in context.Students.AsNoTracking() on e.StudentId equals s.Id
+            join c in context.Classes.AsNoTracking() on e.ClassId equals c.Id
+            where e.StudentId == studentId && e.IsActive
+            select e.ClassId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return rows;
     }
 }

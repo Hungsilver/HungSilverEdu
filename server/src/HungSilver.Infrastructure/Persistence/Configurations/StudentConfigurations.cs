@@ -8,6 +8,8 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
 {
     public void Configure(EntityTypeBuilder<Student> e)
     {
+        e.Property(x => x.StudentCode).HasMaxLength(20);
+        e.HasIndex(x => x.StudentCode).IsUnique();
         e.Property(x => x.FullName).HasMaxLength(200);
         e.Property(x => x.School).HasMaxLength(200);
         e.Property(x => x.GradeLevel).HasMaxLength(100);
@@ -15,6 +17,8 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         e.Property(x => x.ParentName).HasMaxLength(200);
         e.Property(x => x.ParentPhone).HasMaxLength(20);
         e.Property(x => x.Address).HasMaxLength(500);
+        e.Property(x => x.Email).HasMaxLength(256);
+        e.Property(x => x.Note).HasMaxLength(2000);
         e.Property(x => x.EnglishLevel).HasMaxLength(200);
         e.Property(x => x.LearningGoal).HasMaxLength(500);
         e.Property(x => x.Curriculum).HasMaxLength(500);

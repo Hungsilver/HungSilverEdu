@@ -11,6 +11,7 @@ namespace HungSilver.Infrastructure.Reports;
 
 public sealed class SessionReportService(
     AppDbContext context,
+    ICurrentRelationCleanupService relationCleanup,
     IClassAccessGuard accessGuard) : ISessionReportService
 {
     public async Task<Result<GeneratedReportDto>> GenerateSessionNoticeAsync(Guid sessionId, CancellationToken ct = default)
@@ -25,7 +26,7 @@ public sealed class SessionReportService(
 
         var cls = await context.Classes.AsNoTracking().FirstOrDefaultAsync(c => c.Id == session.ClassId, ct);
 
-        var totalRoster = await context.Enrollments.CountAsync(e => e.ClassId == session.ClassId && e.IsActive, ct);
+        var totalRoster = (await relationCleanup.LoadValidClassSizesAsync([session.ClassId], ct)).GetValueOrDefault(session.ClassId);
 
         var records = await (
             from r in context.StudentSessionRecords.AsNoTracking()

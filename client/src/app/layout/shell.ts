@@ -38,6 +38,9 @@ import { ThemeService } from '../core/theme.service';
           <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="book" /><span>Lớp học</span>
           </li>
+          <li nz-menu-item routerLink="/teachers" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="team" /><span>Giáo viên</span>
+          </li>
           <li nz-menu-item routerLink="/schedule" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="calendar" /><span>Lịch học</span>
           </li>
@@ -71,6 +74,9 @@ import { ThemeService } from '../core/theme.service';
           </li>
           <li nz-menu-item routerLink="/classes" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="book" /><span>Lớp học</span>
+          </li>
+          <li nz-menu-item routerLink="/teachers" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="team" /><span>Giáo viên</span>
           </li>
           <li nz-menu-item routerLink="/schedule" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="calendar" /><span>Lịch học</span>

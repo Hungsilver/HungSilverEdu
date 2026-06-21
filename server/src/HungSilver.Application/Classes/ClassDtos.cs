@@ -2,12 +2,18 @@ namespace HungSilver.Application.Classes;
 
 public sealed record ClassDto(
     Guid Id,
+    string ClassCode,
     string Name,
-    Guid TeacherId,
+    Guid? TeacherProfileId,
     string? TeacherName,
+    Guid? BranchId,
+    string? BranchCode,
+    string? BranchName,
     Guid? SubjectId,
     string? SubjectName,
-    string? GradeBand,
+    Guid? GradeId,
+    string? GradeName,
+    decimal TuitionFee,
     Guid? CurriculumId,
     string? CurriculumName,
     int MaxCapacity,
@@ -23,12 +29,18 @@ public sealed record ClassDto(
 
 public sealed record ClassListItemDto(
     Guid Id,
+    string ClassCode,
     string Name,
-    Guid TeacherId,
+    Guid? TeacherProfileId,
     string? TeacherName,
+    Guid? BranchId,
+    string? BranchCode,
+    string? BranchName,
     Guid? SubjectId,
     string? SubjectName,
-    string? GradeBand,
+    Guid? GradeId,
+    string? GradeName,
+    decimal TuitionFee,
     int MaxCapacity,
     int CurrentSize,
     bool IsActive,
@@ -36,10 +48,13 @@ public sealed record ClassListItemDto(
     DateTime CreatedAt);
 
 public sealed record CreateClassRequest(
+    string? ClassCode,
     string Name,
-    Guid TeacherId,
+    Guid TeacherProfileId,
+    Guid? BranchId,
     Guid? SubjectId,
-    string? GradeBand,
+    Guid? GradeId,
+    decimal TuitionFee,
     Guid? CurriculumId,
     int MaxCapacity,
     string? Schedule,
@@ -47,32 +62,39 @@ public sealed record CreateClassRequest(
     bool IsActive = true);
 
 public sealed record UpdateClassRequest(
+    string? ClassCode,
     string Name,
-    Guid TeacherId,
+    Guid TeacherProfileId,
+    Guid? BranchId,
     Guid? SubjectId,
-    string? GradeBand,
+    Guid? GradeId,
+    decimal TuitionFee,
     Guid? CurriculumId,
     int MaxCapacity,
     string? Schedule,
     DateOnly? StartDate,
     bool IsActive);
 
-public sealed record AssignTeacherRequest(Guid TeacherId);
+public sealed record AssignTeacherRequest(Guid TeacherProfileId);
 
 public sealed record EnrollStudentRequest(Guid StudentId);
 
 public sealed record RosterItemDto(
     Guid EnrollmentId,
     Guid StudentId,
+    string StudentCode,
     string FullName,
     string? Phone,
     string? ParentPhone,
+    string? Email,
+    string? Note,
     DateOnly EnrolledOn,
     Guid? UserId);
 
 /// <summary>Tình hình học tập từng học sinh trong lớp (điểm thưởng/phạt, chuyên cần, BTVN).</summary>
 public sealed record ClassStudentOverviewDto(
     Guid StudentId,
+    string StudentCode,
     string FullName,
     int RewardBalance,
     int AttendedSessions,

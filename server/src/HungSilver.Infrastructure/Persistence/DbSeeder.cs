@@ -50,6 +50,8 @@ public static class DbSeeder
             logger.LogInformation("Seeded default settings (FileStorage.Mode = Server)");
         }
 
+        await SeedGradeCategoriesAsync(context, logger);
+
         // Auto-seed tài khoản Admin nếu chưa có admin nào trong hệ thống.
         var userManager = services.GetRequiredService<UserManager<AppUser>>();
         var admins = await userManager.GetUsersInRoleAsync(AppRoles.Admin);
@@ -85,6 +87,41 @@ public static class DbSeeder
             {
                 logger.LogWarning("No admin account exists and Admin__Username / Admin__Password not configured in environment");
             }
+        }
+    }
+
+    private static async Task SeedGradeCategoriesAsync(AppDbContext context, ILogger logger)
+    {
+        var defaults = new List<(string Code, string Name, int SortOrder)>
+        {
+            ("MAM_NON", "Mầm non", 0)
+        };
+        defaults.AddRange(Enumerable.Range(1, 12).Select(i => ($"KHOI_{i}", i.ToString(), i)));
+        defaults.Add(("KHAC", "Khác", 99));
+
+        var existingCodes = await context.GradeCategories.IgnoreQueryFilters()
+            .Select(x => x.Code)
+            .ToListAsync();
+        var existing = existingCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in defaults)
+        {
+            if (existing.Contains(item.Code))
+                continue;
+
+            context.GradeCategories.Add(new GradeCategory
+            {
+                Code = item.Code,
+                Name = item.Name,
+                SortOrder = item.SortOrder,
+                IsActive = true
+            });
+        }
+
+        if (context.ChangeTracker.HasChanges())
+        {
+            await context.SaveChangesAsync();
+            logger.LogInformation("Seeded default grade categories");
         }
     }
 }

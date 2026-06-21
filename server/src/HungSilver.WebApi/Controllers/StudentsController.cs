@@ -14,15 +14,19 @@ public class StudentsController(
     IStudentService studentService,
     IStudentAccountService studentAccountService) : ControllerBase
 {
-    /// <summary>Admin: tất cả học sinh; Teacher: chỉ học sinh trong lớp của mình.</summary>
+    /// <summary>Admin/Teacher: tất cả học sinh.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<StudentDto>>> GetStudents(
         [FromQuery] PagedRequest request,
         [FromQuery] bool includeDeleted = false,
+        [FromQuery] Guid? branchId = null,
+        [FromQuery] Guid? subjectId = null,
+        [FromQuery] Guid? gradeId = null,
+        [FromQuery] Guid? teacherProfileId = null,
         CancellationToken ct = default)
     {
         var canSeeDeleted = includeDeleted && User.IsInRole(AppRoles.Admin);
-        return (await studentService.GetPagedAsync(request, canSeeDeleted, ct)).ToActionResult();
+        return (await studentService.GetPagedAsync(request, canSeeDeleted, branchId, subjectId, gradeId, teacherProfileId, ct)).ToActionResult();
     }
 
     [HttpGet("{id:guid}")]
@@ -30,22 +34,18 @@ public class StudentsController(
         (await studentService.GetByIdAsync(id, ct)).ToActionResult();
 
     [HttpPost]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<StudentDto>> Create(CreateStudentRequest request, CancellationToken ct) =>
         (await studentService.CreateAsync(request, ct)).ToActionResult();
 
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<StudentDto>> Update(Guid id, UpdateStudentRequest request, CancellationToken ct) =>
         (await studentService.UpdateAsync(id, request, ct)).ToActionResult();
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct) =>
         (await studentService.DeleteAsync(id, ct)).ToActionResult();
 
     [HttpPost("{id:guid}/restore")]
-    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> Restore(Guid id, CancellationToken ct) =>
         (await studentService.RestoreAsync(id, ct)).ToActionResult();
 
@@ -55,7 +55,7 @@ public class StudentsController(
     public async Task<ActionResult> LinkUser(Guid id, LinkUserRequest request, CancellationToken ct) =>
         (await studentService.LinkUserAsync(id, request.UserId, ct)).ToActionResult();
 
-    /// <summary>Giáo viên/Admin đặt lại mật khẩu tài khoản học sinh (giáo viên chỉ trong lớp của mình).</summary>
+    /// <summary>Giáo viên/Admin đặt lại mật khẩu tài khoản học sinh.</summary>
     [HttpPut("{id:guid}/password")]
     public async Task<ActionResult> ResetPassword(Guid id, ResetStudentPasswordRequest request, CancellationToken ct) =>
         (await studentAccountService.ResetPasswordAsync(id, request.NewPassword, ct)).ToActionResult();

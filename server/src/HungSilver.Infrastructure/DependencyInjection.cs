@@ -3,6 +3,7 @@ using HungSilver.Application.Account;
 using HungSilver.Application.Assignments;
 using HungSilver.Application.Auth;
 using HungSilver.Application.Files;
+using HungSilver.Application.Common;
 using HungSilver.Application.Settings;
 using HungSilver.Application.Users;
 using HungSilver.Application.Classes;
@@ -14,11 +15,13 @@ using HungSilver.Application.Reports;
 using HungSilver.Application.Schedule;
 using HungSilver.Application.Sessions;
 using HungSilver.Application.Students;
+using HungSilver.Application.Teachers;
 using HungSilver.Application.Tuition;
 using HungSilver.Application.Warnings;
 using HungSilver.Infrastructure.Assignments;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Classes;
+using HungSilver.Infrastructure.Common;
 using HungSilver.Infrastructure.Dashboard;
 using HungSilver.Infrastructure.Evaluations;
 using HungSilver.Infrastructure.Identity;
@@ -37,6 +40,7 @@ using HungSilver.Infrastructure.Services;
 using HungSilver.Infrastructure.Settings;
 using HungSilver.Infrastructure.Storage;
 using HungSilver.Infrastructure.Students;
+using HungSilver.Infrastructure.Teachers;
 using HungSilver.Infrastructure.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -78,6 +82,7 @@ public static class DependencyInjection
 
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ICurrentRelationCleanupService, CurrentRelationCleanupService>();
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IGoogleAuthVerifier, GoogleAuthVerifier>();
@@ -111,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<IStudentImportService, StudentImportService>();
         services.AddScoped<IStudentAccountService, StudentAccountService>();
         services.AddScoped<IClassImportService, ClassImportService>();
+        services.AddScoped<ITeacherService, TeacherService>();
 
         // Thông báo: Email gửi thật (MailKit); Zalo/Messenger stub (gửi tay).
         services.AddScoped<INotificationSender, EmailNotificationSender>();

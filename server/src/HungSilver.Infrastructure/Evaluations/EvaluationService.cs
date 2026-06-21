@@ -12,6 +12,7 @@ namespace HungSilver.Infrastructure.Evaluations;
 public sealed class EvaluationService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
+    ICurrentRelationCleanupService relationCleanup,
     IValidator<UpsertEvaluationRequest> validator) : IEvaluationService
 {
     public async Task<Result<List<MonthlyEvaluationDto>>> GetByClassMonthAsync(Guid classId, int year, int month, CancellationToken ct = default)
@@ -20,9 +21,7 @@ public sealed class EvaluationService(
         if (access.IsFailure)
             return Result.Failure<List<MonthlyEvaluationDto>>(access.Error);
 
-        var studentIds = await context.Enrollments.AsNoTracking()
-            .Where(e => e.ClassId == classId && e.IsActive)
-            .Select(e => e.StudentId).ToListAsync(ct);
+        var studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([classId], ct)).ToList();
 
         var evals = await context.MonthlyEvaluations.AsNoTracking()
             .Where(m => studentIds.Contains(m.StudentId) && m.Year == year && m.Month == month)
@@ -51,7 +50,7 @@ public sealed class EvaluationService(
         if (!validation.IsValid)
             return Result.Failure<MonthlyEvaluationDto>(validation.ToError("Evaluation.Validation"));
 
-        // Luôn kiểm quyền theo học sinh: Teacher chỉ đánh giá HS thuộc lớp của mình
+        // Luôn kiểm quyền theo học sinh: Admin/Teacher thao tác nghiệp vụ toàn trung tâm.
         // (tránh truyền ClassId của mình + StudentId của lớp khác để ghi đè).
         var access = await accessGuard.EnsureCanAccessStudentAsync(request.StudentId, ct);
         if (access.IsFailure)
@@ -104,9 +103,7 @@ public sealed class EvaluationService(
         }
 
         var classIds = await ScopeClassIdsAsync(classId, ct);
-        var studentIds = await context.Enrollments.AsNoTracking()
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .Select(e => e.StudentId).Distinct().ToListAsync(ct);
+        var studentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync(classIds, ct)).ToList();
 
         if (studentIds.Count == 0)
             return new LeaderboardDto([], [], []);
@@ -155,8 +152,11 @@ public sealed class EvaluationService(
         if (classId is not null)
             return [classId.Value];
         var q = context.Classes.AsNoTracking().AsQueryable();
-        if (!accessGuard.IsAdmin)
-            q = q.Where(c => c.TeacherId == accessGuard.TeacherScopeId);
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is not null)
+        {
+            q = q.Where(c => c.TeacherProfileId == scopeId);
+        }
         return await q.Select(c => c.Id).ToListAsync(ct);
     }
 

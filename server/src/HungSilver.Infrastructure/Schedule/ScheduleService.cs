@@ -31,8 +31,9 @@ public sealed class ScheduleService(
         if (classId is not null)
             query = query.Where(x => x.s.ClassId == classId);
 
-        if (!accessGuard.IsAdmin)
-            query = query.Where(x => x.c.TeacherId == accessGuard.TeacherScopeId);
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is not null)
+            query = query.Where(x => x.c.TeacherProfileId == scopeId);
 
         var items = await query
             .OrderBy(x => x.s.SessionDate).ThenBy(x => x.s.StartTime)

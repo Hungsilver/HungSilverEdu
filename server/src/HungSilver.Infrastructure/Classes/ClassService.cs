@@ -1,5 +1,5 @@
+using ClosedXML.Excel;
 using FluentValidation;
-using HungSilver.Application.Abstractions;
 using HungSilver.Application.Classes;
 using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
@@ -15,59 +15,57 @@ namespace HungSilver.Infrastructure.Classes;
 public sealed class ClassService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
-    IUserDirectory userDirectory,
+    ICurrentRelationCleanupService relationCleanup,
     IValidator<CreateClassRequest> createValidator,
     IValidator<UpdateClassRequest> updateValidator) : IClassService
 {
     private static readonly Error NotFoundError = Error.NotFound("Class.NotFound", "Không tìm thấy lớp học.");
 
-    public async Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? subjectId = null, string? gradeBand = null, CancellationToken ct = default)
+    public async Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(
+        PagedRequest request,
+        bool includeDeleted = false,
+        Guid? branchId = null,
+        Guid? subjectId = null,
+        Guid? gradeId = null,
+        Guid? teacherProfileId = null,
+        CancellationToken ct = default)
     {
         var query = includeDeleted && accessGuard.IsAdmin
             ? context.Classes.IgnoreQueryFilters().AsNoTracking()
             : context.Classes.AsNoTracking();
 
-        if (!accessGuard.IsAdmin)
-            query = query.Where(c => c.TeacherId == accessGuard.TeacherScopeId);
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is not null)
+            query = query.Where(c => c.TeacherProfileId == scopeId);
 
+        if (branchId is not null)
+            query = query.Where(c => c.BranchId == branchId);
         if (subjectId is not null)
             query = query.Where(c => c.SubjectId == subjectId);
-
-        if (!string.IsNullOrWhiteSpace(gradeBand))
-            query = query.Where(c => c.GradeBand == gradeBand);
+        if (gradeId is not null)
+            query = query.Where(c => c.GradeId == gradeId);
+        if (teacherProfileId is not null)
+            query = query.Where(c => c.TeacherProfileId == teacherProfileId);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim().ToLower();
-            query = query.Where(c => c.Name.ToLower().Contains(term));
+            query = query.Where(c =>
+                c.ClassCode.ToLower().Contains(term)
+                || c.Name.ToLower().Contains(term)
+                || (c.TeacherName != null && c.TeacherName.ToLower().Contains(term)));
         }
 
         var total = await query.CountAsync(ct);
         var page = Math.Max(request.Page, 1);
-
         var items = await query
             .OrderByDescending(c => c.CreatedAt)
             .Skip((page - 1) * request.PageSize)
             .Take(request.PageSize)
             .ToListAsync(ct);
 
-        var classIds = items.Select(c => c.Id).ToList();
-        var sizes = await context.Enrollments
-            .Where(e => classIds.Contains(e.ClassId) && e.IsActive)
-            .GroupBy(e => e.ClassId)
-            .Select(g => new { ClassId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.ClassId, x => x.Count, ct);
-
-        var teacherNames = await userDirectory.GetDisplayNamesAsync(items.Select(c => c.TeacherId), ct);
-        var subjectNames = await LoadSubjectNamesAsync(items, ct);
-
-        var dtos = items.Select(c => new ClassListItemDto(
-            c.Id, c.Name, c.TeacherId,
-            teacherNames.GetValueOrDefault(c.TeacherId),
-            c.SubjectId, Lookup(subjectNames, c.SubjectId), c.GradeBand,
-            c.MaxCapacity,
-            sizes.GetValueOrDefault(c.Id),
-            c.IsActive, c.IsDeleted, c.CreatedAt)).ToList();
+        var sizes = await LoadClassSizesAsync(items.Select(c => c.Id).ToList(), ct);
+        var dtos = items.Select(c => ToListDto(c, sizes.GetValueOrDefault(c.Id))).ToList();
 
         return new PagedResult<ClassListItemDto>
         {
@@ -97,19 +95,33 @@ public sealed class ClassService(
         if (!validation.IsValid)
             return Result.Failure<ClassDto>(validation.ToError("Class.Validation"));
 
-        var teacherCheck = await ValidateTeacherAsync(request.TeacherId, ct);
-        if (teacherCheck.IsFailure)
-            return Result.Failure<ClassDto>(teacherCheck.Error);
+        var snapshot = await BuildSnapshotAsync(request.TeacherProfileId, request.BranchId, request.SubjectId, request.GradeId, ct);
+        if (snapshot.IsFailure)
+            return Result.Failure<ClassDto>(snapshot.Error);
+
+        var classCode = await ResolveClassCodeAsync(request.ClassCode, null, ct);
+        if (classCode.IsFailure)
+            return Result.Failure<ClassDto>(classCode.Error);
 
         var cls = new ClassRoom
         {
+            ClassCode = classCode.Value,
             Name = request.Name.Trim(),
-            TeacherId = request.TeacherId,
+            TeacherProfileId = request.TeacherProfileId,
+            TeacherId = snapshot.Value.TeacherUserId ?? Guid.Empty,
+            TeacherName = snapshot.Value.TeacherName,
+            BranchId = Normalize(request.BranchId),
+            BranchCode = snapshot.Value.BranchCode,
+            BranchName = snapshot.Value.BranchName,
             SubjectId = Normalize(request.SubjectId),
-            GradeBand = CleanGradeBand(request.GradeBand),
-            CurriculumId = request.CurriculumId,
+            SubjectName = snapshot.Value.SubjectName,
+            GradeId = Normalize(request.GradeId),
+            GradeName = snapshot.Value.GradeName,
+            GradeBand = snapshot.Value.GradeName,
+            TuitionFee = request.TuitionFee,
+            CurriculumId = Normalize(request.CurriculumId),
             MaxCapacity = request.MaxCapacity,
-            Schedule = request.Schedule?.Trim(),
+            Schedule = Clean(request.Schedule),
             StartDate = request.StartDate,
             IsActive = request.IsActive
         };
@@ -130,22 +142,35 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure<ClassDto>(NotFoundError);
 
-        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
         var access = await accessGuard.EnsureCanAccessClassAsync(id, ct);
         if (access.IsFailure)
             return Result.Failure<ClassDto>(access.Error);
 
-        var teacherCheck = await ValidateTeacherAsync(request.TeacherId, ct);
-        if (teacherCheck.IsFailure)
-            return Result.Failure<ClassDto>(teacherCheck.Error);
+        var snapshot = await BuildSnapshotAsync(request.TeacherProfileId, request.BranchId, request.SubjectId, request.GradeId, ct);
+        if (snapshot.IsFailure)
+            return Result.Failure<ClassDto>(snapshot.Error);
 
+        var classCode = await ResolveClassCodeAsync(request.ClassCode, id, ct);
+        if (classCode.IsFailure)
+            return Result.Failure<ClassDto>(classCode.Error);
+
+        cls.ClassCode = classCode.Value;
         cls.Name = request.Name.Trim();
-        cls.TeacherId = request.TeacherId;
+        cls.TeacherProfileId = request.TeacherProfileId;
+        cls.TeacherId = snapshot.Value.TeacherUserId ?? Guid.Empty;
+        cls.TeacherName = snapshot.Value.TeacherName;
+        cls.BranchId = Normalize(request.BranchId);
+        cls.BranchCode = snapshot.Value.BranchCode;
+        cls.BranchName = snapshot.Value.BranchName;
         cls.SubjectId = Normalize(request.SubjectId);
-        cls.GradeBand = CleanGradeBand(request.GradeBand);
-        cls.CurriculumId = request.CurriculumId;
+        cls.SubjectName = snapshot.Value.SubjectName;
+        cls.GradeId = Normalize(request.GradeId);
+        cls.GradeName = snapshot.Value.GradeName;
+        cls.GradeBand = snapshot.Value.GradeName;
+        cls.TuitionFee = request.TuitionFee;
+        cls.CurriculumId = Normalize(request.CurriculumId);
         cls.MaxCapacity = request.MaxCapacity;
-        cls.Schedule = request.Schedule?.Trim();
+        cls.Schedule = Clean(request.Schedule);
         cls.StartDate = request.StartDate;
         cls.IsActive = request.IsActive;
 
@@ -159,17 +184,17 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
-        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
         var access = await accessGuard.EnsureCanAccessClassAsync(id, ct);
         if (access.IsFailure)
             return access;
 
-        // Không FK → tự kiểm ràng buộc: chặn xóa lớp còn học sinh đang học.
-        var hasStudents = await context.Enrollments.AnyAsync(e => e.ClassId == id && e.IsActive, ct);
+        await relationCleanup.SoftDeleteInvalidActiveEnrollmentsForClassAsync(id, ct);
+        var hasStudents = await relationCleanup.HasValidActiveEnrollmentsForClassAsync(id, ct);
         if (hasStudents)
             return Result.Failure(Error.Conflict("Class.HasStudents", "Không thể xóa lớp khi vẫn còn học sinh đang học."));
 
-        context.Classes.Remove(cls); // interceptor → soft delete
+        await relationCleanup.SoftDeleteCurrentClassRelationsAsync(id, ct);
+        context.Classes.Remove(cls);
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }
@@ -179,11 +204,6 @@ public sealed class ClassService(
         var cls = await context.Classes.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id && c.IsDeleted, ct);
         if (cls is null)
             return Result.Failure(NotFoundError);
-
-        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
-        var access = await accessGuard.EnsureCanAccessClassAsync(id, ct);
-        if (access.IsFailure)
-            return access;
 
         cls.IsDeleted = false;
         cls.DeletedAt = null;
@@ -197,16 +217,17 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
-        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
         var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
         if (access.IsFailure)
             return access;
 
-        var teacherCheck = await ValidateTeacherAsync(request.TeacherId, ct);
-        if (teacherCheck.IsFailure)
-            return teacherCheck;
+        var snapshot = await BuildSnapshotAsync(request.TeacherProfileId, cls.BranchId, cls.SubjectId, cls.GradeId, ct);
+        if (snapshot.IsFailure)
+            return snapshot;
 
-        cls.TeacherId = request.TeacherId;
+        cls.TeacherProfileId = request.TeacherProfileId;
+        cls.TeacherId = snapshot.Value.TeacherUserId ?? Guid.Empty;
+        cls.TeacherName = snapshot.Value.TeacherName;
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }
@@ -222,7 +243,7 @@ public sealed class ClassService(
             join s in context.Students on e.StudentId equals s.Id
             where e.ClassId == classId && e.IsActive
             orderby s.FullName
-            select new RosterItemDto(e.Id, s.Id, s.FullName, s.Phone, s.ParentPhone, e.EnrolledOn, s.UserId))
+            select new RosterItemDto(e.Id, s.Id, s.StudentCode, s.FullName, s.Phone, s.ParentPhone, s.Email, s.Note, e.EnrolledOn, s.UserId))
             .ToListAsync(ct);
 
         return roster;
@@ -239,7 +260,7 @@ public sealed class ClassService(
             join s in context.Students on e.StudentId equals s.Id
             where e.ClassId == classId && e.IsActive
             orderby s.FullName
-            select new { s.Id, s.FullName })
+            select new { s.Id, s.StudentCode, s.FullName })
             .ToListAsync(ct);
 
         if (roster.Count == 0)
@@ -247,7 +268,6 @@ public sealed class ClassService(
 
         var studentIds = roster.Select(r => r.Id).ToList();
 
-        // Số dư điểm = thưởng − phạt − đã quy đổi (đồng bộ công thức DashboardService).
         var pointAgg = await context.PointEntries.AsNoTracking()
             .Where(p => studentIds.Contains(p.StudentId))
             .GroupBy(p => p.StudentId)
@@ -265,7 +285,6 @@ public sealed class ClassService(
             .Select(g => new { StudentId = g.Key, Spent = g.Sum(x => x.PointsSpent) })
             .ToDictionaryAsync(x => x.StudentId, x => x.Spent, ct);
 
-        // Chuyên cần + BTVN từ bản ghi buổi học của lớp này.
         var sessionIds = await context.ClassSessions.AsNoTracking()
             .Where(s => s.ClassId == classId)
             .Select(s => s.Id)
@@ -288,7 +307,6 @@ public sealed class ClassService(
         {
             var agg = pointAgg.FirstOrDefault(x => x.StudentId == s.Id);
             var balance = (agg?.Reward ?? 0) - (agg?.Penalty ?? 0) - redeemed.GetValueOrDefault(s.Id);
-
             var rec = recAgg.FirstOrDefault(x => x.StudentId == s.Id);
             var total = rec?.Total ?? 0;
             var present = rec?.Present ?? 0;
@@ -297,7 +315,7 @@ public sealed class ClassService(
             var attRate = total > 0 ? Math.Round((decimal)present / total * 100, 1) : 0m;
             var hwRate = hwAssigned > 0 ? Math.Round((decimal)hwDone / hwAssigned * 100, 1) : 0m;
 
-            return new ClassStudentOverviewDto(s.Id, s.FullName, balance, present, total, attRate, hwDone, hwAssigned, hwRate);
+            return new ClassStudentOverviewDto(s.Id, s.StudentCode, s.FullName, balance, present, total, attRate, hwDone, hwAssigned, hwRate);
         }).ToList();
 
         return result;
@@ -309,7 +327,6 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
-        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
         var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
         if (access.IsFailure)
             return access;
@@ -322,7 +339,7 @@ public sealed class ClassService(
         if (alreadyEnrolled)
             return Result.Failure(Error.Conflict("Class.AlreadyEnrolled", "Học sinh đã có trong lớp này."));
 
-        var size = await context.Enrollments.CountAsync(e => e.ClassId == classId && e.IsActive, ct);
+        var size = (await relationCleanup.LoadValidClassSizesAsync([classId], ct)).GetValueOrDefault(classId);
         if (size >= cls.MaxCapacity)
             return Result.Failure(Error.Conflict("Class.Full", "Lớp đã đủ sĩ số tối đa."));
 
@@ -340,7 +357,6 @@ public sealed class ClassService(
         }
         catch (DbUpdateException)
         {
-            // Đua check-then-insert: partial unique index chặn ghi danh trùng đang hiệu lực → trả lỗi nghiệp vụ.
             return Result.Failure(Error.Conflict("Class.AlreadyEnrolled", "Học sinh đã có trong lớp này."));
         }
         return Result.Success();
@@ -348,7 +364,6 @@ public sealed class ClassService(
 
     public async Task<Result> WithdrawAsync(Guid classId, Guid studentId, CancellationToken ct = default)
     {
-        // Phòng thủ chiều sâu: endpoint AdminOnly nhưng service vẫn tự kiểm phạm vi lớp.
         var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
         if (access.IsFailure)
             return access;
@@ -364,28 +379,11 @@ public sealed class ClassService(
         return Result.Success();
     }
 
-    private async Task<Result> ValidateTeacherAsync(Guid teacherId, CancellationToken ct)
-    {
-        if (!await userDirectory.ExistsAsync(teacherId, ct))
-            return Result.Failure(Error.Validation("Class.TeacherNotFound", "Không tìm thấy người dùng giáo viên."));
-
-        var isTeacher = await userDirectory.IsInRoleAsync(teacherId, AppRoles.Teacher, ct);
-        var isAdmin = await userDirectory.IsInRoleAsync(teacherId, AppRoles.Admin, ct);
-        if (!isTeacher && !isAdmin)
-            return Result.Failure(Error.Validation("Class.NotATeacher", "Người dùng được gán không có vai trò Giáo viên."));
-
-        return Result.Success();
-    }
-
     private async Task<ClassDto> BuildClassDtoAsync(ClassRoom cls, CancellationToken ct)
     {
-        var activeStudentIds = await context.Enrollments
-            .Where(e => e.ClassId == cls.Id && e.IsActive)
-            .Select(e => e.StudentId)
-            .ToListAsync(ct);
+        var activeStudentIds = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([cls.Id], ct)).ToList();
 
         var currentSize = activeStudentIds.Count;
-
         decimal? averageScore = null;
         if (activeStudentIds.Count > 0)
         {
@@ -394,12 +392,10 @@ public sealed class ClassService(
                             && a.Type == AssessmentType.Periodic
                             && a.OverallScore != null)
                 .ToListAsync(ct);
-
             var latestPerStudent = assessments
                 .GroupBy(a => a.StudentId)
                 .Select(g => g.OrderByDescending(a => a.TakenOn).First().OverallScore!.Value)
                 .ToList();
-
             if (latestPerStudent.Count > 0)
                 averageScore = Math.Round(latestPerStudent.Average(), 2);
         }
@@ -409,7 +405,6 @@ public sealed class ClassService(
             .Where(s => s.ClassId == cls.Id)
             .Select(s => s.Id)
             .ToListAsync(ct);
-
         if (sessionIds.Count > 0)
         {
             var totalRecords = await context.StudentSessionRecords.CountAsync(r => sessionIds.Contains(r.ClassSessionId), ct);
@@ -421,37 +416,157 @@ public sealed class ClassService(
             }
         }
 
-        var teacherName = (await userDirectory.GetDisplayNamesAsync([cls.TeacherId], ct)).GetValueOrDefault(cls.TeacherId);
-
         string? curriculumName = null;
         if (cls.CurriculumId is not null)
             curriculumName = (await context.Curriculums.FirstOrDefaultAsync(c => c.Id == cls.CurriculumId, ct))?.Name;
 
-        string? subjectName = null;
-        if (cls.SubjectId is not null)
-            subjectName = (await context.Subjects.AsNoTracking().FirstOrDefaultAsync(s => s.Id == cls.SubjectId, ct))?.Name;
-
         return new ClassDto(
-            cls.Id, cls.Name, cls.TeacherId, teacherName,
-            cls.SubjectId, subjectName, cls.GradeBand,
+            cls.Id, cls.ClassCode, cls.Name,
+            cls.TeacherProfileId, cls.TeacherName,
+            cls.BranchId, cls.BranchCode, cls.BranchName,
+            cls.SubjectId, cls.SubjectName,
+            cls.GradeId, cls.GradeName,
+            cls.TuitionFee,
             cls.CurriculumId, curriculumName, cls.MaxCapacity, cls.Schedule, cls.StartDate,
             cls.IsActive, currentSize, averageScore, attendanceRate,
             cls.IsDeleted, cls.CreatedAt, cls.UpdatedAt);
     }
 
-    private async Task<Dictionary<Guid, string>> LoadSubjectNamesAsync(IEnumerable<ClassRoom> items, CancellationToken ct)
+    private async Task<Result<ClassSnapshot>> BuildSnapshotAsync(Guid teacherProfileId, Guid? branchId, Guid? subjectId, Guid? gradeId, CancellationToken ct)
     {
-        var ids = items.Where(c => c.SubjectId.HasValue).Select(c => c.SubjectId!.Value).Distinct().ToList();
-        if (ids.Count == 0) return [];
-        return await context.Subjects.AsNoTracking()
-            .Where(s => ids.Contains(s.Id))
-            .ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        var teacher = await context.TeacherProfiles.AsNoTracking().FirstOrDefaultAsync(t => t.Id == teacherProfileId && t.IsActive, ct);
+        if (teacher is null)
+            return Result.Failure<ClassSnapshot>(Error.Validation("Class.TeacherNotFound", "Không tìm thấy giáo viên."));
+
+        Branch? branch = null;
+        if (Normalize(branchId) is Guid bid)
+        {
+            branch = await context.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == bid && b.IsActive, ct);
+            if (branch is null)
+                return Result.Failure<ClassSnapshot>(Error.Validation("Class.BranchNotFound", "Không tìm thấy cơ sở."));
+        }
+
+        Subject? subject = null;
+        if (Normalize(subjectId) is Guid sid)
+        {
+            subject = await context.Subjects.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sid && s.IsActive, ct);
+            if (subject is null)
+                return Result.Failure<ClassSnapshot>(Error.Validation("Class.SubjectNotFound", "Không tìm thấy môn học."));
+        }
+
+        GradeCategory? grade = null;
+        if (Normalize(gradeId) is Guid gid)
+        {
+            grade = await context.GradeCategories.AsNoTracking().FirstOrDefaultAsync(g => g.Id == gid && g.IsActive, ct);
+            if (grade is null)
+                return Result.Failure<ClassSnapshot>(Error.Validation("Class.GradeNotFound", "Không tìm thấy khối."));
+        }
+
+        return new ClassSnapshot(
+            teacher.UserId, teacher.FullName,
+            branch?.Code, branch?.Name,
+            subject?.Name,
+            grade?.Name);
     }
 
-    private static string? Lookup(Dictionary<Guid, string> map, Guid? id) =>
-        id.HasValue && map.TryGetValue(id.Value, out var name) ? name : null;
+    private async Task<Result<string>> ResolveClassCodeAsync(string? requested, Guid? currentId, CancellationToken ct)
+    {
+        var code = string.IsNullOrWhiteSpace(requested)
+            ? UniqueCodeGenerator.Next("LH")
+            : requested.Trim().ToUpperInvariant();
+
+        var duplicate = await context.Classes.IgnoreQueryFilters()
+            .AnyAsync(c => c.ClassCode == code && (currentId == null || c.Id != currentId), ct);
+        return duplicate
+            ? Result.Failure<string>(Error.Conflict("Class.DuplicateCode", $"Mã lớp '{code}' đã tồn tại."))
+            : code;
+    }
+
+    private async Task<Dictionary<Guid, int>> LoadClassSizesAsync(List<Guid> classIds, CancellationToken ct)
+    {
+        if (classIds.Count == 0)
+            return [];
+        return await relationCleanup.LoadValidClassSizesAsync(classIds, ct);
+    }
+
+    private static ClassListItemDto ToListDto(ClassRoom c, int currentSize) => new(
+        c.Id, c.ClassCode, c.Name,
+        c.TeacherProfileId, c.TeacherName,
+        c.BranchId, c.BranchCode, c.BranchName,
+        c.SubjectId, c.SubjectName,
+        c.GradeId, c.GradeName,
+        c.TuitionFee, c.MaxCapacity, currentSize,
+        c.IsActive, c.IsDeleted, c.CreatedAt);
+
+    public async Task<Result<byte[]>> ExportAsync(string? search = null, Guid? branchId = null, Guid? subjectId = null, Guid? gradeId = null, Guid? teacherProfileId = null, CancellationToken ct = default)
+    {
+        var query = context.Classes.AsNoTracking().AsQueryable();
+
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is not null)
+            query = query.Where(c => c.TeacherProfileId == scopeId);
+
+        if (branchId is not null)
+            query = query.Where(c => c.BranchId == branchId);
+        if (subjectId is not null)
+            query = query.Where(c => c.SubjectId == subjectId);
+        if (gradeId is not null)
+            query = query.Where(c => c.GradeId == gradeId);
+        if (teacherProfileId is not null)
+            query = query.Where(c => c.TeacherProfileId == teacherProfileId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(c =>
+                c.ClassCode.ToLower().Contains(term)
+                || c.Name.ToLower().Contains(term)
+                || (c.TeacherName != null && c.TeacherName.ToLower().Contains(term)));
+        }
+
+        var items = await query.OrderByDescending(c => c.CreatedAt).ToListAsync(ct);
+        var sizes = await LoadClassSizesAsync(items.Select(c => c.Id).ToList(), ct);
+
+        using var wb = new XLWorkbook();
+        var ws = wb.Worksheets.Add("Danh sách lớp");
+        var headers = new[] { "STT", "Mã lớp", "Tên lớp", "Giáo viên", "Môn học", "Khối", "Mã cơ sở", "Tên cơ sở", "Học phí", "Sĩ số", "Sĩ số tối đa", "Trạng thái" };
+        for (var i = 0; i < headers.Length; i++)
+            ws.Cell(1, i + 1).Value = headers[i];
+        ws.Row(1).Style.Font.Bold = true;
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var c = items[i];
+            var row = i + 2;
+            ws.Cell(row, 1).Value = i + 1;
+            ws.Cell(row, 2).Value = c.ClassCode;
+            ws.Cell(row, 3).Value = c.Name;
+            ws.Cell(row, 4).Value = c.TeacherName ?? "";
+            ws.Cell(row, 5).Value = c.SubjectName ?? "";
+            ws.Cell(row, 6).Value = c.GradeName ?? "";
+            ws.Cell(row, 7).Value = c.BranchCode ?? "";
+            ws.Cell(row, 8).Value = c.BranchName ?? "";
+            ws.Cell(row, 9).Value = c.TuitionFee;
+            ws.Cell(row, 10).Value = sizes.GetValueOrDefault(c.Id);
+            ws.Cell(row, 11).Value = c.MaxCapacity;
+            ws.Cell(row, 12).Value = c.IsActive ? "Đang mở" : "Đã đóng";
+        }
+
+        ws.Columns().AdjustToContents();
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        return ms.ToArray();
+    }
 
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
 
-    private static string? CleanGradeBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private sealed record ClassSnapshot(
+        Guid? TeacherUserId,
+        string TeacherName,
+        string? BranchCode,
+        string? BranchName,
+        string? SubjectName,
+        string? GradeName);
 }
