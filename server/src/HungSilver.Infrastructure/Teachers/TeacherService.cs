@@ -1,6 +1,7 @@
 using FluentValidation;
 using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
+using HungSilver.Application.Settings;
 using HungSilver.Application.Teachers;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
@@ -15,6 +16,7 @@ namespace HungSilver.Infrastructure.Teachers;
 public sealed class TeacherService(
     AppDbContext context,
     UserManager<AppUser> userManager,
+    ISettingsResolver settingsResolver,
     IValidator<CreateTeacherRequest> createValidator,
     IValidator<UpdateTeacherRequest> updateValidator,
     IValidator<CreateTeacherAccountRequest> createAccountValidator) : ITeacherService
@@ -82,7 +84,7 @@ public sealed class TeacherService(
         if (!validation.IsValid)
             return Result.Failure<TeacherProfileDto>(validation.ToError("Teacher.Validation"));
 
-        var codeResult = await NextTeacherCodeAsync(request.TeacherCode, ct);
+        var codeResult = await NextTeacherCodeAsync(request.TeacherCode, request.FullName, ct);
         if (codeResult.IsFailure)
             return Result.Failure<TeacherProfileDto>(codeResult.Error);
 
@@ -157,7 +159,7 @@ public sealed class TeacherService(
         }
         else
         {
-            var codeResult = await NextTeacherCodeAsync(request.TeacherCode, ct);
+            var codeResult = await NextTeacherCodeAsync(request.TeacherCode, request.FullName, ct);
             if (codeResult.IsFailure)
                 return Result.Failure<TeacherProfileDto>(codeResult.Error);
 
@@ -295,14 +297,24 @@ public sealed class TeacherService(
             : Result.Success();
     }
 
-    private async Task<Result<string>> NextTeacherCodeAsync(string? requested, CancellationToken ct)
+    private async Task<Result<string>> NextTeacherCodeAsync(string? requested, string fullName, CancellationToken ct)
     {
-        var code = string.IsNullOrWhiteSpace(requested)
-            ? UniqueCodeGenerator.Next("GV")
-            : requested.Trim().ToUpperInvariant();
-        if (await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode == code, ct))
-            return Result.Failure<string>(Error.Conflict("Teacher.DuplicateCode", $"Mã giáo viên '{code}' đã tồn tại."));
-        return code;
+        if (!string.IsNullOrWhiteSpace(requested))
+        {
+            var manual = requested.Trim().ToUpperInvariant();
+            return await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode == manual, ct)
+                ? Result.Failure<string>(Error.Conflict("Teacher.DuplicateCode", $"Mã giáo viên '{manual}' đã tồn tại."))
+                : (Result<string>)manual;
+        }
+        // Tự sinh theo rule: {prefix}-{Ten}{VietTat}{counter}
+        var prefix = await settingsResolver.GetEffectiveValueAsync(SettingKeys.CenterCodePrefix, ct: ct) ?? "HV";
+        for (var i = 0; i <= 99; i++)
+        {
+            var generated = NameCodeGenerator.GenerateTeacherCode(fullName, prefix, i);
+            if (!await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode == generated, ct))
+                return generated;
+        }
+        return UniqueCodeGenerator.Next("GV");
     }
 
     private async Task SnapshotTeacherNameAsync(TeacherProfile teacher, CancellationToken ct)

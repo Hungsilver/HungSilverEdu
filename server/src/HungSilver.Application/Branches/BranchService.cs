@@ -1,6 +1,7 @@
 using FluentValidation;
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
+using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
 
@@ -25,13 +26,8 @@ public sealed class BranchService(
 
     public async Task<Result<List<BranchDto>>> GetAllAsync(bool includeInactive = false, CancellationToken ct = default)
     {
-        var list = await branches.FindAsync(
-            b => includeInactive || b.IsActive,
-            ct);
-
-        return list.OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
-            .Select(ToDto)
-            .ToList();
+        var list = await branches.FindAsync(b => includeInactive || b.IsActive, ct);
+        return list.OrderBy(b => b.IndexOrder).ThenBy(b => b.Name).Select(ToDto).ToList();
     }
 
     public async Task<Result<BranchDto>> CreateAsync(CreateBranchRequest request, CancellationToken ct = default)
@@ -40,19 +36,18 @@ public sealed class BranchService(
         if (!validation.IsValid)
             return Result.Failure<BranchDto>(validation.ToError("Branch.Validation"));
 
-        if (await branches.AnyAsync(b => b.Code == request.Code.Trim().ToUpper(), ct))
-            return Result.Failure<BranchDto>(Error.Conflict("Branch.DuplicateCode", $"Mã cơ sở '{request.Code}' đã tồn tại."));
+        var code = await ResolveCodeAsync(request.Code, request.Name, null, ct);
+        if (code.IsFailure) return Result.Failure<BranchDto>(code.Error);
 
         var branch = new Branch
         {
-            Code = request.Code.Trim().ToUpper(),
+            Code = code.Value,
             Name = request.Name.Trim(),
             Address = request.Address?.Trim(),
             Phone = request.Phone?.Trim(),
-            SortOrder = request.SortOrder,
+            IndexOrder = request.IndexOrder,
             IsActive = request.IsActive
         };
-
         await branches.AddAsync(branch, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return ToDto(branch);
@@ -65,31 +60,26 @@ public sealed class BranchService(
             return Result.Failure<BranchDto>(validation.ToError("Branch.Validation"));
 
         var branch = await branches.GetByIdAsync(id, ct: ct);
-        if (branch is null)
-            return Result.Failure<BranchDto>(NotFoundError);
+        if (branch is null) return Result.Failure<BranchDto>(NotFoundError);
 
-        var codeUpper = request.Code.Trim().ToUpper();
-        if (branch.Code != codeUpper && await branches.AnyAsync(b => b.Code == codeUpper, ct))
-            return Result.Failure<BranchDto>(Error.Conflict("Branch.DuplicateCode", $"Mã cơ sở '{request.Code}' đã tồn tại."));
+        var code = await ResolveCodeAsync(request.Code, request.Name, branch.Code, ct);
+        if (code.IsFailure) return Result.Failure<BranchDto>(code.Error);
 
-        branch.Code = codeUpper;
+        branch.Code = code.Value;
         branch.Name = request.Name.Trim();
         branch.Address = request.Address?.Trim();
         branch.Phone = request.Phone?.Trim();
-        branch.SortOrder = request.SortOrder;
+        branch.IndexOrder = request.IndexOrder;
         branch.IsActive = request.IsActive;
-
         branches.Update(branch);
         await unitOfWork.SaveChangesAsync(ct);
-
         return ToDto(branch);
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var branch = await branches.GetByIdAsync(id, ct: ct);
-        if (branch is null)
-            return Result.Failure(NotFoundError);
+        if (branch is null) return Result.Failure(NotFoundError);
 
         if (await classes.AnyAsync(c => c.BranchId == id, ct))
             return Result.Failure(Error.Conflict("Branch.HasClasses", "Không thể xóa cơ sở khi vẫn còn lớp thuộc cơ sở này."));
@@ -99,7 +89,27 @@ public sealed class BranchService(
         return Result.Success();
     }
 
+    private async Task<Result<string>> ResolveCodeAsync(string? requested, string name, string? currentCode, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(requested))
+        {
+            var slug = NameCodeGenerator.SlugCode(name);
+            for (var i = 0; i <= 99; i++)
+            {
+                var candidate = i == 0 ? slug : $"{slug}{i}";
+                if (!await branches.AnyAsync(b => b.Code == candidate, ct))
+                    return candidate;
+            }
+            return UniqueCodeGenerator.Next("BR");
+        }
+        var code = requested.Trim().ToUpperInvariant();
+        if (currentCode != null && currentCode == code) return code;
+        return await branches.AnyAsync(b => b.Code == code, ct)
+            ? Result.Failure<string>(Error.Conflict("Branch.DuplicateCode", $"Mã cơ sở '{requested}' đã tồn tại."))
+            : (Result<string>)code;
+    }
+
     private static BranchDto ToDto(Branch b) => new(
         b.Id, b.Code, b.Name, b.Address, b.Phone,
-        b.SortOrder, b.IsActive, b.IsDeleted, b.CreatedAt, b.UpdatedAt);
+        b.IndexOrder, b.IsActive, b.IsDeleted, b.CreatedAt, b.UpdatedAt);
 }

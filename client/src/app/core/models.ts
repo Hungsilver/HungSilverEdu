@@ -341,7 +341,7 @@ export interface Branch {
   name: string;
   address: string | null;
   phone: string | null;
-  sortOrder: number;
+  indexOrder: number;
   isActive: boolean;
   isDeleted: boolean;
   createdAt: string;
@@ -349,11 +349,11 @@ export interface Branch {
 }
 
 export interface BranchRequest {
-  code: string;
+  code?: string | null;
   name: string;
   address: string | null;
   phone: string | null;
-  sortOrder: number;
+  indexOrder: number;
   isActive: boolean;
 }
 
@@ -363,7 +363,7 @@ export interface Grade {
   id: string;
   code: string;
   name: string;
-  sortOrder: number;
+  indexOrder: number;
   isActive: boolean;
   isDeleted: boolean;
   createdAt: string;
@@ -371,9 +371,9 @@ export interface Grade {
 }
 
 export interface GradeRequest {
-  code: string;
+  code?: string | null;
   name: string;
-  sortOrder: number;
+  indexOrder: number;
   isActive: boolean;
 }
 
@@ -441,15 +441,15 @@ export interface Subject {
   code: string;
   name: string;
   description: string | null;
-  sortOrder: number;
+  indexOrder: number;
   isActive: boolean;
 }
 
 export interface SubjectRequest {
-  code: string;
+  code?: string | null;
   name: string;
   description: string | null;
-  sortOrder: number;
+  indexOrder: number;
   isActive: boolean;
 }
 
@@ -952,6 +952,7 @@ export interface ClassImportStudentPreview {
   previewClassId: string;
   studentCode: string | null;
   fullName: string;
+  dateOfBirth: string | null;
   parentPhone: string | null;
   phone: string | null;
   note: string | null;
@@ -984,13 +985,13 @@ export interface MaterialCategory {
   id: string;
   name: string;
   description: string | null;
-  sortOrder: number;
+  indexOrder: number;
 }
 
 export interface MaterialCategoryRequest {
   name: string;
   description: string | null;
-  sortOrder: number;
+  indexOrder: number;
 }
 
 // ----------------- Bài tập & nộp bài (Đợt 4) -----------------

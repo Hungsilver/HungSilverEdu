@@ -68,7 +68,7 @@ public sealed class StudentService(
             request.SortBy ?? nameof(Student.CreatedAt), request.SortDesc || request.SortBy is null,
             includeDeleted && accessGuard.IsAdmin, ct);
 
-        var items = await ToDtosAsync(page.Items.ToList(), includeClasses: false, ct);
+        var items = await ToDtosAsync(page.Items.ToList(), includeClasses: true, ct);
         return new PagedResult<StudentDto>
         {
             Items = items,
@@ -96,7 +96,7 @@ public sealed class StudentService(
         if (!validation.IsValid)
             return Result.Failure<StudentDto>(validation.ToError("Student.Validation"));
 
-        var code = await ResolveStudentCodeAsync(request.StudentCode, null, ct);
+        var code = await ResolveStudentCodeAsync(request.StudentCode, request.FullName, request.GradeLevel, null, ct);
         if (code.IsFailure)
             return Result.Failure<StudentDto>(code.Error);
 
@@ -140,7 +140,7 @@ public sealed class StudentService(
         if (student is null)
             return Result.Failure<StudentDto>(NotFoundError);
 
-        var code = await ResolveStudentCodeAsync(request.StudentCode, id, ct);
+        var code = await ResolveStudentCodeAsync(request.StudentCode, request.FullName, request.GradeLevel, id, ct);
         if (code.IsFailure)
             return Result.Failure<StudentDto>(code.Error);
 
@@ -229,15 +229,24 @@ public sealed class StudentService(
             .ToHashSet();
     }
 
-    private async Task<Result<string>> ResolveStudentCodeAsync(string? requested, Guid? currentId, CancellationToken ct)
+    private async Task<Result<string>> ResolveStudentCodeAsync(string? requested, string fullName, string? gradeLevel, Guid? currentId, CancellationToken ct)
     {
-        var code = string.IsNullOrWhiteSpace(requested)
-            ? UniqueCodeGenerator.Next("HS")
-            : requested.Trim().ToUpperInvariant();
-        var duplicate = await students.AnyAsync(s => s.StudentCode == code && (currentId == null || s.Id != currentId.Value), ct);
-        return duplicate
-            ? Result.Failure<string>(Error.Conflict("Student.DuplicateCode", $"Mã học viên '{code}' đã tồn tại."))
-            : code;
+        if (!string.IsNullOrWhiteSpace(requested))
+        {
+            var manual = requested.Trim().ToUpperInvariant();
+            var dup = await students.AnyAsync(s => s.StudentCode == manual && (currentId == null || s.Id != currentId.Value), ct);
+            return dup
+                ? Result.Failure<string>(Error.Conflict("Student.DuplicateCode", $"Mã học viên '{manual}' đã tồn tại."))
+                : (Result<string>)manual;
+        }
+        // Tự sinh theo rule: 2K{khoi}{TEN}{VIET_TAT}{counter}
+        for (var i = 0; i <= 99; i++)
+        {
+            var generated = NameCodeGenerator.GenerateStudentCode(fullName, gradeLevel, i);
+            if (!await students.AnyAsync(s => s.StudentCode == generated && (currentId == null || s.Id != currentId.Value), ct))
+                return generated;
+        }
+        return UniqueCodeGenerator.Next("HS");
     }
 
     private async Task<List<StudentDto>> ToDtosAsync(List<Student> items, bool includeClasses, CancellationToken ct)

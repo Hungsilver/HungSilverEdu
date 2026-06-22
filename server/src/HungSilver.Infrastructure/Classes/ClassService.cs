@@ -528,10 +528,12 @@ public sealed class ClassService(
         var sizes = await LoadClassSizesAsync(items.Select(c => c.Id).ToList(), ct);
 
         using var wb = new XLWorkbook();
-        var ws = wb.Worksheets.Add("Danh sách lớp");
-        var headers = new[] { "STT", "Mã lớp", "Tên lớp", "Giáo viên", "Môn học", "Khối", "Mã cơ sở", "Tên cơ sở", "Học phí", "Sĩ số", "Sĩ số tối đa", "Trạng thái" };
-        for (var i = 0; i < headers.Length; i++)
-            ws.Cell(1, i + 1).Value = headers[i];
+
+        // Sheet 1 — Data
+        var ws = wb.Worksheets.Add("Data");
+        var dataHeaders = new[] { "STT", "Mã lớp", "Tên lớp", "Giáo viên", "Môn học", "Khối", "Cơ sở", "Học phí", "Sĩ số", "Sĩ số tối đa", "Trạng thái" };
+        for (var i = 0; i < dataHeaders.Length; i++)
+            ws.Cell(1, i + 1).Value = dataHeaders[i];
         ws.Row(1).Style.Font.Bold = true;
 
         for (var i = 0; i < items.Count; i++)
@@ -544,15 +546,36 @@ public sealed class ClassService(
             ws.Cell(row, 4).Value = c.TeacherName ?? "";
             ws.Cell(row, 5).Value = c.SubjectName ?? "";
             ws.Cell(row, 6).Value = c.GradeName ?? "";
-            ws.Cell(row, 7).Value = c.BranchCode ?? "";
-            ws.Cell(row, 8).Value = c.BranchName ?? "";
-            ws.Cell(row, 9).Value = c.TuitionFee;
-            ws.Cell(row, 10).Value = sizes.GetValueOrDefault(c.Id);
-            ws.Cell(row, 11).Value = c.MaxCapacity;
-            ws.Cell(row, 12).Value = c.IsActive ? "Đang mở" : "Đã đóng";
+            ws.Cell(row, 7).Value = string.IsNullOrWhiteSpace(c.BranchName) ? (c.BranchCode ?? "") : c.BranchName;
+            ws.Cell(row, 8).Value = c.TuitionFee;
+            ws.Cell(row, 9).Value = sizes.GetValueOrDefault(c.Id);
+            ws.Cell(row, 10).Value = c.MaxCapacity;
+            ws.Cell(row, 11).Value = c.IsActive ? "Đang mở" : "Đã đóng";
         }
-
         ws.Columns().AdjustToContents();
+
+        // Sheet 2 — Danh mục
+        var grades = await context.GradeCategories.AsNoTracking().OrderBy(g => g.IndexOrder).Select(g => g.Name).ToListAsync(ct);
+        var teachers = await context.TeacherProfiles.AsNoTracking().OrderBy(t => t.FullName).Select(t => t.FullName).ToListAsync(ct);
+        var classNames = await context.Classes.AsNoTracking().OrderBy(c => c.Name).Select(c => c.Name).ToListAsync(ct);
+        var branches = await context.Branches.AsNoTracking().OrderBy(b => b.IndexOrder).Select(b => b.Name).ToListAsync(ct);
+        var subjects = await context.Subjects.AsNoTracking().OrderBy(s => s.IndexOrder).Select(s => s.Name).ToListAsync(ct);
+
+        var ws2 = wb.Worksheets.Add("Danh mục");
+        var catHeaders = new[] { "Khối", "Giáo viên", "Lớp", "Cơ sở", "Môn học" };
+        var catData = new[] { grades, teachers, classNames, branches, subjects };
+        var headerColor = XLColor.FromArgb(255, 255, 200);
+        for (var col = 0; col < catHeaders.Length; col++)
+        {
+            var cell = ws2.Cell(1, col + 1);
+            cell.Value = catHeaders[col];
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = headerColor;
+            for (var rowIdx = 0; rowIdx < catData[col].Count; rowIdx++)
+                ws2.Cell(rowIdx + 2, col + 1).Value = catData[col][rowIdx];
+        }
+        ws2.Columns().AdjustToContents();
+
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();

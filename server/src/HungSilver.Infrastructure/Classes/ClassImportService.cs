@@ -12,7 +12,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
 {
     private static readonly string[] MainHeaders =
     [
-        "Cơ sở", "Mã học viên", "Tên học viên", "Mã lớp", "Tên lớp",
+        "Cơ sở", "Mã học viên", "Tên học viên", "Ngày sinh (dd/MM/yyyy)", "Mã lớp", "Tên lớp",
         "Môn", "Khối", "Giáo viên", "SĐT phụ huynh", "SĐT học viên", "Ghi chú"
     ];
 
@@ -24,19 +24,20 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
             ws.Cell(1, i + 1).Value = MainHeaders[i];
         ws.Row(1).Style.Font.Bold = true;
         ws.Cell(2, 3).Value = "Nguyễn Văn A";
-        ws.Cell(2, 5).Value = "Lớp toán 11 cô Phượng";
-        ws.Cell(2, 9).Value = "0900000000";
+        ws.Cell(2, 4).Value = "01/09/2010";
+        ws.Cell(2, 6).Value = "Lớp toán 11 cô Phượng";
+        ws.Cell(2, 10).Value = "0900000000";
 
-        AddLookupSheet(wb, "CoSo", context.Branches.AsNoTracking().OrderBy(x => x.SortOrder).Select(x => $"{x.Code} - {x.Name}").ToList());
-        AddLookupSheet(wb, "MonHoc", context.Subjects.AsNoTracking().OrderBy(x => x.SortOrder).Select(x => x.Name).ToList());
-        AddLookupSheet(wb, "Khoi", context.GradeCategories.AsNoTracking().OrderBy(x => x.SortOrder).Select(x => x.Name).ToList());
-        AddLookupSheet(wb, "GiaoVien", context.TeacherProfiles.AsNoTracking().OrderBy(x => x.FullName).Select(x => $"{x.TeacherCode} - {x.FullName}").ToList());
+        AddLookupSheet(wb, "CoSo", context.Branches.AsNoTracking().OrderBy(x => x.IndexOrder).Select(x => $"{x.Code} - {x.Name}").ToList());
+        AddLookupSheet(wb, "MonHoc", context.Subjects.AsNoTracking().OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList());
+        AddLookupSheet(wb, "Khoi", context.GradeCategories.AsNoTracking().OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList());
+        AddLookupSheet(wb, "GiaoVien", context.TeacherProfiles.AsNoTracking().OrderBy(x => x.FullName).Select(x => x.FullName).ToList());
         AddLookupSheet(wb, "LopHienCo", context.Classes.AsNoTracking().OrderBy(x => x.Name).Select(x => $"{x.ClassCode} - {x.Name}").ToList());
 
         AddDropdown(ws, "A2:A500", "CoSo");
-        AddDropdown(ws, "F2:F500", "MonHoc");
-        AddDropdown(ws, "G2:G500", "Khoi");
-        AddDropdown(ws, "H2:H500", "GiaoVien");
+        AddDropdown(ws, "G2:G500", "MonHoc");
+        AddDropdown(ws, "H2:H500", "Khoi");
+        AddDropdown(ws, "I2:I500", "GiaoVien");
         ws.Columns().AdjustToContents();
 
         using var ms = new MemoryStream();
@@ -55,7 +56,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                 .Select(r => new RawRow(
                     r.RowNumber(),
                     Cell(r, 1), Cell(r, 2), Cell(r, 3), Cell(r, 4), Cell(r, 5),
-                    Cell(r, 6), Cell(r, 7), Cell(r, 8), Cell(r, 9), Cell(r, 10), Cell(r, 11)))
+                    Cell(r, 6), Cell(r, 7), Cell(r, 8), Cell(r, 9), Cell(r, 10), Cell(r, 11), Cell(r, 12)))
                 .Where(r => !string.IsNullOrWhiteSpace(r.StudentName) || !string.IsNullOrWhiteSpace(r.ClassName) || !string.IsNullOrWhiteSpace(r.ClassCode))
                 .ToList();
         }
@@ -126,7 +127,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
 
             students.Add(new ClassImportStudentPreviewDto(
                 row.RowNumber, previewId, Clean(row.StudentCode), row.StudentName.Trim(),
-                Clean(row.ParentPhone), Clean(row.Phone), Clean(row.Note), studentError is null, studentError));
+                Clean(row.DateOfBirth), Clean(row.ParentPhone), Clean(row.Phone), Clean(row.Note), studentError is null, studentError));
         }
 
         var classes = classMap.Values.ToList();
@@ -145,6 +146,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         var enrollmentCreated = 0;
 
         var classByPreview = new Dictionary<string, Guid>();
+        var gradeByPreview = request.Classes.ToDictionary(c => c.PreviewId, c => c.GradeName);
         foreach (var item in request.Classes)
         {
             if (!item.IsValid)
@@ -205,18 +207,30 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                 continue;
             }
 
-            var code = string.IsNullOrWhiteSpace(row.StudentCode) ? UniqueCodeGenerator.Next("HS") : row.StudentCode.Trim().ToUpperInvariant();
-            if (await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == code, ct))
+            string code;
+            if (!string.IsNullOrWhiteSpace(row.StudentCode))
             {
-                skipped++;
-                errors.Add($"Dòng {row.RowNumber}: mã học viên '{code}' đã tồn tại.");
-                continue;
+                code = row.StudentCode.Trim().ToUpperInvariant();
+                if (await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == code, ct))
+                {
+                    skipped++;
+                    errors.Add($"Dòng {row.RowNumber}: mã học viên '{code}' đã tồn tại.");
+                    continue;
+                }
+            }
+            else
+            {
+                var gradeName = gradeByPreview.GetValueOrDefault(row.PreviewClassId);
+                var dob = ParseDate(row.DateOfBirth);
+                code = await ResolveStudentCodeAsync(row.FullName, dob, gradeName, ct);
             }
 
+            var dobForStudent = ParseDate(row.DateOfBirth);
             var student = new Student
             {
                 StudentCode = code,
                 FullName = row.FullName.Trim(),
+                DateOfBirth = dobForStudent,
                 ParentPhone = Clean(row.ParentPhone),
                 Phone = Clean(row.Phone),
                 Note = Clean(row.Note),
@@ -303,6 +317,20 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
 
     private static string CleanLookup(string? s) => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim();
 
+    private async Task<string> ResolveStudentCodeAsync(string fullName, DateOnly? dateOfBirth, string? gradeLevel, CancellationToken ct)
+    {
+        for (var i = 0; i <= 99; i++)
+        {
+            var generated = NameCodeGenerator.GenerateStudentCode(fullName, dateOfBirth, gradeLevel, i);
+            if (!await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == generated, ct))
+                return generated;
+        }
+        return UniqueCodeGenerator.Next("HS");
+    }
+
+    private static DateOnly? ParseDate(string? s) =>
+        !string.IsNullOrWhiteSpace(s) && DateOnly.TryParseExact(s.Trim(), "dd/MM/yyyy", out var d) ? d : null;
+
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     private sealed record RawRow(
@@ -310,6 +338,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         string Branch,
         string StudentCode,
         string StudentName,
+        string DateOfBirth,
         string ClassCode,
         string ClassName,
         string Subject,

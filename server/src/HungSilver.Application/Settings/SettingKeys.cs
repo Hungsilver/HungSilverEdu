@@ -18,6 +18,9 @@ public static class SettingKeys
     /// <summary>Danh sách Khối chuẩn (phân tách bằng xuống dòng/dấu phẩy) — dùng cho lớp &amp; học liệu (Đợt 7).</summary>
     public const string ClassGradeBands = "Class.GradeBands";
 
+    /// <summary>Tiền tố dùng trong mã giáo viên (vd "TriViet" → "TriViet-TrangNTT0"). Mặc định "HV".</summary>
+    public const string CenterCodePrefix = "Center.CodePrefix";
+
     /// <summary>Giá trị mặc định khi chưa có cấu hình ở scope nào.</summary>
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
@@ -25,6 +28,7 @@ public static class SettingKeys
         [TuitionDueSoonDays] = "7",
         [WarningScoreDropThreshold] = "1.5",
         [CenterTimeZone] = "Asia/Ho_Chi_Minh",
-        [ClassGradeBands] = "Mầm non\nKhối 1\nKhối 2\nKhối 3\nKhối 4\nKhối 5\nKhối 6\nKhối 7\nKhối 8\nKhối 9\nKhối 10\nKhối 11\nKhối 12\nNgười lớn"
+        [ClassGradeBands] = "Mầm non\nKhối 1\nKhối 2\nKhối 3\nKhối 4\nKhối 5\nKhối 6\nKhối 7\nKhối 8\nKhối 9\nKhối 10\nKhối 11\nKhối 12\nNgười lớn",
+        [CenterCodePrefix] = "HV"
     };
 }

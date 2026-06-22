@@ -6,7 +6,7 @@ public sealed class CreateGradeRequestValidator : AbstractValidator<CreateGradeR
 {
     public CreateGradeRequestValidator()
     {
-        RuleFor(x => x.Code).NotEmpty().MaximumLength(50);
+        RuleFor(x => x.Code).MaximumLength(50).When(x => x.Code != null);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
     }
 }
@@ -15,7 +15,7 @@ public sealed class UpdateGradeRequestValidator : AbstractValidator<UpdateGradeR
 {
     public UpdateGradeRequestValidator()
     {
-        RuleFor(x => x.Code).NotEmpty().MaximumLength(50);
+        RuleFor(x => x.Code).MaximumLength(50).When(x => x.Code != null);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
     }
 }

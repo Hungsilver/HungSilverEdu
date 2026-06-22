@@ -109,9 +109,8 @@ import { PageHeader } from '../../shared/page-header';
           <section>
             <h3>Môn học</h3>
             <form nz-form nzLayout="inline">
-              <input nz-input placeholder="Mã" [(ngModel)]="subjectCode" name="subjectCode" />
               <input nz-input placeholder="Tên môn" [(ngModel)]="subjectName" name="subjectName" />
-              <nz-input-number [(ngModel)]="subjectSort" name="subjectSort" [nzMin]="0" />
+              <nz-input-number [(ngModel)]="subjectIndex" name="subjectIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
               <button nz-button nzType="primary" (click)="saveSubject()">{{ editingSubject() ? 'Cập nhật' : 'Thêm' }}</button>
               @if (editingSubject()) { <button nz-button (click)="resetSubject()">Hủy</button> }
             </form>
@@ -132,9 +131,8 @@ import { PageHeader } from '../../shared/page-header';
           <section>
             <h3>Khối</h3>
             <form nz-form nzLayout="inline">
-              <input nz-input placeholder="Mã" [(ngModel)]="gradeCode" name="gradeCode" />
               <input nz-input placeholder="Tên khối" [(ngModel)]="gradeName" name="gradeName" />
-              <nz-input-number [(ngModel)]="gradeSort" name="gradeSort" [nzMin]="0" />
+              <nz-input-number [(ngModel)]="gradeIndex" name="gradeIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
               <button nz-button nzType="primary" (click)="saveGrade()">{{ editingGrade() ? 'Cập nhật' : 'Thêm' }}</button>
               @if (editingGrade()) { <button nz-button (click)="resetGrade()">Hủy</button> }
             </form>
@@ -155,9 +153,8 @@ import { PageHeader } from '../../shared/page-header';
           <section>
             <h3>Cơ sở</h3>
             <form nz-form nzLayout="inline">
-              <input nz-input placeholder="Mã" [(ngModel)]="branchCode" name="branchCode" />
               <input nz-input placeholder="Tên cơ sở" [(ngModel)]="branchName" name="branchName" />
-              <nz-input-number [(ngModel)]="branchSort" name="branchSort" [nzMin]="0" />
+              <nz-input-number [(ngModel)]="branchIndex" name="branchIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
               <button nz-button nzType="primary" (click)="saveBranch()">{{ editingBranch() ? 'Cập nhật' : 'Thêm' }}</button>
               @if (editingBranch()) { <button nz-button (click)="resetBranch()">Hủy</button> }
             </form>
@@ -366,17 +363,14 @@ export class ClassesPage {
   });
 
   protected readonly editingSubject = signal<Subject | null>(null);
-  protected subjectCode = '';
   protected subjectName = '';
-  protected subjectSort = 0;
+  protected subjectIndex = 0;
   protected readonly editingGrade = signal<Grade | null>(null);
-  protected gradeCode = '';
   protected gradeName = '';
-  protected gradeSort = 0;
+  protected gradeIndex = 0;
   protected readonly editingBranch = signal<Branch | null>(null);
-  protected branchCode = '';
   protected branchName = '';
-  protected branchSort = 0;
+  protected branchIndex = 0;
 
   constructor() {
     this.loadLookups();
@@ -548,36 +542,36 @@ export class ClassesPage {
   }
 
   protected saveSubject(): void {
-    const req: SubjectRequest = { code: this.subjectCode.trim(), name: this.subjectName.trim(), description: null, sortOrder: this.subjectSort, isActive: true };
-    if (!req.code || !req.name) return;
+    const req: SubjectRequest = { name: this.subjectName.trim(), description: null, indexOrder: this.subjectIndex, isActive: true };
+    if (!req.name) return;
     const editing = this.editingSubject();
     const op = editing ? this.subjectsService.update(editing.id, req) : this.subjectsService.create(req);
     op.subscribe({ next: () => { this.resetSubject(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu môn thất bại.') });
   }
-  protected editSubject(s: Subject): void { this.editingSubject.set(s); this.subjectCode = s.code; this.subjectName = s.name; this.subjectSort = s.sortOrder; }
-  protected resetSubject(): void { this.editingSubject.set(null); this.subjectCode = ''; this.subjectName = ''; this.subjectSort = 0; }
+  protected editSubject(s: Subject): void { this.editingSubject.set(s); this.subjectName = s.name; this.subjectIndex = s.indexOrder; }
+  protected resetSubject(): void { this.editingSubject.set(null); this.subjectName = ''; this.subjectIndex = 0; }
   protected deleteSubject(s: Subject): void { this.subjectsService.delete(s.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa môn thất bại.') }); }
 
   protected saveGrade(): void {
-    const req: GradeRequest = { code: this.gradeCode.trim(), name: this.gradeName.trim(), sortOrder: this.gradeSort, isActive: true };
-    if (!req.code || !req.name) return;
+    const req: GradeRequest = { name: this.gradeName.trim(), indexOrder: this.gradeIndex, isActive: true };
+    if (!req.name) return;
     const editing = this.editingGrade();
     const op = editing ? this.gradesService.update(editing.id, req) : this.gradesService.create(req);
     op.subscribe({ next: () => { this.resetGrade(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu khối thất bại.') });
   }
-  protected editGrade(g: Grade): void { this.editingGrade.set(g); this.gradeCode = g.code; this.gradeName = g.name; this.gradeSort = g.sortOrder; }
-  protected resetGrade(): void { this.editingGrade.set(null); this.gradeCode = ''; this.gradeName = ''; this.gradeSort = 0; }
+  protected editGrade(g: Grade): void { this.editingGrade.set(g); this.gradeName = g.name; this.gradeIndex = g.indexOrder; }
+  protected resetGrade(): void { this.editingGrade.set(null); this.gradeName = ''; this.gradeIndex = 0; }
   protected deleteGrade(g: Grade): void { this.gradesService.delete(g.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa khối thất bại.') }); }
 
   protected saveBranch(): void {
-    const req: BranchRequest = { code: this.branchCode.trim(), name: this.branchName.trim(), address: null, phone: null, sortOrder: this.branchSort, isActive: true };
-    if (!req.code || !req.name) return;
+    const req: BranchRequest = { name: this.branchName.trim(), address: null, phone: null, indexOrder: this.branchIndex, isActive: true };
+    if (!req.name) return;
     const editing = this.editingBranch();
     const op = editing ? this.branchesService.update(editing.id, req) : this.branchesService.create(req);
     op.subscribe({ next: () => { this.resetBranch(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu cơ sở thất bại.') });
   }
-  protected editBranch(b: Branch): void { this.editingBranch.set(b); this.branchCode = b.code; this.branchName = b.name; this.branchSort = b.sortOrder; }
-  protected resetBranch(): void { this.editingBranch.set(null); this.branchCode = ''; this.branchName = ''; this.branchSort = 0; }
+  protected editBranch(b: Branch): void { this.editingBranch.set(b); this.branchName = b.name; this.branchIndex = b.indexOrder; }
+  protected resetBranch(): void { this.editingBranch.set(null); this.branchName = ''; this.branchIndex = 0; }
   protected deleteBranch(b: Branch): void { this.branchesService.delete(b.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa cơ sở thất bại.') }); }
 
   private showError(err: HttpErrorResponse, fallback: string): void {

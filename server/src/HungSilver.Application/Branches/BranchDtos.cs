@@ -6,12 +6,12 @@ public sealed record BranchDto(
     string Name,
     string? Address,
     string? Phone,
-    int SortOrder,
+    int IndexOrder,
     bool IsActive,
     bool IsDeleted,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
 
-public sealed record CreateBranchRequest(string Code, string Name, string? Address, string? Phone, int SortOrder, bool IsActive = true);
+public sealed record CreateBranchRequest(string? Code, string Name, string? Address, string? Phone, int IndexOrder, bool IsActive = true);
 
-public sealed record UpdateBranchRequest(string Code, string Name, string? Address, string? Phone, int SortOrder, bool IsActive);
+public sealed record UpdateBranchRequest(string? Code, string Name, string? Address, string? Phone, int IndexOrder, bool IsActive);

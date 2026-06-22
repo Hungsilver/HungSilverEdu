@@ -11,6 +11,7 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
+import { NzPopoverModule } from 'ng-zorro-antd/popover';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { BranchesService } from '../../core/branches.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
@@ -26,7 +27,7 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
-    NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule
+    NzModalModule, NzPopconfirmModule, NzPopoverModule, NzSelectModule, NzTableModule
   ],
   template: `
     <app-page-header title="Học viên" subtitle="Hồ sơ học viên và lớp đang theo học" icon="idcard">
@@ -51,8 +52,8 @@ import { PageHeader } from '../../shared/page-header';
 
     <nz-table #table [nzData]="students()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
-      (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '980px' }">
-      <thead><tr><th>STT</th><th>Mã học viên</th><th>Tên học viên</th><th>SĐT</th><th>SĐT phụ huynh</th><th>Ngày sinh</th><th>Email</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
+      (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '1160px' }">
+      <thead><tr><th>STT</th><th>Mã học viên</th><th>Tên học viên</th><th>SĐT</th><th>SĐT phụ huynh</th><th>Ngày sinh</th><th>Email</th><th>Ghi chú</th><th>Lớp đang theo học</th><th>Thao tác</th></tr></thead>
       <tbody>
         @for (s of table.data; track s.id; let i = $index) {
           <tr class="clickable" (click)="openDetail(s)">
@@ -64,6 +65,23 @@ import { PageHeader } from '../../shared/page-header';
             <td>{{ s.dateOfBirth | date:'dd/MM/yyyy' }}</td>
             <td>{{ s.email || '—' }}</td>
             <td>{{ s.note || '—' }}</td>
+            <td>
+              @if (!s.classes || s.classes.length === 0) {
+                <span class="muted">Chưa có lớp</span>
+              } @else {
+                <span nz-popover nzPopoverTrigger="hover" nzPopoverTitle="Lớp đang theo học"
+                      [nzPopoverContent]="classPopContent" class="classes-badge">
+                  {{ s.classes.length === 1 ? s.classes[0].className : (s.classes.length + ' lớp') }}
+                </span>
+                <ng-template #classPopContent>
+                  <div class="pop-class-list">
+                    @for (c of s.classes; track c.classId) {
+                      <div>{{ c.className }}</div>
+                    }
+                  </div>
+                </ng-template>
+              }
+            </td>
             <td (click)="$event.stopPropagation()">
               <button nz-button nzType="link" nzSize="small" (click)="openForm(s)">Sửa</button>
               <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa học viên?"
@@ -115,6 +133,10 @@ import { PageHeader } from '../../shared/page-header';
   styles: `
     .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
     .clickable { cursor: pointer; }
+    .classes-badge { cursor: default; color: var(--hs-primary, #1890ff); }
+    .pop-class-list { min-width: 140px; }
+    .pop-class-list div { padding: 3px 0; border-bottom: 1px solid var(--hs-border); font-size: 13px; }
+    .pop-class-list div:last-child { border-bottom: none; }
     .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 16px; }
     .detail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
     .detail div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; }

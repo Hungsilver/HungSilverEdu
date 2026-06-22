@@ -4,7 +4,7 @@ using HungSilver.Application.Students;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
-using static HungSilver.Domain.Common.UniqueCodeGenerator;
+
 using HungSilver.Infrastructure.Identity;
 using HungSilver.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -45,7 +45,11 @@ public sealed class StudentImportService(
         if (access.IsFailure)
             return Result.Failure<StudentImportResultDto>(access.Error);
 
-        if (!await context.Classes.AnyAsync(c => c.Id == classId, ct))
+        var classGrade = await context.Classes.AsNoTracking()
+            .Where(c => c.Id == classId)
+            .Select(c => c.GradeName)
+            .FirstOrDefaultAsync(ct);
+        if (classGrade == null && !await context.Classes.AnyAsync(c => c.Id == classId, ct))
             return Result.Failure<StudentImportResultDto>(Error.NotFound("Class.NotFound", "Không tìm thấy lớp học."));
 
         var parse = Parse(file);
@@ -59,9 +63,11 @@ public sealed class StudentImportService(
         {
             if (!row.IsValid) { skipped++; continue; }
 
+            var dob = ParseDate(row.DateOfBirth);
+            var resolvedCode = await ResolveStudentCodeAsync(row.FullName!, dob, classGrade, ct);
             var student = new Student
             {
-                StudentCode = Next("HS"),
+                StudentCode = resolvedCode,
                 FullName = row.FullName!.Trim(),
                 DateOfBirth = ParseDate(row.DateOfBirth),
                 School = Clean(row.School),
@@ -206,6 +212,17 @@ public sealed class StudentImportService(
         context.Students.Update(student);
         await context.SaveChangesAsync(ct);
         return true;
+    }
+
+    private async Task<string> ResolveStudentCodeAsync(string fullName, DateOnly? dateOfBirth, string? gradeLevel, CancellationToken ct)
+    {
+        for (var i = 0; i <= 99; i++)
+        {
+            var generated = NameCodeGenerator.GenerateStudentCode(fullName, dateOfBirth, gradeLevel, i);
+            if (!await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == generated, ct))
+                return generated;
+        }
+        return UniqueCodeGenerator.Next("HS");
     }
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

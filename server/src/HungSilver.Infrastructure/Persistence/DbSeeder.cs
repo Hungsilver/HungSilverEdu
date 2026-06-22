@@ -92,7 +92,7 @@ public static class DbSeeder
 
     private static async Task SeedGradeCategoriesAsync(AppDbContext context, ILogger logger)
     {
-        var defaults = new List<(string Code, string Name, int SortOrder)>
+        var defaults = new List<(string Code, string Name, int IndexOrder)>
         {
             ("MAM_NON", "Mầm non", 0)
         };
@@ -113,7 +113,7 @@ public static class DbSeeder
             {
                 Code = item.Code,
                 Name = item.Name,
-                SortOrder = item.SortOrder,
+                IndexOrder = item.IndexOrder,
                 IsActive = true
             });
         }

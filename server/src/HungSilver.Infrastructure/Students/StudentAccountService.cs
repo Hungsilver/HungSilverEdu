@@ -41,15 +41,20 @@ public sealed class StudentAccountService(
                 return Result.Failure<CreateClassStudentResultDto>(Error.Validation("Student.PasswordRequired", "Vui lòng nhập mật khẩu cho học sinh."));
         }
 
-        var studentCode = string.IsNullOrWhiteSpace(request.StudentCode)
-            ? UniqueCodeGenerator.Next("HS")
-            : request.StudentCode.Trim().ToUpperInvariant();
-        if (await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == studentCode, ct))
-            return Result.Failure<CreateClassStudentResultDto>(Error.Conflict("Student.DuplicateCode", $"Mã học viên '{studentCode}' đã tồn tại."));
+        // Lấy tên khối của lớp để sinh mã học viên theo rule.
+        var classGrade = await context.Classes.AsNoTracking()
+            .Where(c => c.Id == classId)
+            .Select(c => c.GradeName)
+            .FirstOrDefaultAsync(ct);
+
+        var studentCode = await GenerateStudentCodeAsync(request.StudentCode, request.FullName, classGrade, ct);
+        if (studentCode.IsFailure)
+            return Result.Failure<CreateClassStudentResultDto>(studentCode.Error);
+        var resolvedCode = studentCode.Value;
 
         var student = new Student
         {
-            StudentCode = studentCode,
+            StudentCode = resolvedCode,
             FullName = request.FullName.Trim(),
             DateOfBirth = request.DateOfBirth,
             School = Clean(request.School),
@@ -132,6 +137,24 @@ public sealed class StudentAccountService(
                 string.Join(" | ", added.Errors.Select(e => e.Description))));
 
         return Result.Success();
+    }
+
+    private async Task<Result<string>> GenerateStudentCodeAsync(string? requested, string fullName, string? gradeLevel, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(requested))
+        {
+            var manual = requested.Trim().ToUpperInvariant();
+            return await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == manual, ct)
+                ? Result.Failure<string>(Error.Conflict("Student.DuplicateCode", $"Mã học viên '{manual}' đã tồn tại."))
+                : (Result<string>)manual;
+        }
+        for (var i = 0; i <= 99; i++)
+        {
+            var generated = NameCodeGenerator.GenerateStudentCode(fullName, gradeLevel, i);
+            if (!await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == generated, ct))
+                return generated;
+        }
+        return UniqueCodeGenerator.Next("HS");
     }
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();

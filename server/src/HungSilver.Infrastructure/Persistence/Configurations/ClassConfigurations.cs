@@ -13,7 +13,7 @@ public sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
         e.Property(x => x.Address).HasMaxLength(500);
         e.Property(x => x.Phone).HasMaxLength(20);
         e.HasIndex(x => x.Code).IsUnique();
-        e.HasIndex(x => x.SortOrder);
+        e.HasIndex(x => x.IndexOrder);
     }
 }
 
@@ -24,7 +24,7 @@ public sealed class GradeCategoryConfiguration : IEntityTypeConfiguration<GradeC
         e.Property(x => x.Code).HasMaxLength(50);
         e.Property(x => x.Name).HasMaxLength(100);
         e.HasIndex(x => x.Code).IsUnique();
-        e.HasIndex(x => x.SortOrder);
+        e.HasIndex(x => x.IndexOrder);
     }
 }
 
@@ -77,7 +77,7 @@ public sealed class SubjectConfiguration : IEntityTypeConfiguration<Subject>
         e.Property(x => x.Name).HasMaxLength(150);
         e.Property(x => x.Description).HasMaxLength(500);
         e.HasIndex(x => x.Code).IsUnique();
-        e.HasIndex(x => x.SortOrder);
+        e.HasIndex(x => x.IndexOrder);
     }
 }
 

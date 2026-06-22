@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -8,6 +8,7 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
+import { NzDescriptionsModule } from 'ng-zorro-antd/descriptions';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzIconModule } from 'ng-zorro-antd/icon';
@@ -18,6 +19,7 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTableModule } from 'ng-zorro-antd/table';
+import { NzTabsModule } from 'ng-zorro-antd/tabs';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTimePickerModule } from 'ng-zorro-antd/time-picker';
 import { NzUploadModule, NzUploadFile } from 'ng-zorro-antd/upload';
@@ -26,13 +28,14 @@ import { ClassesService } from '../../core/classes.service';
 import {
   Assignment, CalendarSession, ClassDetail, ClassStudentOverview, CreateAssignmentRequest, Material,
   RosterItem, ScheduleSlot, Student, StudentImportPreview, StudentImportResult, SubmissionStatus,
-  SubmissionStatusInfo, SUBMISSION_STATUS_LABELS, Warnings, WEEKDAY_LABELS
+  SubmissionStatusInfo, SUBMISSION_STATUS_LABELS, TuitionInvoice, Warnings, WEEKDAY_LABELS
 } from '../../core/models';
 import { AssignmentsService } from '../../core/assignments.service';
 import { MaterialsService } from '../../core/materials.service';
 import { ScheduleService } from '../../core/schedule.service';
 import { toDateOnly, toTimeOnly } from '../../core/date-util';
 import { StudentsService } from '../../core/students.service';
+import { TuitionService } from '../../core/tuition.service';
 import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
 import { PageHeader } from '../../shared/page-header';
@@ -40,10 +43,11 @@ import { PageHeader } from '../../shared/page-header';
 @Component({
   selector: 'app-class-detail-page',
   imports: [
-    FormsModule, RouterLink, DatePipe,
+    FormsModule, RouterLink, DatePipe, DecimalPipe,
     NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzButtonModule, NzIconModule,
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
-    NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule, PageHeader
+    NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule,
+    NzTabsModule, NzDescriptionsModule, PageHeader
   ],
   template: `
     <a routerLink="/classes" class="back"><nz-icon nzType="arrow-left" /> Danh sách lớp</a>
@@ -60,116 +64,69 @@ import { PageHeader } from '../../shared/page-header';
         </div>
       </app-page-header>
 
-      @if (c.subjectName || c.gradeBand) {
-        <div class="tags-line">
-          @if (c.subjectName) { <nz-tag nzColor="blue"><nz-icon nzType="book" /> {{ c.subjectName }}</nz-tag> }
-          @if (c.gradeBand) { <nz-tag nzColor="geekblue">{{ c.gradeBand }}</nz-tag> }
-        </div>
-      }
+      <nz-tabset nzType="line" class="detail-tabs">
 
-      <nz-row [nzGutter]="[16, 16]">
-        <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.currentSize" [nzSuffix]="'/' + c.maxCapacity" nzTitle="Sĩ số" /></nz-card></nz-col>
-        <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.averageScore ?? 0" nzTitle="Điểm TB lớp" /></nz-card></nz-col>
-        <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.attendanceRate" nzSuffix="%" nzTitle="Chuyên cần" /></nz-card></nz-col>
-      </nz-row>
-
-      <nz-row [nzGutter]="[16, 16]" class="mt">
-        <nz-col [nzXs]="24" [nzLg]="14">
-          <nz-card nzTitle="Danh sách học viên">
-            <div class="enroll-row">
-              <button nz-button nzType="primary" (click)="openCreateStudent()">
-                <nz-icon nzType="user-add" /> Tạo học sinh
-              </button>
-              @if (canManage()) {
-                <nz-select class="enroll-select" nzShowSearch nzPlaceHolder="Chọn học viên để thêm"
-                  [(ngModel)]="enrollStudentId">
-                  @for (s of enrollableStudents(); track s.id) {
-                    <nz-option [nzValue]="s.id" [nzLabel]="s.fullName" />
-                  }
-                </nz-select>
-                <button nz-button [disabled]="!enrollStudentId" (click)="enroll()">Thêm vào lớp</button>
-              }
+        <!-- Tab 1: Thông tin cơ bản -->
+        <nz-tab nzTitle="Thông tin cơ bản">
+          @if (c.subjectName || c.gradeBand) {
+            <div class="tags-line">
+              @if (c.subjectName) { <nz-tag nzColor="blue"><nz-icon nzType="book" /> {{ c.subjectName }}</nz-tag> }
+              @if (c.gradeBand) { <nz-tag nzColor="geekblue">{{ c.gradeBand }}</nz-tag> }
             </div>
-            @if (screen.isMobile()) {
-              <div class="mobile-card-list">
-                @for (r of roster(); track r.studentId) {
-                  <nz-card>
-                    <div class="card-header">
-                      <a class="card-title" [routerLink]="['/students', r.studentId]">{{ r.fullName }}</a>
-                    </div>
-                    <div class="card-field"><span class="label">SĐT PH</span><span>{{ r.parentPhone || '—' }}</span></div>
-                    <div class="card-field"><span class="label">Điểm thưởng</span>
-                      <span>@if (ov(r.studentId); as o) { <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag> } @else { — }</span>
-                    </div>
-                    <div class="card-field"><span class="label">Chuyên cần</span><span>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</span></div>
-                    <div class="card-field"><span class="label">BTVN</span><span>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</span></div>
-                    <div class="card-actions">
-                      @if (r.userId) {
-                        <button nz-button nzSize="small" (click)="openResetPassword(r)"><nz-icon nzType="key" /> Đổi MK</button>
-                      } @else {
-                        <span class="muted" style="font-size:12px">Chưa có TK</span>
+          }
+          <nz-row [nzGutter]="[16, 16]" class="mb">
+            <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.currentSize" [nzSuffix]="'/' + c.maxCapacity" nzTitle="Sĩ số" /></nz-card></nz-col>
+            <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.averageScore ?? 0" nzTitle="Điểm TB lớp" /></nz-card></nz-col>
+            <nz-col [nzXs]="8"><nz-card><nz-statistic [nzValue]="c.attendanceRate" nzSuffix="%" nzTitle="Chuyên cần" /></nz-card></nz-col>
+          </nz-row>
+          <nz-card>
+            <nz-descriptions nzBordered [nzColumn]="{ xs: 1, sm: 2, lg: 3 }">
+              <nz-descriptions-item nzTitle="Mã lớp">{{ c.classCode }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Tên lớp">{{ c.name }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Giáo viên">{{ c.teacherName || '—' }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Môn học">{{ c.subjectName || '—' }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Khối">{{ c.gradeName || '—' }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Cơ sở">{{ c.branchName || c.branchCode || '—' }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Học phí">{{ c.tuitionFee | number:'1.0-0' }} đ</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Lịch học">{{ c.schedule || '—' }}</nz-descriptions-item>
+              <nz-descriptions-item nzTitle="Trạng thái">
+                <nz-tag [nzColor]="c.isActive ? 'green' : 'red'">{{ c.isActive ? 'Đang mở' : 'Đã đóng' }}</nz-tag>
+              </nz-descriptions-item>
+            </nz-descriptions>
+          </nz-card>
+
+          <!-- Cảnh báo -->
+          <nz-card class="mt" [nzTitle]="warnTitle">
+            <ng-template #warnTitle>
+              <nz-icon nzType="warning" /> Cảnh báo của lớp
+              @if (warnings(); as w) { @if (warnTotal(w) > 0) { <nz-tag nzColor="red" class="ml">{{ warnTotal(w) }}</nz-tag> } }
+            </ng-template>
+            @if (warnings(); as w) {
+              @if (warnTotal(w) === 0) {
+                <p class="muted">Không có cảnh báo nào. 👍</p>
+              } @else {
+                @for (grp of warnGroups(w); track grp.label) {
+                  @if (grp.items.length) {
+                    <div class="warn-group">
+                      <div class="warn-head"><nz-icon [nzType]="grp.icon" /> {{ grp.label }} <span class="muted">({{ grp.items.length }})</span></div>
+                      @for (it of grp.items; track it.studentId + it.detail) {
+                        <div class="warn-item">
+                          <a [routerLink]="['/students', it.studentId]">{{ it.studentName }}</a>
+                          <span class="muted"> — {{ it.detail }}</span>
+                        </div>
                       }
-                      @if (canManage()) {
-                        <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
-                      }
                     </div>
-                  </nz-card>
-                }
-              </div>
-            } @else {
-              <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '620px' }">
-                <thead><tr>
-                  <th nzLeft>Họ tên</th><th>SĐT phụ huynh</th>
-                  <th>Điểm thưởng</th><th>Chuyên cần</th><th>BTVN</th>
-                  <th nzRight>Thao tác</th>
-                </tr></thead>
-                <tbody>
-                  @for (r of rt.data; track r.studentId) {
-                    <tr>
-                      <td nzLeft><a [routerLink]="['/students', r.studentId]">{{ r.fullName }}</a></td>
-                      <td>{{ r.parentPhone || '—' }}</td>
-                      <td>
-                        @if (ov(r.studentId); as o) {
-                          <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
-                        } @else { <span class="muted">—</span> }
-                      </td>
-                      <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
-                      <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
-                      <td nzRight>
-                        @if (r.userId) {
-                          <button nz-button nzType="link" nzSize="small" (click)="openResetPassword(r)">
-                            <nz-icon nzType="key" /> Đổi MK
-                          </button>
-                        } @else {
-                          <span class="muted no-acc">Chưa có TK</span>
-                        }
-                        @if (canManage()) {
-                          <button nz-button nzType="link" nzSize="small" nzDanger
-                                  nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
-                        }
-                      </td>
-                    </tr>
                   }
-                </tbody>
-              </nz-table>
-            }
+                }
+              }
+            } @else { <p class="muted">Đang tải…</p> }
           </nz-card>
-        </nz-col>
+        </nz-tab>
 
-        <nz-col [nzXs]="24" [nzLg]="10">
-          <nz-card nzTitle="Buổi học">
-            @for (s of sessions(); track s.id) {
-              <div class="row-item">
-                <a [routerLink]="['/sessions', s.id]">Buổi {{ s.sessionNumber }} · {{ s.sessionDate | date: 'dd/MM' }}</a>
-                @if (s.status === 'Cancelled') { <nz-tag nzColor="red">Hủy</nz-tag> }
-                @else if (s.status === 'Completed') { <nz-tag nzColor="green">Xong</nz-tag> }
-                @else { <nz-tag>Lên lịch</nz-tag> }
-              </div>
-            } @empty { <p class="muted">Chưa có buổi học.</p> }
-          </nz-card>
-
+        <!-- Tab 2: Lịch học -->
+        <nz-tab nzTitle="Lịch học">
           @if (canManage()) {
-            <nz-card nzTitle="Khung giờ lặp tuần" class="mt">
+            <nz-card nzTitle="Khung giờ lặp tuần">
               @for (slot of slots(); track slot.id) {
                 <div class="row-item">
                   <span>{{ weekdays[slot.dayOfWeek] }} · {{ slot.startTime }}–{{ slot.endTime }}</span>
@@ -182,83 +139,230 @@ import { PageHeader } from '../../shared/page-header';
                 </nz-select>
                 <nz-time-picker [(ngModel)]="slotStart" nzFormat="HH:mm" />
                 <nz-time-picker [(ngModel)]="slotEnd" nzFormat="HH:mm" />
-                <button nz-button nzType="dashed" (click)="addSlot()">Thêm</button>
+                <button nz-button nzType="dashed" (click)="addSlot()">Thêm khung giờ</button>
               </div>
             </nz-card>
+          } @else {
+            <nz-card nzTitle="Khung giờ lặp tuần">
+              @for (slot of slots(); track slot.id) {
+                <div class="row-item">
+                  <span>{{ weekdays[slot.dayOfWeek] }} · {{ slot.startTime }}–{{ slot.endTime }}</span>
+                </div>
+              } @empty { <p class="muted">Chưa có khung giờ.</p> }
+            </nz-card>
           }
-        </nz-col>
-      </nz-row>
+        </nz-tab>
 
-      <nz-card nzTitle="Bài tập" class="mt">
-        <button nz-button nzType="primary" class="mb" (click)="openAssignment()"><nz-icon nzType="plus" /> Giao bài</button>
-        @if (screen.isMobile()) {
-          <div class="mobile-card-list">
-            @for (a of assignments(); track a.id) {
-              <nz-card>
-                <div class="card-header">
-                  <span class="card-title">{{ a.title }}</span>
-                  <span>{{ a.submittedCount }}/{{ a.totalCount }}</span>
-                </div>
-                <div class="card-field"><span class="label">Học liệu</span><span>{{ a.materialTitle || '—' }}</span></div>
-                <div class="card-field"><span class="label">Hạn nộp</span><span>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</span></div>
-                <div class="card-actions">
-                  <button nz-button nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /> Xóa</button>
-                </div>
-              </nz-card>
-            } @empty {
-              <span class="muted">Chưa giao bài nào.</span>
+        <!-- Tab 3: Buổi học -->
+        <nz-tab nzTitle="Buổi học">
+          <nz-card nzTitle="Danh sách buổi học">
+            @for (s of sessions(); track s.id) {
+              <div class="row-item">
+                <a [routerLink]="['/sessions', s.id]">Buổi {{ s.sessionNumber }} · {{ s.sessionDate | date: 'dd/MM/yyyy' }}</a>
+                @if (s.status === 'Cancelled') { <nz-tag nzColor="red">Hủy</nz-tag> }
+                @else if (s.status === 'Completed') { <nz-tag nzColor="green">Xong</nz-tag> }
+                @else { <nz-tag>Lên lịch</nz-tag> }
+              </div>
+            } @empty { <p class="muted">Chưa có buổi học.</p> }
+          </nz-card>
+
+          <nz-card nzTitle="Bài tập" class="mt">
+            <button nz-button nzType="primary" class="mb" (click)="openAssignment()"><nz-icon nzType="plus" /> Giao bài</button>
+            @if (screen.isMobile()) {
+              <div class="mobile-card-list">
+                @for (a of assignments(); track a.id) {
+                  <nz-card>
+                    <div class="card-header">
+                      <span class="card-title">{{ a.title }}</span>
+                      <span>{{ a.submittedCount }}/{{ a.totalCount }}</span>
+                    </div>
+                    <div class="card-field"><span class="label">Học liệu</span><span>{{ a.materialTitle || '—' }}</span></div>
+                    <div class="card-field"><span class="label">Hạn nộp</span><span>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</span></div>
+                    <div class="card-actions">
+                      <button nz-button nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
+                      <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /> Xóa</button>
+                    </div>
+                  </nz-card>
+                } @empty { <span class="muted">Chưa giao bài nào.</span> }
+              </div>
+            } @else {
+              <nz-table #at [nzData]="assignments()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '560px' }">
+                <thead><tr><th nzLeft>Tiêu đề</th><th>Học liệu</th><th>Hạn nộp</th><th>Đã nộp</th><th nzRight></th></tr></thead>
+                <tbody>
+                  @for (a of at.data; track a.id) {
+                    <tr>
+                      <td nzLeft>{{ a.title }}</td>
+                      <td>{{ a.materialTitle || '—' }}</td>
+                      <td>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</td>
+                      <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
+                      <td nzRight>
+                        <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
+                        <button nz-button nzType="link" nzSize="small" nzDanger
+                                nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
+                      </td>
+                    </tr>
+                  } @empty { <tr><td colspan="5"><span class="muted">Chưa giao bài nào.</span></td></tr> }
+                </tbody>
+              </nz-table>
+            }
+          </nz-card>
+        </nz-tab>
+
+        <!-- Tab 4: Học viên -->
+        <nz-tab nzTitle="Học viên">
+          <div class="enroll-row">
+            <button nz-button nzType="primary" (click)="openCreateStudent()">
+              <nz-icon nzType="user-add" /> Tạo học sinh
+            </button>
+            @if (canManage()) {
+              <nz-select class="enroll-select" nzShowSearch nzPlaceHolder="Chọn học viên để thêm"
+                [(ngModel)]="enrollStudentId">
+                @for (s of enrollableStudents(); track s.id) {
+                  <nz-option [nzValue]="s.id" [nzLabel]="s.fullName" />
+                }
+              </nz-select>
+              <button nz-button [disabled]="!enrollStudentId" (click)="enroll()">Thêm vào lớp</button>
+              <button nz-button (click)="openImport()"><nz-icon nzType="file-text" /> Nhập Excel</button>
             }
           </div>
-        } @else {
-          <nz-table #at [nzData]="assignments()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '560px' }">
-            <thead><tr><th nzLeft>Tiêu đề</th><th>Học liệu</th><th>Hạn nộp</th><th>Đã nộp</th><th nzRight></th></tr></thead>
-            <tbody>
-              @for (a of at.data; track a.id) {
-                <tr>
-                  <td nzLeft>{{ a.title }}</td>
-                  <td>{{ a.materialTitle || '—' }}</td>
-                  <td>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</td>
-                  <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
-                  <td nzRight>
-                    <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger
-                            nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
-                  </td>
-                </tr>
-              } @empty { <tr><td colspan="5"><span class="muted">Chưa giao bài nào.</span></td></tr> }
-            </tbody>
-          </nz-table>
-        }
-      </nz-card>
 
-      <!-- Cảnh báo của lớp (gộp từ trang Cảnh báo — Đợt 7) -->
-      <nz-card class="mt" [nzTitle]="warnTitle">
-        <ng-template #warnTitle>
-          <nz-icon nzType="warning" /> Cảnh báo của lớp
-          @if (warnings(); as w) { @if (warnTotal(w) > 0) { <nz-tag nzColor="red" class="ml">{{ warnTotal(w) }}</nz-tag> } }
-        </ng-template>
-        @if (warnings(); as w) {
-          @if (warnTotal(w) === 0) {
-            <p class="muted">Không có cảnh báo nào. 👍</p>
-          } @else {
-            @for (grp of warnGroups(w); track grp.label) {
-              @if (grp.items.length) {
-                <div class="warn-group">
-                  <div class="warn-head"><nz-icon [nzType]="grp.icon" /> {{ grp.label }} <span class="muted">({{ grp.items.length }})</span></div>
-                  @for (it of grp.items; track it.studentId + it.detail) {
-                    <div class="warn-item">
-                      <a [routerLink]="['/students', it.studentId]">{{ it.studentName }}</a>
-                      <span class="muted"> — {{ it.detail }}</span>
-                    </div>
-                  }
-                </div>
+          @if (screen.isMobile()) {
+            <div class="mobile-card-list">
+              @for (r of roster(); track r.studentId) {
+                <nz-card>
+                  <div class="card-header">
+                    <a class="card-title" (click)="openStudentDetail(r)" style="cursor:pointer">{{ r.fullName }}</a>
+                  </div>
+                  <div class="card-field"><span class="label">Mã HV</span><span>{{ r.studentCode }}</span></div>
+                  <div class="card-field"><span class="label">SĐT PH</span><span>{{ r.parentPhone || '—' }}</span></div>
+                  <div class="card-field"><span class="label">Điểm thưởng</span>
+                    <span>@if (ov(r.studentId); as o) { <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag> } @else { — }</span>
+                  </div>
+                  <div class="card-field"><span class="label">Chuyên cần</span><span>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</span></div>
+                  <div class="card-actions">
+                    @if (r.userId) {
+                      <button nz-button nzSize="small" (click)="openResetPassword(r)"><nz-icon nzType="key" /> Đổi MK</button>
+                    }
+                    @if (canManage()) {
+                      <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
+                    }
+                  </div>
+                </nz-card>
               }
-            }
+            </div>
+          } @else {
+            <nz-table #rt [nzData]="roster()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '680px' }">
+              <thead><tr>
+                <th nzLeft>Họ tên</th><th>Mã HV</th><th>SĐT phụ huynh</th>
+                <th>Điểm thưởng</th><th>Chuyên cần</th><th>BTVN</th>
+                <th nzRight>Thao tác</th>
+              </tr></thead>
+              <tbody>
+                @for (r of rt.data; track r.studentId) {
+                  <tr>
+                    <td nzLeft>
+                      <a (click)="openStudentDetail(r)" style="cursor:pointer">{{ r.fullName }}</a>
+                    </td>
+                    <td>{{ r.studentCode }}</td>
+                    <td>{{ r.parentPhone || '—' }}</td>
+                    <td>
+                      @if (ov(r.studentId); as o) {
+                        <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
+                      } @else { <span class="muted">—</span> }
+                    </td>
+                    <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
+                    <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
+                    <td nzRight>
+                      @if (r.userId) {
+                        <button nz-button nzType="link" nzSize="small" (click)="openResetPassword(r)">
+                          <nz-icon nzType="key" /> Đổi MK
+                        </button>
+                      } @else {
+                        <span class="muted no-acc">Chưa có TK</span>
+                      }
+                      @if (canManage()) {
+                        <button nz-button nzType="link" nzSize="small" nzDanger
+                                nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </nz-table>
           }
-        } @else { <p class="muted">Đang tải…</p> }
-      </nz-card>
+        </nz-tab>
+
+      </nz-tabset>
     }
+
+    <!-- Popup chi tiết học viên -->
+    <nz-modal [nzVisible]="studentDetailOpen()" [nzTitle]="studentDetailTitle()" [nzWidth]="720"
+      [nzFooter]="null" (nzOnCancel)="studentDetailOpen.set(false)">
+      <ng-container *nzModalContent>
+        @if (selectedRosterItem(); as r) {
+          <nz-tabset nzType="line">
+            <nz-tab nzTitle="Thông tin cơ bản">
+              @if (studentDetailData(); as s) {
+                <nz-descriptions nzBordered [nzColumn]="{ xs: 1, sm: 2 }">
+                  <nz-descriptions-item nzTitle="Mã học viên">{{ s.studentCode }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Họ tên">{{ s.fullName }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Ngày sinh">{{ s.dateOfBirth || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="SĐT">{{ s.phone || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Phụ huynh">{{ s.parentName || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="SĐT phụ huynh">{{ s.parentPhone || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Email">{{ s.email || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Trình độ">{{ s.englishLevel || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Mục tiêu" [nzSpan]="2">{{ s.learningGoal || '—' }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Ghi chú" [nzSpan]="2">{{ s.note || '—' }}</nz-descriptions-item>
+                </nz-descriptions>
+              } @else {
+                <p class="muted">Đang tải…</p>
+              }
+            </nz-tab>
+
+            <nz-tab nzTitle="Tình hình học tập">
+              @if (ov(r.studentId); as o) {
+                <nz-descriptions nzBordered [nzColumn]="2">
+                  <nz-descriptions-item nzTitle="Chuyên cần">{{ o.attendanceRate }}%</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Hoàn thành BTVN">{{ o.homeworkRate }}%</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Điểm thưởng">
+                    <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
+                  </nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Số buổi học">{{ o.totalSessions }}</nz-descriptions-item>
+                </nz-descriptions>
+              } @else {
+                <p class="muted">Chưa có dữ liệu tình hình học tập.</p>
+              }
+            </nz-tab>
+
+            <nz-tab nzTitle="Học phí">
+              @if (studentTuition().length > 0) {
+                <nz-table [nzData]="studentTuition()" [nzFrontPagination]="false" nzSize="small">
+                  <thead><tr><th>Tháng</th><th>Số tiền</th><th>Đã thanh toán</th><th>Trạng thái</th><th>Hạn</th></tr></thead>
+                  <tbody>
+                    @for (inv of studentTuition(); track inv.id) {
+                      <tr>
+                        <td>{{ inv.periodMonth }}/{{ inv.periodYear }}</td>
+                        <td>{{ inv.amount | number:'1.0-0' }} đ</td>
+                        <td>{{ inv.paidAmount | number:'1.0-0' }} đ</td>
+                        <td>
+                          @if (inv.status === 'Paid') { <nz-tag nzColor="green">Đã đóng</nz-tag> }
+                          @else if (inv.status === 'Overdue') { <nz-tag nzColor="red">Quá hạn</nz-tag> }
+                          @else { <nz-tag>Chưa đóng</nz-tag> }
+                        </td>
+                        <td>{{ inv.dueDate | date: 'dd/MM/yyyy' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </nz-table>
+              } @else {
+                <p class="muted">Không có hóa đơn học phí trong lớp này.</p>
+              }
+            </nz-tab>
+          </nz-tabset>
+        }
+      </ng-container>
+    </nz-modal>
 
     <!-- Giao bài tập -->
     <nz-modal [nzVisible]="assignOpen()" nzTitle="Giao bài tập" [nzOkLoading]="assignBusy()"
@@ -320,7 +424,6 @@ import { PageHeader } from '../../shared/page-header';
           </nz-upload>
           <label nz-checkbox [(ngModel)]="createAccounts">Tạo tài khoản đăng nhập cho HS</label>
         </div>
-
         @if (importPreview(); as p) {
           <p class="muted">Hợp lệ: <strong>{{ p.validCount }}</strong> · Lỗi: <strong>{{ p.invalidCount }}</strong></p>
           <nz-table [nzData]="p.rows" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ y: '240px' }">
@@ -345,7 +448,6 @@ import { PageHeader } from '../../shared/page-header';
             </button>
           </div>
         }
-
         @if (importResult(); as res) {
           <nz-alert nzType="success" class="mt"
             [nzMessage]="'Đã nhập ' + res.created + ' học viên'
@@ -428,8 +530,10 @@ import { PageHeader } from '../../shared/page-header';
   styles: `
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    .tags-line { margin: -4px 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .tags-line { margin: 0 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .detail-tabs { margin-top: 4px; }
     .mt { margin-top: 16px; }
+    .mb { margin-bottom: 16px; }
     .ml { margin-left: 8px; }
     .warn-group { padding: 6px 0; border-bottom: 1px solid var(--hs-border); }
     .warn-group:last-child { border-bottom: none; }
@@ -442,7 +546,7 @@ import { PageHeader } from '../../shared/page-header';
     .slot-add { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
     .wk { min-width: 110px; }
     .full { width: 100%; }
-    .mb { margin-bottom: 12px; }
+    .mb-form { margin-bottom: 12px; }
     .st { min-width: 110px; }
     .muted { color: var(--hs-text-muted); }
     .imp-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
@@ -456,6 +560,10 @@ import { PageHeader } from '../../shared/page-header';
     .card-field:last-of-type { border-bottom: none; }
     .card-field .label { color: var(--hs-text-muted); }
     .card-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+    @media (max-width: 768px) {
+      .enroll-row { flex-direction: column; }
+      .enroll-select { min-width: 100%; }
+    }
   `
 })
 export class ClassDetailPage implements OnInit {
@@ -469,6 +577,7 @@ export class ClassDetailPage implements OnInit {
   private readonly assignmentsService = inject(AssignmentsService);
   private readonly materialsService = inject(MaterialsService);
   private readonly warningsService = inject(WarningsService);
+  private readonly tuitionService = inject(TuitionService);
   private readonly message = inject(NzMessageService);
   private readonly router = inject(Router);
   protected readonly canManage = computed(() => this.auth.isAdmin() || this.auth.isTeacher());
@@ -542,6 +651,16 @@ export class ClassDetailPage implements OnInit {
   protected readonly resetTarget = signal<RosterItem | null>(null);
   protected newPassword = '';
 
+  // Popup chi tiết học viên
+  protected readonly studentDetailOpen = signal(false);
+  protected readonly selectedRosterItem = signal<RosterItem | null>(null);
+  protected readonly studentDetailData = signal<Student | null>(null);
+  protected readonly studentTuition = signal<TuitionInvoice[]>([]);
+  protected readonly studentDetailTitle = computed(() => {
+    const r = this.selectedRosterItem();
+    return r ? `Chi tiết: ${r.fullName}` : 'Chi tiết học viên';
+  });
+
   protected readonly enrollableStudents = computed(() => {
     const enrolled = new Set(this.roster().map(r => r.studentId));
     return this.allStudents().filter(s => !enrolled.has(s.id));
@@ -582,13 +701,26 @@ export class ClassDetailPage implements OnInit {
     this.assignmentsService.getByClass(this.id()).subscribe(a => this.assignments.set(a));
   }
 
-  /** Học liệu chọn được khi giao bài = học liệu của lớp + thư viện chung. */
   private loadMaterials(): void {
     this.materialsService.getByClass(this.id()).subscribe(cls => {
       this.materialsService.getLibrary().subscribe(lib => this.materials.set([...cls, ...lib]));
     });
   }
 
+  // ---- Popup chi tiết học viên ----
+  protected openStudentDetail(r: RosterItem): void {
+    this.selectedRosterItem.set(r);
+    this.studentDetailData.set(null);
+    this.studentTuition.set([]);
+    this.studentDetailOpen.set(true);
+    this.studentsService.getById(r.studentId).subscribe(s => this.studentDetailData.set(s));
+    const classId = this.id();
+    this.tuitionService.getByStudent(r.studentId).subscribe(invs => {
+      this.studentTuition.set(invs.filter(inv => inv.classId === classId));
+    });
+  }
+
+  // ---- Bài tập ----
   protected openAssignment(): void {
     this.aTitle = '';
     this.aMaterialId = null;
@@ -661,7 +793,6 @@ export class ClassDetailPage implements OnInit {
     });
   }
 
-  /** Chọn file → xem trước (không upload tự động). */
   protected beforeUpload = (file: NzUploadFile): boolean => {
     this.importFile = file as unknown as File;
     this.importResult.set(null);
@@ -688,7 +819,6 @@ export class ClassDetailPage implements OnInit {
   }
 
   private reloadPublic(): void {
-    // làm mới roster + tình hình sau khi nhập
     const id = this.id();
     this.classesService.getRoster(id).subscribe(r => this.roster.set(r));
     this.classesService.getOverview(id).subscribe(o => this.overview.set(o));

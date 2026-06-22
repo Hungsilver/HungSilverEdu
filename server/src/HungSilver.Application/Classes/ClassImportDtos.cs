@@ -32,6 +32,7 @@ public sealed record ClassImportStudentPreviewDto(
     string PreviewClassId,
     string? StudentCode,
     string FullName,
+    string? DateOfBirth,
     string? ParentPhone,
     string? Phone,
     string? Note,
