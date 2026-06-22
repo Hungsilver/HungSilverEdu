@@ -89,7 +89,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                 ? existingClasses.FirstOrDefault(c => c.ClassCode.Equals(row.ClassCode.Trim(), StringComparison.OrdinalIgnoreCase))
                 : null;
 
-            var classError = ValidateClass(row, branch, subject, grade, teacher);
+            var classError = existingClass != null ? null : ValidateClass(row, branch, subject, grade, teacher);
             var classKey = existingClass?.ClassCode
                 ?? (!string.IsNullOrWhiteSpace(row.ClassCode)
                     ? row.ClassCode.Trim().ToUpperInvariant()

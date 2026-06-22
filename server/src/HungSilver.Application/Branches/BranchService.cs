@@ -97,14 +97,14 @@ public sealed class BranchService(
             for (var i = 0; i <= 99; i++)
             {
                 var candidate = i == 0 ? slug : $"{slug}{i}";
-                if (!await branches.AnyAsync(b => b.Code == candidate, ct))
+                if (!await branches.AnyAsync(b => b.Code == candidate, ct, includeDeleted: true))
                     return candidate;
             }
             return UniqueCodeGenerator.Next("BR");
         }
         var code = requested.Trim().ToUpperInvariant();
         if (currentCode != null && currentCode == code) return code;
-        return await branches.AnyAsync(b => b.Code == code, ct)
+        return await branches.AnyAsync(b => b.Code == code, ct, includeDeleted: true)
             ? Result.Failure<string>(Error.Conflict("Branch.DuplicateCode", $"Mã cơ sở '{requested}' đã tồn tại."))
             : (Result<string>)code;
     }

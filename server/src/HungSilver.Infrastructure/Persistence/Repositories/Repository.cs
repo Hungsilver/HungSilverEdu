@@ -24,8 +24,8 @@ public class Repository<T>(AppDbContext context) : IRepository<T> where T : Base
     public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) =>
         Query().Where(predicate).ToListAsync(ct);
 
-    public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) =>
-        Query().AnyAsync(predicate, ct);
+    public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false) =>
+        Query(includeDeleted).AnyAsync(predicate, ct);
 
     public async Task<PagedResult<T>> GetPagedAsync(
         int page,

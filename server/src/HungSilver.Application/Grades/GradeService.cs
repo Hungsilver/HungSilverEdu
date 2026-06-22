@@ -95,14 +95,14 @@ public sealed class GradeService(
             for (var i = 0; i <= 99; i++)
             {
                 var candidate = i == 0 ? slug : $"{slug}{i}";
-                if (!await grades.AnyAsync(g => g.Code == candidate, ct))
+                if (!await grades.AnyAsync(g => g.Code == candidate, ct, includeDeleted: true))
                     return candidate;
             }
             return UniqueCodeGenerator.Next("GR");
         }
         var code = requested.Trim().ToUpperInvariant().Replace(" ", "_");
         if (currentCode != null && currentCode == code) return code;
-        return await grades.AnyAsync(g => g.Code == code, ct)
+        return await grades.AnyAsync(g => g.Code == code, ct, includeDeleted: true)
             ? Result.Failure<string>(Error.Conflict("Grade.DuplicateCode", $"Mã khối '{requested}' đã tồn tại."))
             : (Result<string>)code;
     }

@@ -47,7 +47,7 @@ public sealed class StudentAccountService(
             .Select(c => c.GradeName)
             .FirstOrDefaultAsync(ct);
 
-        var studentCode = await GenerateStudentCodeAsync(request.StudentCode, request.FullName, classGrade, ct);
+        var studentCode = await GenerateStudentCodeAsync(request.StudentCode, request.FullName, request.DateOfBirth, classGrade, ct);
         if (studentCode.IsFailure)
             return Result.Failure<CreateClassStudentResultDto>(studentCode.Error);
         var resolvedCode = studentCode.Value;
@@ -139,7 +139,7 @@ public sealed class StudentAccountService(
         return Result.Success();
     }
 
-    private async Task<Result<string>> GenerateStudentCodeAsync(string? requested, string fullName, string? gradeLevel, CancellationToken ct)
+    private async Task<Result<string>> GenerateStudentCodeAsync(string? requested, string fullName, DateOnly? dateOfBirth, string? gradeLevel, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(requested))
         {
@@ -150,7 +150,7 @@ public sealed class StudentAccountService(
         }
         for (var i = 0; i <= 99; i++)
         {
-            var generated = NameCodeGenerator.GenerateStudentCode(fullName, gradeLevel, i);
+            var generated = NameCodeGenerator.GenerateStudentCode(fullName, dateOfBirth, gradeLevel, i);
             if (!await context.Students.IgnoreQueryFilters().AnyAsync(s => s.StudentCode == generated, ct))
                 return generated;
         }

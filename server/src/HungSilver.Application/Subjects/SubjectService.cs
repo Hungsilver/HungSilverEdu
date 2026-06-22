@@ -96,14 +96,14 @@ public sealed class SubjectService(
             for (var i = 0; i <= 99; i++)
             {
                 var candidate = i == 0 ? slug : $"{slug}{i}";
-                if (!await subjects.AnyAsync(s => s.Code == candidate, ct))
+                if (!await subjects.AnyAsync(s => s.Code == candidate, ct, includeDeleted: true))
                     return candidate;
             }
             return UniqueCodeGenerator.Next("SB");
         }
         var code = requested.Trim().ToUpperInvariant().Replace(" ", "_");
         if (currentCode != null && currentCode == code) return code;
-        return await subjects.AnyAsync(s => s.Code == code, ct)
+        return await subjects.AnyAsync(s => s.Code == code, ct, includeDeleted: true)
             ? Result.Failure<string>(Error.Conflict("Subject.DuplicateCode", $"Mã môn học '{requested}' đã tồn tại."))
             : (Result<string>)code;
     }

@@ -15,7 +15,7 @@ public interface IRepository<T> where T : BaseEntity
 
     Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
 
-    Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
+    Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false);
 
     Task<PagedResult<T>> GetPagedAsync(
         int page,

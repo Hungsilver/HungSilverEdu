@@ -96,7 +96,7 @@ public sealed class StudentService(
         if (!validation.IsValid)
             return Result.Failure<StudentDto>(validation.ToError("Student.Validation"));
 
-        var code = await ResolveStudentCodeAsync(request.StudentCode, request.FullName, request.GradeLevel, null, ct);
+        var code = await ResolveStudentCodeAsync(request.StudentCode, request.FullName, request.DateOfBirth, request.GradeLevel, null, ct);
         if (code.IsFailure)
             return Result.Failure<StudentDto>(code.Error);
 
@@ -140,7 +140,7 @@ public sealed class StudentService(
         if (student is null)
             return Result.Failure<StudentDto>(NotFoundError);
 
-        var code = await ResolveStudentCodeAsync(request.StudentCode, request.FullName, request.GradeLevel, id, ct);
+        var code = await ResolveStudentCodeAsync(request.StudentCode, request.FullName, request.DateOfBirth, request.GradeLevel, id, ct);
         if (code.IsFailure)
             return Result.Failure<StudentDto>(code.Error);
 
@@ -229,7 +229,7 @@ public sealed class StudentService(
             .ToHashSet();
     }
 
-    private async Task<Result<string>> ResolveStudentCodeAsync(string? requested, string fullName, string? gradeLevel, Guid? currentId, CancellationToken ct)
+    private async Task<Result<string>> ResolveStudentCodeAsync(string? requested, string fullName, DateOnly? dateOfBirth, string? gradeLevel, Guid? currentId, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(requested))
         {
@@ -239,10 +239,10 @@ public sealed class StudentService(
                 ? Result.Failure<string>(Error.Conflict("Student.DuplicateCode", $"Mã học viên '{manual}' đã tồn tại."))
                 : (Result<string>)manual;
         }
-        // Tự sinh theo rule: 2K{khoi}{TEN}{VIET_TAT}{counter}
+        // Tự sinh theo rule: nếu có ngày sinh dùng năm sinh, nếu không dùng tên khối
         for (var i = 0; i <= 99; i++)
         {
-            var generated = NameCodeGenerator.GenerateStudentCode(fullName, gradeLevel, i);
+            var generated = NameCodeGenerator.GenerateStudentCode(fullName, dateOfBirth, gradeLevel, i);
             if (!await students.AnyAsync(s => s.StudentCode == generated && (currentId == null || s.Id != currentId.Value), ct))
                 return generated;
         }
