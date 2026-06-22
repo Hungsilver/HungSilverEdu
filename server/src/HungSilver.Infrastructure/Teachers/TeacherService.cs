@@ -152,8 +152,10 @@ public sealed class TeacherService(
         TeacherProfile teacher;
         if (request.TeacherProfileId is not null)
         {
-            teacher = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.Id == request.TeacherProfileId.Value, ct)
-                ?? throw new InvalidOperationException("Teacher profile disappeared during lookup.");
+            var found = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.Id == request.TeacherProfileId.Value, ct);
+            if (found is null)
+                return Result.Failure<TeacherProfileDto>(NotFoundError);
+            teacher = found;
             if (teacher.UserId is not null)
                 return Result.Failure<TeacherProfileDto>(Error.Conflict("Teacher.AlreadyLinked", "Giáo viên này đã có tài khoản."));
         }
@@ -221,7 +223,9 @@ public sealed class TeacherService(
         if (await context.Classes.AnyAsync(c => c.TeacherProfileId == id, ct))
             return Result.Failure(Error.Conflict("Teacher.HasClasses", "Không thể xóa giáo viên khi vẫn còn lớp đang quản lý."));
 
-        context.TeacherProfiles.Remove(teacher);
+        teacher.IsDeleted = true;
+        teacher.DeletedAt = DateTime.Now;
+        context.TeacherProfiles.Update(teacher);
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }

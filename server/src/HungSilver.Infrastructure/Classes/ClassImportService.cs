@@ -191,12 +191,13 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                     IsActive = true
                 };
                 context.Classes.Add(cls);
-                await context.SaveChangesAsync(ct);
-                classId = cls.Id;
+                classId = cls.Id;  // Id = Guid.NewGuid() — có sẵn trước khi SaveChanges
                 classCreated++;
             }
             classByPreview[item.PreviewId] = classId.Value;
         }
+        if (classCreated > 0)
+            await context.SaveChangesAsync(ct);
 
         foreach (var row in request.Students)
         {

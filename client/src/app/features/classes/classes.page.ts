@@ -403,20 +403,31 @@ export class ClassesPage {
 
   protected openClassForm(item?: ClassListItem): void {
     this.editingClass.set(item ?? null);
-    this.classForm.reset({
-      classCode: item?.classCode ?? null,
-      name: item?.name ?? '',
-      teacherProfileId: item?.teacherProfileId ?? '',
-      branchId: item?.branchId ?? null,
-      subjectId: item?.subjectId ?? null,
-      gradeId: item?.gradeId ?? null,
-      tuitionFee: item?.tuitionFee ?? 0,
-      maxCapacity: item?.maxCapacity ?? 20,
-      schedule: null,
-      startDate: null,
-      isActive: item?.isActive ?? true
+    if (!item) {
+      this.classForm.reset({
+        classCode: null, name: '', teacherProfileId: '',
+        branchId: null, subjectId: null, gradeId: null,
+        tuitionFee: 0, maxCapacity: 20, schedule: null, startDate: null, isActive: true
+      });
+      this.classModalOpen.set(true);
+      return;
+    }
+    this.classesService.getById(item.id).subscribe(d => {
+      this.classForm.reset({
+        classCode: d.classCode ?? null,
+        name: d.name,
+        teacherProfileId: d.teacherProfileId ?? '',
+        branchId: d.branchId ?? null,
+        subjectId: d.subjectId ?? null,
+        gradeId: d.gradeId ?? null,
+        tuitionFee: d.tuitionFee,
+        maxCapacity: d.maxCapacity,
+        schedule: d.schedule ?? null,
+        startDate: d.startDate ? new Date(d.startDate) : null,
+        isActive: d.isActive
+      });
+      this.classModalOpen.set(true);
     });
-    this.classModalOpen.set(true);
   }
 
   protected saveClass(): void {
