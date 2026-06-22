@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
@@ -23,9 +24,9 @@ import { ClassesService } from '../../core/classes.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
 import { GradesService } from '../../core/grades.service';
 import {
-  Branch, BranchRequest, ClassDetail, ClassImportClassPreview, ClassImportPreview,
+  Branch, BranchRequest, ClassImportClassPreview, ClassImportPreview,
   ClassImportStudentPreview, ClassListItem, ClassRequest, Grade, GradeRequest,
-  RosterItem, Subject, SubjectRequest, TeacherProfile
+  Subject, SubjectRequest, TeacherProfile
 } from '../../core/models';
 import { SubjectsService } from '../../core/subjects.service';
 import { TeachersService } from '../../core/teachers.service';
@@ -34,7 +35,7 @@ import { PageHeader } from '../../shared/page-header';
 @Component({
   selector: 'app-classes-page',
   imports: [
-    DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader,
+    DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, PageHeader,
     NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzEmptyModule, NzFormModule, NzIconModule,
     NzInputModule, NzInputNumberModule, NzModalModule, NzPopconfirmModule, NzSelectModule,
     NzTableModule, NzTabsModule, NzTagModule, NzUploadModule
@@ -83,7 +84,7 @@ import { PageHeader } from '../../shared/page-header';
           </thead>
           <tbody>
             @for (c of classTable.data; track c.id; let i = $index) {
-              <tr class="clickable" (click)="openClassDetail(c)">
+              <tr class="clickable" [routerLink]="['/classes', c.id]">
                 <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
                 <td>{{ c.classCode }}</td>
                 <td>{{ c.name }}</td>
@@ -200,49 +201,6 @@ import { PageHeader } from '../../shared/page-header';
       </ng-container>
     </nz-modal>
 
-    <nz-modal [nzVisible]="detailOpen()" nzTitle="Chi tiết lớp" [nzWidth]="980" [nzFooter]="null" (nzOnCancel)="detailOpen.set(false)">
-      <ng-container *nzModalContent>
-        @if (detail(); as d) {
-          <div class="detail-grid">
-            <div><b>Mã lớp</b><span>{{ d.classCode }}</span></div>
-            <div><b>Tên lớp</b><span>{{ d.name }}</span></div>
-            <div><b>Giáo viên</b><span>{{ d.teacherName || '—' }}</span></div>
-            <div><b>Môn / Khối</b><span>{{ d.subjectName || '—' }} / {{ d.gradeName || '—' }}</span></div>
-            <div><b>Cơ sở</b><span>{{ d.branchCode || '—' }} · {{ d.branchName || '—' }}</span></div>
-            <div><b>Học phí</b><span>{{ d.tuitionFee | number:'1.0-0' }}</span></div>
-          </div>
-          <div class="detail-actions">
-            <button nz-button nzType="primary" (click)="openStudentInClass()"><nz-icon nzType="plus" /> Thêm học viên</button>
-          </div>
-          <nz-table [nzData]="roster()" [nzFrontPagination]="false" nzSize="small">
-            <thead><tr><th>Mã HV</th><th>Học viên</th><th>SĐT</th><th>SĐT PH</th><th>Ghi chú</th><th></th></tr></thead>
-            <tbody>
-              @for (r of roster(); track r.enrollmentId) {
-                <tr>
-                  <td>{{ r.studentCode }}</td><td>{{ r.fullName }}</td><td>{{ r.phone || '—' }}</td><td>{{ r.parentPhone || '—' }}</td><td>{{ r.note || '—' }}</td>
-                  <td><button nz-button nzType="link" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdrawStudent(r)">Xóa</button></td>
-                </tr>
-              }
-            </tbody>
-          </nz-table>
-        }
-      </ng-container>
-    </nz-modal>
-
-    <nz-modal [nzVisible]="studentModalOpen()" nzTitle="Thêm học viên vào lớp" [nzWidth]="560"
-      (nzOnCancel)="studentModalOpen.set(false)" (nzOnOk)="saveStudentInClass()">
-      <ng-container *nzModalContent>
-        <form nz-form [formGroup]="studentForm" nzLayout="vertical">
-          <nz-form-item><nz-form-label>Mã học viên</nz-form-label><nz-form-control><input nz-input formControlName="studentCode" placeholder="Trống để tự sinh" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label nzRequired>Tên học viên</nz-form-label><nz-form-control><input nz-input formControlName="fullName" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>SĐT học viên</nz-form-label><nz-form-control><input nz-input formControlName="phone" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>SĐT phụ huynh</nz-form-label><nz-form-control><input nz-input formControlName="parentPhone" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Email</nz-form-label><nz-form-control><input nz-input formControlName="email" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Ghi chú</nz-form-label><nz-form-control><textarea nz-input formControlName="note" rows="3"></textarea></nz-form-control></nz-form-item>
-        </form>
-      </ng-container>
-    </nz-modal>
-
     <nz-modal [nzVisible]="importOpen()" nzTitle="Import lớp học" [nzWidth]="1080"
       (nzOnCancel)="importOpen.set(false)" [nzOkText]="importPreview() ? 'Xác nhận import' : null"
       [nzOkDisabled]="!importPreview()" (nzOnOk)="commitImport()">
@@ -300,6 +258,7 @@ import { PageHeader } from '../../shared/page-header';
   `
 })
 export class ClassesPage {
+  private readonly router = inject(Router);
   private readonly classesService = inject(ClassesService);
   private readonly branchesService = inject(BranchesService);
   private readonly subjectsService = inject(SubjectsService);
@@ -338,20 +297,6 @@ export class ClassesPage {
     schedule: new FormControl<string | null>(null),
     startDate: new FormControl<Date | null>(null),
     isActive: new FormControl(true, { nonNullable: true })
-  });
-
-  protected readonly detailOpen = signal(false);
-  protected readonly detail = signal<ClassDetail | null>(null);
-  protected readonly roster = signal<RosterItem[]>([]);
-
-  protected readonly studentModalOpen = signal(false);
-  protected readonly studentForm = new FormGroup({
-    studentCode: new FormControl<string | null>(null),
-    fullName: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    phone: new FormControl<string | null>(null),
-    parentPhone: new FormControl<string | null>(null),
-    email: new FormControl<string | null>(null),
-    note: new FormControl<string | null>(null)
   });
 
   protected readonly importOpen = signal(false);
@@ -459,36 +404,6 @@ export class ClassesPage {
     this.classesService.delete(c.id).subscribe({
       next: () => { this.message.success('Đã xóa lớp.'); this.loadClasses(); },
       error: err => this.showError(err, 'Xóa lớp thất bại.')
-    });
-  }
-
-  protected openClassDetail(c: ClassListItem): void {
-    this.classesService.getById(c.id).subscribe(x => this.detail.set(x));
-    this.classesService.getRoster(c.id).subscribe(x => this.roster.set(x));
-    this.detailOpen.set(true);
-  }
-
-  protected openStudentInClass(): void {
-    this.studentForm.reset({ studentCode: null, fullName: '', phone: null, parentPhone: null, email: null, note: null });
-    this.studentModalOpen.set(true);
-  }
-
-  protected saveStudentInClass(): void {
-    const d = this.detail();
-    if (!d || this.studentForm.invalid) return;
-    const v = this.studentForm.getRawValue();
-    this.classesService.createStudent(d.id, { ...v, createAccount: false }).subscribe({
-      next: () => { this.message.success('Đã thêm học viên.'); this.studentModalOpen.set(false); this.openClassDetail({ ...d, currentSize: d.currentSize } as ClassListItem); },
-      error: err => this.showError(err, 'Thêm học viên thất bại.')
-    });
-  }
-
-  protected withdrawStudent(r: RosterItem): void {
-    const d = this.detail();
-    if (!d) return;
-    this.classesService.withdraw(d.id, r.studentId).subscribe({
-      next: () => { this.message.success('Đã xóa khỏi lớp.'); this.openClassDetail({ ...d, currentSize: d.currentSize } as ClassListItem); },
-      error: err => this.showError(err, 'Xóa học viên khỏi lớp thất bại.')
     });
   }
 
