@@ -179,7 +179,7 @@ import { PageHeader } from '../../shared/page-header';
         </div>
         @for (c of categories(); track c.id) {
           <div class="cat-row">
-            <span class="n">{{ c.name }} <span class="muted">#{{ c.sortOrder }}</span></span>
+            <span class="n">{{ c.name }} <span class="muted">#{{ c.indexOrder }}</span></span>
             <button nz-button nzType="link" nzSize="small" (click)="editCat(c)"><nz-icon nzType="edit" /></button>
             <button nz-button nzType="link" nzSize="small" nzDanger
                     nz-popconfirm nzPopconfirmTitle="Xóa danh mục này?" (nzOnConfirm)="removeCat(c)"><nz-icon nzType="delete" /></button>
@@ -390,12 +390,12 @@ export class MaterialsPage {
   protected editCat(c: MaterialCategory): void {
     this.catEditId = c.id;
     this.catName = c.name;
-    this.catSort = c.sortOrder;
+    this.catSort = c.indexOrder;
   }
 
   protected saveCat(): void {
     if (!this.catName.trim()) { this.message.warning('Nhập tên danh mục.'); return; }
-    const body = { name: this.catName.trim(), description: null, sortOrder: this.catSort };
+    const body = { name: this.catName.trim(), description: null, indexOrder: this.catSort };
     const op = this.catEditId
       ? this.materialsService.updateCategory(this.catEditId, body)
       : this.materialsService.createCategory(body);

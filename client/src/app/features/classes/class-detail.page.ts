@@ -64,7 +64,7 @@ import { PageHeader } from '../../shared/page-header';
         </div>
       </app-page-header>
 
-      <nz-tabset nzType="line" class="detail-tabs">
+      <nz-tabs nzType="line" class="detail-tabs">
 
         <!-- Tab 1: Thông tin cơ bản -->
         <nz-tab nzTitle="Thông tin cơ bản">
@@ -292,7 +292,7 @@ import { PageHeader } from '../../shared/page-header';
           }
         </nz-tab>
 
-      </nz-tabset>
+      </nz-tabs>
     }
 
     <!-- Popup chi tiết học viên -->
@@ -300,7 +300,7 @@ import { PageHeader } from '../../shared/page-header';
       [nzFooter]="null" (nzOnCancel)="studentDetailOpen.set(false)">
       <ng-container *nzModalContent>
         @if (selectedRosterItem(); as r) {
-          <nz-tabset nzType="line">
+          <nz-tabs nzType="line">
             <nz-tab nzTitle="Thông tin cơ bản">
               @if (studentDetailData(); as s) {
                 <nz-descriptions nzBordered [nzColumn]="{ xs: 1, sm: 2 }">
@@ -328,7 +328,7 @@ import { PageHeader } from '../../shared/page-header';
                   <nz-descriptions-item nzTitle="Điểm thưởng">
                     <nz-tag [nzColor]="o.rewardBalance >= 0 ? 'gold' : 'red'">{{ o.rewardBalance }}</nz-tag>
                   </nz-descriptions-item>
-                  <nz-descriptions-item nzTitle="Số buổi học">{{ o.totalSessions }}</nz-descriptions-item>
+                  <nz-descriptions-item nzTitle="Số buổi học">{{ o.totalRecords }}</nz-descriptions-item>
                 </nz-descriptions>
               } @else {
                 <p class="muted">Chưa có dữ liệu tình hình học tập.</p>
@@ -359,7 +359,7 @@ import { PageHeader } from '../../shared/page-header';
                 <p class="muted">Không có hóa đơn học phí trong lớp này.</p>
               }
             </nz-tab>
-          </nz-tabset>
+          </nz-tabs>
         }
       </ng-container>
     </nz-modal>
