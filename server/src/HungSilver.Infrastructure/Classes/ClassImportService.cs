@@ -10,6 +10,9 @@ namespace HungSilver.Infrastructure.Classes;
 
 public sealed class ClassImportService(AppDbContext context) : IClassImportService
 {
+    private static readonly XLColor HeaderIndigo = XLColor.FromHtml("#4F46E5");
+    private static readonly XLColor HeaderYellow = XLColor.FromHtml("#FFFFC8");
+
     private static readonly string[] MainHeaders =
     [
         "Cơ sở", "Mã học viên", "Tên học viên", "Ngày sinh (dd/MM/yyyy)", "Mã lớp", "Tên lớp",
@@ -26,9 +29,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         {
             var cell = ws.Cell(1, i + 1);
             cell.Value = MainHeaders[i];
-            cell.Style.Font.Bold = true;
-            cell.Style.Font.FontColor = XLColor.White;
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#4F46E5");
+            ApplyHeaderStyle(cell, HeaderIndigo, XLColor.White);
         }
         ws.Cell(2, 3).Value = "Nguyễn Văn A";
         ws.Cell(2, 4).Value = "01/09/2010";
@@ -48,8 +49,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         {
             var cell = dmWs.Cell(1, i + 1);
             cell.Value = dmHeaders[i];
-            cell.Style.Font.Bold = true;
-            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFFC8");
+            ApplyHeaderStyle(cell, HeaderYellow, HeaderIndigo);
         }
 
         var grades = context.GradeCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList();
@@ -316,6 +316,13 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         validation.List($"={sheetName}!${col}$2:${col}$500");
         validation.IgnoreBlanks = true;
         validation.InCellDropdown = true;
+    }
+
+    private static void ApplyHeaderStyle(IXLCell cell, XLColor fillColor, XLColor fontColor)
+    {
+        cell.Style.Font.Bold = true;
+        cell.Style.Font.FontColor = fontColor;
+        cell.Style.Fill.BackgroundColor = fillColor;
     }
 
     private static string? ValidateClass(RawRow row, Branch? branch, Subject? subject, GradeCategory? grade, TeacherProfile? teacher)

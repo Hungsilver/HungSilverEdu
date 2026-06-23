@@ -19,6 +19,9 @@ public sealed class ClassService(
     IValidator<CreateClassRequest> createValidator,
     IValidator<UpdateClassRequest> updateValidator) : IClassService
 {
+    private static readonly XLColor HeaderIndigo = XLColor.FromHtml("#4F46E5");
+    private static readonly XLColor HeaderYellow = XLColor.FromHtml("#FFFFC8");
+
     private static readonly Error NotFoundError = Error.NotFound("Class.NotFound", "Không tìm thấy lớp học.");
 
     public async Task<Result<PagedResult<ClassListItemDto>>> GetPagedAsync(
@@ -547,8 +550,11 @@ public sealed class ClassService(
         var ws = wb.Worksheets.Add("Data");
         var dataHeaders = new[] { "STT", "Mã lớp", "Tên lớp", "Giáo viên", "Môn học", "Khối", "Cơ sở", "Học phí", "Sĩ số", "Sĩ số tối đa", "Trạng thái" };
         for (var i = 0; i < dataHeaders.Length; i++)
-            ws.Cell(1, i + 1).Value = dataHeaders[i];
-        ws.Row(1).Style.Font.Bold = true;
+        {
+            var cell = ws.Cell(1, i + 1);
+            cell.Value = dataHeaders[i];
+            ApplyHeaderStyle(cell, HeaderIndigo, XLColor.White);
+        }
 
         for (var i = 0; i < items.Count; i++)
         {
@@ -578,13 +584,11 @@ public sealed class ClassService(
         var ws2 = wb.Worksheets.Add("Danh mục");
         var catHeaders = new[] { "Khối", "Giáo viên", "Lớp", "Cơ sở", "Môn học" };
         var catData = new[] { grades, teachers, classNames, branches, subjects };
-        var headerColor = XLColor.FromArgb(255, 255, 200);
         for (var col = 0; col < catHeaders.Length; col++)
         {
             var cell = ws2.Cell(1, col + 1);
             cell.Value = catHeaders[col];
-            cell.Style.Font.Bold = true;
-            cell.Style.Fill.BackgroundColor = headerColor;
+            ApplyHeaderStyle(cell, HeaderYellow, HeaderIndigo);
             for (var rowIdx = 0; rowIdx < catData[col].Count; rowIdx++)
                 ws2.Cell(rowIdx + 2, col + 1).Value = catData[col][rowIdx];
         }
@@ -613,6 +617,13 @@ public sealed class ClassService(
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private static void ApplyHeaderStyle(IXLCell cell, XLColor fillColor, XLColor fontColor)
+    {
+        cell.Style.Font.Bold = true;
+        cell.Style.Font.FontColor = fontColor;
+        cell.Style.Fill.BackgroundColor = fillColor;
+    }
 
     private sealed record ClassSnapshot(
         Guid? TeacherUserId,
