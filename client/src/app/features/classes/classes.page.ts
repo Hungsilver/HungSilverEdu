@@ -4,6 +4,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
@@ -13,18 +14,22 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTabsModule } from 'ng-zorro-antd/tabs';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
+import { AuthService } from '../../core/auth.service';
 import { BranchesService } from '../../core/branches.service';
 import { ClassesService } from '../../core/classes.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
+import { ScreenService } from '../../core/screen.service';
 import { GradesService } from '../../core/grades.service';
 import {
-  Branch, BranchRequest, ClassImportClassPreview, ClassImportPreview,
+  Branch, BranchRequest, ClassImportClassPreview,
   ClassImportStudentPreview, ClassListItem, ClassRequest, Grade, GradeRequest,
   Subject, SubjectRequest, TeacherProfile
 } from '../../core/models';
@@ -36,14 +41,16 @@ import { PageHeader } from '../../shared/page-header';
   selector: 'app-classes-page',
   imports: [
     DecimalPipe, FormsModule, ReactiveFormsModule, RouterLink, PageHeader,
-    NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzEmptyModule, NzFormModule, NzIconModule,
-    NzInputModule, NzInputNumberModule, NzModalModule, NzPopconfirmModule, NzSelectModule,
-    NzTableModule, NzTabsModule, NzTagModule, NzUploadModule
+    NzButtonModule, NzCardModule, NzCheckboxModule, NzDatePickerModule, NzEmptyModule, NzFormModule, NzIconModule,
+    NzInputModule, NzInputNumberModule, NzModalModule, NzPaginationModule, NzPopconfirmModule, NzSelectModule,
+    NzTableModule, NzTabsModule, NzTagModule, NzTooltipModule, NzUploadModule
   ],
   template: `
     <app-page-header title="Lớp học" subtitle="Quản lý lớp, danh mục và import Excel" icon="book">
       <button nz-button nzType="primary" (click)="openClassForm()"><nz-icon nzType="plus" /> Thêm lớp</button>
-      <button nz-button (click)="openImportModal()"><nz-icon nzType="file-excel" /> Import Excel</button>
+      @if (auth.isAdmin()) {
+        <button nz-button (click)="openImportModal()"><nz-icon nzType="file-excel" /> Import Excel</button>
+      }
       <button nz-button (click)="exportClasses()"><nz-icon nzType="download" /> Export Excel</button>
     </app-page-header>
 
@@ -59,52 +66,82 @@ import { PageHeader } from '../../shared/page-header';
           <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId" (ngModelChange)="loadClasses()">
             @for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }
           </nz-select>
-          <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId" (ngModelChange)="loadClasses()">
-            @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
-          </nz-select>
+          @if (auth.isAdmin()) {
+            <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId" (ngModelChange)="loadClasses()">
+              @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
+            </nz-select>
+          }
           <input nz-input placeholder="Mã lớp, tên lớp, giáo viên" [(ngModel)]="search" (ngModelChange)="onSearch()" />
         </div>
 
-        <nz-table #classTable [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
-          [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
-          (nzPageIndexChange)="page.set($event); loadClasses()" [nzScroll]="{ x: '1100px' }">
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Mã lớp</th>
-              <th>Tên lớp</th>
-              <th>Giáo viên</th>
-              <th>Môn học</th>
-              <th>Khối</th>
-              <th>Mã cơ sở</th>
-              <th>Tên cơ sở</th>
-              <th>Học phí</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (c of classTable.data; track c.id; let i = $index) {
-              <tr class="clickable" [routerLink]="['/classes', c.id]">
-                <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
-                <td>{{ c.classCode }}</td>
-                <td>{{ c.name }}</td>
-                <td>{{ c.teacherName || '—' }}</td>
-                <td>{{ c.subjectName || '—' }}</td>
-                <td>{{ c.gradeName || '—' }}</td>
-                <td>{{ c.branchCode || '—' }}</td>
-                <td>{{ c.branchName || '—' }}</td>
-                <td>{{ c.tuitionFee | number:'1.0-0' }}</td>
-                <td (click)="$event.stopPropagation()">
-                  <button nz-button nzType="link" nzSize="small" (click)="openClassForm(c)"><nz-icon nzType="edit" /></button>
-                  <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
-                    (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /></button>
-                </td>
-              </tr>
+        @if (screen.isMobile()) {
+          <div class="mobile-card-list">
+            @for (c of classes(); track c.id) {
+              <nz-card class="clickable" [routerLink]="['/classes', c.id]">
+                <div class="card-header">
+                  <span class="card-title">{{ c.name }}</span>
+                  <nz-tag>{{ c.classCode }}</nz-tag>
+                </div>
+                <div class="card-field"><span class="label">Giáo viên</span><span>{{ c.teacherName || '—' }}</span></div>
+                <div class="card-field"><span class="label">Môn / Khối</span><span>{{ c.subjectName || '—' }} · {{ c.gradeName || '—' }}</span></div>
+                <div class="card-field"><span class="label">Cơ sở</span><span>{{ c.branchName || '—' }}</span></div>
+                <div class="card-field"><span class="label">Sĩ số</span><span>{{ c.currentSize }}/{{ c.maxCapacity }}</span></div>
+                <div class="card-field"><span class="label">Học phí</span><span>{{ c.tuitionFee | number:'1.0-0' }}</span></div>
+                <div class="card-actions" (click)="$event.stopPropagation()">
+                  <button nz-button nzSize="small" (click)="openClassForm(c)"><nz-icon nzType="edit" /> Sửa</button>
+                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
+                    (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /> Xóa</button>
+                </div>
+              </nz-card>
+            } @empty {
+              <nz-empty nzNotFoundContent="Chưa có lớp học" />
             }
-          </tbody>
-        </nz-table>
+            <nz-pagination class="mobile-pager" [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
+              (nzPageIndexChange)="page.set($event); loadClasses()" />
+          </div>
+        } @else {
+          <nz-table #classTable [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
+            [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
+            (nzPageIndexChange)="page.set($event); loadClasses()" [nzScroll]="{ x: '1100px' }">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Mã lớp</th>
+                <th>Tên lớp</th>
+                <th>Giáo viên</th>
+                <th>Môn học</th>
+                <th>Khối</th>
+                <th>Mã cơ sở</th>
+                <th>Tên cơ sở</th>
+                <th>Học phí</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of classTable.data; track c.id; let i = $index) {
+                <tr class="clickable" [routerLink]="['/classes', c.id]">
+                  <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
+                  <td>{{ c.classCode }}</td>
+                  <td>{{ c.name }}</td>
+                  <td>{{ c.teacherName || '—' }}</td>
+                  <td>{{ c.subjectName || '—' }}</td>
+                  <td>{{ c.gradeName || '—' }}</td>
+                  <td>{{ c.branchCode || '—' }}</td>
+                  <td>{{ c.branchName || '—' }}</td>
+                  <td>{{ c.tuitionFee | number:'1.0-0' }}</td>
+                  <td (click)="$event.stopPropagation()">
+                    <button nz-button nzType="link" nzSize="small" (click)="openClassForm(c)"><nz-icon nzType="edit" /></button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
+                      (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </nz-table>
+        }
       </nz-tab>
 
+      @if (auth.isAdmin()) {
       <nz-tab nzTitle="Danh mục">
         <div class="catalog-grid">
           <section>
@@ -178,6 +215,7 @@ import { PageHeader } from '../../shared/page-header';
       <nz-tab nzTitle="Cấu hình">
         <nz-empty nzNotFoundContent="Chưa có cấu hình" />
       </nz-tab>
+      }
     </nz-tabs>
 
     <nz-modal [nzVisible]="classModalOpen()" [nzTitle]="editingClass() ? 'Sửa lớp' : 'Thêm lớp'" [nzWidth]="720"
@@ -187,7 +225,9 @@ import { PageHeader } from '../../shared/page-header';
           <div class="form-grid">
             <nz-form-item><nz-form-label>Mã lớp</nz-form-label><nz-form-control><input nz-input formControlName="classCode" placeholder="Trống để tự sinh" /></nz-form-control></nz-form-item>
             <nz-form-item><nz-form-label nzRequired>Tên lớp</nz-form-label><nz-form-control><input nz-input formControlName="name" /></nz-form-control></nz-form-item>
+            @if (auth.isAdmin()) {
             <nz-form-item><nz-form-label nzRequired>Giáo viên</nz-form-label><nz-form-control><nz-select formControlName="teacherProfileId" nzShowSearch>@for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }</nz-select></nz-form-control></nz-form-item>
+            }
             <nz-form-item><nz-form-label>Cơ sở</nz-form-label><nz-form-control><nz-select formControlName="branchId" nzAllowClear nzShowSearch>@for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }</nz-select></nz-form-control></nz-form-item>
             <nz-form-item><nz-form-label>Môn học</nz-form-label><nz-form-control><nz-select formControlName="subjectId" nzAllowClear nzShowSearch>@for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }</nz-select></nz-form-control></nz-form-item>
             <nz-form-item><nz-form-label>Khối</nz-form-label><nz-form-control><nz-select formControlName="gradeId" nzAllowClear nzShowSearch>@for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }</nz-select></nz-form-control></nz-form-item>
@@ -201,37 +241,91 @@ import { PageHeader } from '../../shared/page-header';
       </ng-container>
     </nz-modal>
 
-    <nz-modal [nzVisible]="importOpen()" nzTitle="Import lớp học" [nzWidth]="1080"
-      (nzOnCancel)="importOpen.set(false)" [nzOkText]="importPreview() ? 'Xác nhận import' : null"
-      [nzOkDisabled]="!importPreview()" (nzOnOk)="commitImport()">
+    <nz-modal [nzVisible]="importOpen()" nzTitle="Import lớp học" [nzWidth]="1200"
+      (nzOnCancel)="importOpen.set(false)" [nzOkText]="importLoaded() ? 'Xác nhận import' : null"
+      [nzOkDisabled]="!importLoaded()" (nzOnOk)="commitImport()">
       <ng-container *nzModalContent>
-        <div style="margin-bottom:14px;display:flex;gap:12px;align-items:center">
+        <div class="import-toolbar">
           <button nz-button (click)="downloadImportTemplate()"><nz-icon nzType="download" /> Tải file mẫu</button>
           <nz-upload [nzShowUploadList]="false" [nzBeforeUpload]="beforeImportUpload">
             <button nz-button nzType="primary"><nz-icon nzType="upload" /> Chọn file Excel</button>
           </nz-upload>
         </div>
-        @if (importPreview(); as p) {
-          <div class="import-grid">
-            <nz-table [nzData]="p.classes" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th>Lớp</th><th>Giáo viên</th><th>Lỗi</th></tr></thead>
+        @if (importLoaded()) {
+          <div class="import-summary">
+            <nz-tag nzColor="green">{{ importValidClasses() }} lớp hợp lệ</nz-tag>
+            <nz-tag nzColor="green">{{ importValidStudents() }} học viên hợp lệ</nz-tag>
+            @if (importInvalid() > 0) {
+              <nz-tag nzColor="red">{{ importInvalid() }} dòng lỗi — sửa rồi mới import</nz-tag>
+            }
+            <span class="import-hint">Sửa trực tiếp bên dưới (dropdown lấy từ danh mục thật). Bấm 1 lớp để xem học viên của lớp đó. Dòng lỗi sẽ bị bỏ qua khi import.</span>
+          </div>
+
+          <h4 class="import-h">Lớp ({{ editClasses().length }})</h4>
+          <nz-table [nzData]="editClasses()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '960px' }">
+            <thead><tr>
+              <th nzWidth="180px">Tên lớp</th><th nzWidth="160px">Giáo viên</th><th nzWidth="140px">Môn</th>
+              <th nzWidth="120px">Khối</th><th nzWidth="140px">Cơ sở</th><th nzWidth="110px">Học phí</th>
+              <th nzWidth="90px">Trạng thái</th><th nzWidth="48px"></th>
+            </tr></thead>
+            <tbody>
+              @for (c of editClasses(); track c.previewId) {
+                <tr class="clickable" [class.selected]="selectedImportClass() === c.previewId" (click)="selectedImportClass.set(c.previewId)">
+                  @if (c.existingClassId) {
+                    <td>{{ c.name }}</td>
+                    <td>{{ c.teacherName || '—' }}</td>
+                    <td>{{ c.subjectName || '—' }}</td>
+                    <td>{{ c.gradeName || '—' }}</td>
+                    <td>{{ c.branchName || '—' }}</td>
+                    <td>{{ c.tuitionFee | number:'1.0-0' }}</td>
+                    <td><nz-tag nzColor="blue">Lớp đã có</nz-tag></td>
+                    <td></td>
+                  } @else {
+                    <td (click)="$event.stopPropagation()"><input nz-input nzSize="small" [(ngModel)]="c.name" (ngModelChange)="revalidateImport()" /></td>
+                    <td (click)="$event.stopPropagation()"><nz-select class="cell-select" nzSize="small" nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="c.teacherProfileId" (ngModelChange)="revalidateImport()">@for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }</nz-select></td>
+                    <td (click)="$event.stopPropagation()"><nz-select class="cell-select" nzSize="small" nzShowSearch nzPlaceHolder="Môn" [(ngModel)]="c.subjectId" (ngModelChange)="revalidateImport()">@for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }</nz-select></td>
+                    <td (click)="$event.stopPropagation()"><nz-select class="cell-select" nzSize="small" nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="c.gradeId" (ngModelChange)="revalidateImport()">@for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }</nz-select></td>
+                    <td (click)="$event.stopPropagation()"><nz-select class="cell-select" nzSize="small" nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="c.branchId" (ngModelChange)="revalidateImport()">@for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }</nz-select></td>
+                    <td (click)="$event.stopPropagation()"><nz-input-number nzSize="small" class="full" [(ngModel)]="c.tuitionFee" [nzMin]="0" /></td>
+                    <td>
+                      @if (c.isValid) { <nz-tag nzColor="green">OK</nz-tag> }
+                      @else { <nz-tag nzColor="red" nz-tooltip [nzTooltipTitle]="c.error">Lỗi</nz-tag> }
+                    </td>
+                    <td (click)="$event.stopPropagation()"><button nz-button nzType="text" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Bỏ lớp này khỏi import?" (nzOnConfirm)="removeImportClass(c)"><nz-icon nzType="delete" /></button></td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </nz-table>
+
+          @if (selectedImportClass()) {
+            <h4 class="import-h">Học viên của lớp đã chọn ({{ selectedImportStudents().length }})</h4>
+            <nz-table [nzData]="selectedImportStudents()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '960px' }">
+              <thead><tr>
+                <th nzWidth="120px">Mã HV</th><th nzWidth="170px">Họ tên</th><th nzWidth="120px">Ngày sinh</th>
+                <th nzWidth="120px">SĐT PH</th><th nzWidth="120px">SĐT HV</th><th nzWidth="140px">Ghi chú</th>
+                <th nzWidth="150px">Lớp</th><th nzWidth="80px">Trạng thái</th><th nzWidth="48px"></th>
+              </tr></thead>
               <tbody>
-                @for (c of p.classes; track c.previewId) {
-                  <tr [class.selected]="selectedImportClass() === c.previewId" (click)="selectedImportClass.set(c.previewId)">
-                    <td>{{ c.classCode || 'Tự sinh' }} · {{ c.name }}</td><td>{{ c.teacherName || '—' }}</td><td>{{ c.error || '—' }}</td>
+                @for (s of selectedImportStudents(); track s.rowNumber) {
+                  <tr>
+                    <td><input nz-input nzSize="small" placeholder="Tự sinh" [(ngModel)]="s.studentCode" /></td>
+                    <td><input nz-input nzSize="small" [(ngModel)]="s.fullName" (ngModelChange)="revalidateImport()" /></td>
+                    <td><input nz-input nzSize="small" placeholder="dd/MM/yyyy" [(ngModel)]="s.dateOfBirth" /></td>
+                    <td><input nz-input nzSize="small" [(ngModel)]="s.parentPhone" /></td>
+                    <td><input nz-input nzSize="small" [(ngModel)]="s.phone" /></td>
+                    <td><input nz-input nzSize="small" [(ngModel)]="s.note" /></td>
+                    <td><nz-select class="cell-select" nzSize="small" [(ngModel)]="s.previewClassId" (ngModelChange)="revalidateImport()">@for (c of editClasses(); track c.previewId) { <nz-option [nzValue]="c.previewId" [nzLabel]="c.name || c.classCode || 'Lớp mới'" /> }</nz-select></td>
+                    <td>
+                      @if (s.isValid) { <nz-tag nzColor="green">OK</nz-tag> }
+                      @else { <nz-tag nzColor="red" nz-tooltip [nzTooltipTitle]="s.error">Lỗi</nz-tag> }
+                    </td>
+                    <td><button nz-button nzType="text" nzSize="small" nzDanger (click)="removeImportStudent(s)"><nz-icon nzType="delete" /></button></td>
                   </tr>
                 }
               </tbody>
             </nz-table>
-            <nz-table [nzData]="selectedImportStudents()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th>Dòng</th><th>Mã HV</th><th>Học viên</th><th>SĐT PH</th><th>Lỗi</th></tr></thead>
-              <tbody>
-                @for (s of selectedImportStudents(); track s.rowNumber) {
-                  <tr><td>{{ s.rowNumber }}</td><td>{{ s.studentCode || 'Tự sinh' }}</td><td>{{ s.fullName }}</td><td>{{ s.parentPhone || '—' }}</td><td>{{ s.error || '—' }}</td></tr>
-                }
-              </tbody>
-            </nz-table>
-          </div>
+          }
         }
       </ng-container>
     </nz-modal>
@@ -251,7 +345,20 @@ import { PageHeader } from '../../shared/page-header';
     .detail-grid b { display: block; color: var(--hs-text-muted); font-size: 12px; margin-bottom: 4px; }
     .detail-actions { margin-bottom: 12px; }
     .import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .import-toolbar { margin-bottom: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .import-summary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .import-hint { color: var(--hs-text-muted); font-size: 12px; }
+    .import-h { margin: 14px 0 8px; font-size: 14px; }
+    .cell-select { width: 100%; min-width: 110px; }
     .selected td { background: var(--hs-surface-2); }
+    .mobile-card-list { display: flex; flex-direction: column; gap: 12px; }
+    .mobile-card-list .clickable { cursor: pointer; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .card-title { font-weight: 600; }
+    .card-field { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+    .card-field .label { color: var(--hs-text-muted); font-size: 12px; }
+    .card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .mobile-pager { margin-top: 4px; text-align: center; }
     @media (max-width: 900px) {
       .filters, .catalog-grid, .form-grid, .detail-grid, .import-grid { grid-template-columns: 1fr; }
     }
@@ -265,6 +372,12 @@ export class ClassesPage {
   private readonly gradesService = inject(GradesService);
   private readonly teachersService = inject(TeachersService);
   private readonly message = inject(NzMessageService);
+  protected readonly auth = inject(AuthService);
+  protected readonly screen = inject(ScreenService);
+
+  /** Guid rỗng để form hợp lệ khi GV ẩn dropdown giáo viên; server tự gán GV = chính mình. */
+  private readonly EMPTY_GUID = '00000000-0000-0000-0000-000000000000';
+  private defaultTeacherId(): string { return this.auth.isAdmin() ? '' : this.EMPTY_GUID; }
 
   protected readonly classes = signal<ClassListItem[]>([]);
   protected readonly branches = signal<Branch[]>([]);
@@ -300,12 +413,17 @@ export class ClassesPage {
   });
 
   protected readonly importOpen = signal(false);
-  protected readonly importPreview = signal<ClassImportPreview | null>(null);
+  protected readonly importLoaded = signal(false);
+  // Bản sao có thể sửa của preview — người dùng chỉnh trực tiếp trước khi import; server revalidate lại khi commit.
+  protected readonly editClasses = signal<ClassImportClassPreview[]>([]);
+  protected readonly editStudents = signal<ClassImportStudentPreview[]>([]);
   protected readonly selectedImportClass = signal<string | null>(null);
-  protected readonly selectedImportStudents = computed(() => {
-    const id = this.selectedImportClass();
-    return this.importPreview()?.students.filter(s => s.previewClassId === id) ?? [];
-  });
+  protected readonly selectedImportStudents = computed(() =>
+    this.editStudents().filter(s => s.previewClassId === this.selectedImportClass()));
+  protected readonly importValidClasses = computed(() => this.editClasses().filter(c => c.isValid).length);
+  protected readonly importValidStudents = computed(() => this.editStudents().filter(s => s.isValid).length);
+  protected readonly importInvalid = computed(() =>
+    this.editClasses().filter(c => !c.isValid).length + this.editStudents().filter(s => !s.isValid).length);
 
   protected readonly editingSubject = signal<Subject | null>(null);
   protected subjectName = '';
@@ -350,7 +468,7 @@ export class ClassesPage {
     this.editingClass.set(item ?? null);
     if (!item) {
       this.classForm.reset({
-        classCode: null, name: '', teacherProfileId: '',
+        classCode: null, name: '', teacherProfileId: this.defaultTeacherId(),
         branchId: null, subjectId: null, gradeId: null,
         tuitionFee: 0, maxCapacity: 20, schedule: null, startDate: null, isActive: true
       });
@@ -361,7 +479,7 @@ export class ClassesPage {
       this.classForm.reset({
         classCode: d.classCode ?? null,
         name: d.name,
-        teacherProfileId: d.teacherProfileId ?? '',
+        teacherProfileId: d.teacherProfileId ?? this.defaultTeacherId(),
         branchId: d.branchId ?? null,
         subjectId: d.subjectId ?? null,
         gradeId: d.gradeId ?? null,
@@ -381,7 +499,7 @@ export class ClassesPage {
     const request: ClassRequest = {
       classCode: v.classCode || null,
       name: v.name,
-      teacherProfileId: v.teacherProfileId,
+      teacherProfileId: this.auth.isAdmin() ? v.teacherProfileId : this.EMPTY_GUID,
       branchId: v.branchId || null,
       subjectId: v.subjectId || null,
       gradeId: v.gradeId || null,
@@ -408,7 +526,9 @@ export class ClassesPage {
   }
 
   protected openImportModal(): void {
-    this.importPreview.set(null);
+    this.importLoaded.set(false);
+    this.editClasses.set([]);
+    this.editStudents.set([]);
     this.selectedImportClass.set(null);
     this.importOpen.set(true);
   }
@@ -444,8 +564,11 @@ export class ClassesPage {
     const raw = file as unknown as File;
     this.classesService.importClassesPreview(raw).subscribe({
       next: p => {
-        this.importPreview.set(p);
+        // Clone để sửa tại chỗ; revalidate phía client cho phản hồi tức thì, server vẫn kiểm lại khi commit.
+        this.editClasses.set(p.classes.map(c => ({ ...c })));
+        this.editStudents.set(p.students.map(s => ({ ...s })));
         this.selectedImportClass.set(p.classes[0]?.previewId ?? null);
+        this.importLoaded.set(true);
         this.importOpen.set(true);
       },
       error: err => this.showError(err, 'Không đọc được file import.')
@@ -454,17 +577,66 @@ export class ClassesPage {
   };
 
   protected commitImport(): void {
-    const preview = this.importPreview();
-    if (!preview) return;
-    this.classesService.importClassesCommit({ classes: preview.classes, students: preview.students }).subscribe({
+    if (!this.importLoaded()) return;
+    this.classesService.importClassesCommit({ classes: this.editClasses(), students: this.editStudents() }).subscribe({
       next: r => {
-        this.message.success(`Đã tạo ${r.classesCreated} lớp, ${r.studentsCreated} học viên.`);
+        const skipped = r.skipped > 0 ? ` Bỏ qua ${r.skipped} dòng.` : '';
+        this.message.success(`Đã tạo ${r.classesCreated} lớp, ${r.studentsCreated} học viên.${skipped}`);
+        if (r.errors?.length) this.message.warning(r.errors.slice(0, 3).join(' · '));
         this.importOpen.set(false);
         this.loadClasses();
         this.loadLookups();
       },
       error: err => this.showError(err, 'Import thất bại.')
     });
+  }
+
+  /** Kiểm tra lại tính hợp lệ sau mỗi lần sửa preview (mirror logic server; server vẫn revalidate khi commit). */
+  protected revalidateImport(): void {
+    const classes = this.editClasses();
+    const validIds = new Set<string>();
+    for (const c of classes) {
+      c.error = this.validateImportClass(c);
+      c.isValid = c.error === null;
+      if (c.isValid) validIds.add(c.previewId);
+    }
+    const students = this.editStudents();
+    for (const s of students) {
+      s.error = this.validateImportStudent(s, validIds);
+      s.isValid = s.error === null;
+    }
+    // Gán lại tham chiếu để các computed (đếm hợp lệ/lỗi) cập nhật.
+    this.editClasses.set([...classes]);
+    this.editStudents.set([...students]);
+  }
+
+  private validateImportClass(c: ClassImportClassPreview): string | null {
+    if (c.existingClassId) return null; // lớp đã có → dùng lại, bỏ qua kiểm
+    if (!c.name?.trim() && !c.classCode?.trim()) return 'Thiếu tên lớp hoặc mã lớp.';
+    if (!c.branchId) return 'Cơ sở không hợp lệ.';
+    if (!c.subjectId) return 'Môn học không hợp lệ.';
+    if (!c.gradeId) return 'Khối không hợp lệ.';
+    if (!c.teacherProfileId) return 'Giáo viên không hợp lệ.';
+    return null;
+  }
+
+  private validateImportStudent(s: ClassImportStudentPreview, validClassIds: Set<string>): string | null {
+    if (!s.fullName?.trim()) return 'Thiếu tên học viên.';
+    if (!validClassIds.has(s.previewClassId)) return 'Lớp của dòng này chưa hợp lệ.';
+    return null;
+  }
+
+  protected removeImportClass(c: ClassImportClassPreview): void {
+    this.editClasses.set(this.editClasses().filter(x => x.previewId !== c.previewId));
+    this.editStudents.set(this.editStudents().filter(s => s.previewClassId !== c.previewId));
+    if (this.selectedImportClass() === c.previewId)
+      this.selectedImportClass.set(this.editClasses()[0]?.previewId ?? null);
+    this.revalidateImport();
+  }
+
+  protected removeImportStudent(s: ClassImportStudentPreview): void {
+    this.editStudents.set(this.editStudents().filter(x => x.rowNumber !== s.rowNumber));
+    this.revalidateImport();
   }
 
   protected saveSubject(): void {

@@ -49,14 +49,17 @@ public class ClassesController(
         return (await importService.CommitAsync(id, stream, createAccounts, ct)).ToActionResult();
     }
 
+    // Nhập hàng loạt LỚP (tạo lớp + gán giáo viên) là thao tác điều phối — chỉ Admin.
     /// <summary>Tải file Excel mẫu để nhập danh sách lớp.</summary>
     [HttpGet("import-classes-template")]
+    [Authorize(Policy = "AdminOnly")]
     public IActionResult ImportClassesTemplate() =>
         File(classImportService.BuildTemplate(),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "mau-danh-sach-lop.xlsx");
 
     /// <summary>Xem trước danh sách lớp từ file Excel (validate từng dòng).</summary>
     [HttpPost("import-classes/preview")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ClassImportPreviewDto>> ImportClassesPreview(IFormFile file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
@@ -67,6 +70,7 @@ public class ClassesController(
 
     /// <summary>Xác nhận nhập sau khi người dùng đã chỉnh preview: tạo lớp + học viên + ghi danh.</summary>
     [HttpPost("import-classes")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<ClassImportResultDto>> ImportClassesCommit(ClassImportCommitRequest request, CancellationToken ct) =>
         (await classImportService.CommitAsync(request, ct)).ToActionResult();
 

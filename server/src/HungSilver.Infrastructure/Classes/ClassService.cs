@@ -95,7 +95,11 @@ public sealed class ClassService(
         if (!validation.IsValid)
             return Result.Failure<ClassDto>(validation.ToError("Class.Validation"));
 
-        var snapshot = await BuildSnapshotAsync(request.TeacherProfileId, request.BranchId, request.SubjectId, request.GradeId, ct);
+        var teacherProfileId = await ResolveTeacherProfileIdAsync(request.TeacherProfileId, ct);
+        if (teacherProfileId.IsFailure)
+            return Result.Failure<ClassDto>(teacherProfileId.Error);
+
+        var snapshot = await BuildSnapshotAsync(teacherProfileId.Value, request.BranchId, request.SubjectId, request.GradeId, ct);
         if (snapshot.IsFailure)
             return Result.Failure<ClassDto>(snapshot.Error);
 
@@ -107,7 +111,7 @@ public sealed class ClassService(
         {
             ClassCode = classCode.Value,
             Name = request.Name.Trim(),
-            TeacherProfileId = request.TeacherProfileId,
+            TeacherProfileId = teacherProfileId.Value,
             TeacherId = snapshot.Value.TeacherUserId ?? Guid.Empty,
             TeacherName = snapshot.Value.TeacherName,
             BranchId = Normalize(request.BranchId),
@@ -146,7 +150,11 @@ public sealed class ClassService(
         if (access.IsFailure)
             return Result.Failure<ClassDto>(access.Error);
 
-        var snapshot = await BuildSnapshotAsync(request.TeacherProfileId, request.BranchId, request.SubjectId, request.GradeId, ct);
+        var teacherProfileId = await ResolveTeacherProfileIdAsync(request.TeacherProfileId, ct);
+        if (teacherProfileId.IsFailure)
+            return Result.Failure<ClassDto>(teacherProfileId.Error);
+
+        var snapshot = await BuildSnapshotAsync(teacherProfileId.Value, request.BranchId, request.SubjectId, request.GradeId, ct);
         if (snapshot.IsFailure)
             return Result.Failure<ClassDto>(snapshot.Error);
 
@@ -156,7 +164,7 @@ public sealed class ClassService(
 
         cls.ClassCode = classCode.Value;
         cls.Name = request.Name.Trim();
-        cls.TeacherProfileId = request.TeacherProfileId;
+        cls.TeacherProfileId = teacherProfileId.Value;
         cls.TeacherId = snapshot.Value.TeacherUserId ?? Guid.Empty;
         cls.TeacherName = snapshot.Value.TeacherName;
         cls.BranchId = Normalize(request.BranchId);
@@ -213,6 +221,10 @@ public sealed class ClassService(
 
     public async Task<Result> AssignTeacherAsync(Guid classId, AssignTeacherRequest request, CancellationToken ct = default)
     {
+        // Đổi giáo viên phụ trách là thao tác điều phối — chỉ Admin (GV không tự chuyển lớp sang người khác).
+        if (!accessGuard.IsAdmin)
+            return Result.Failure(Error.Forbidden("Class.AssignTeacherForbidden", "Chỉ quản trị viên được đổi giáo viên phụ trách."));
+
         var cls = await context.Classes.FirstOrDefaultAsync(c => c.Id == classId, ct);
         if (cls is null)
             return Result.Failure(NotFoundError);
@@ -410,8 +422,10 @@ public sealed class ClassService(
             var totalRecords = await context.StudentSessionRecords.CountAsync(r => sessionIds.Contains(r.ClassSessionId), ct);
             if (totalRecords > 0)
             {
+                // Có mặt = Present hoặc Late (đi muộn vẫn tính chuyên cần) — khớp GetOverviewAsync.
                 var present = await context.StudentSessionRecords
-                    .CountAsync(r => sessionIds.Contains(r.ClassSessionId) && r.Attendance == AttendanceStatus.Present, ct);
+                    .CountAsync(r => sessionIds.Contains(r.ClassSessionId)
+                        && (r.Attendance == AttendanceStatus.Present || r.Attendance == AttendanceStatus.Late), ct);
                 attendanceRate = Math.Round((decimal)present / totalRecords * 100, 1);
             }
         }
@@ -579,6 +593,21 @@ public sealed class ClassService(
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Admin được gán lớp cho bất kỳ giáo viên nào; Giáo viên bị ép gán cho chính mình (scope),
+    /// bỏ qua giá trị client gửi. GV chưa liên kết hồ sơ → Forbidden.
+    /// </summary>
+    private async Task<Result<Guid>> ResolveTeacherProfileIdAsync(Guid requested, CancellationToken ct)
+    {
+        if (accessGuard.IsAdmin)
+            return requested;
+
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        return scopeId is null || scopeId.Value == Guid.Empty
+            ? Result.Failure<Guid>(Error.Forbidden("Class.NoTeacherProfile", "Tài khoản giáo viên chưa liên kết hồ sơ giáo viên."))
+            : scopeId.Value;
     }
 
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;

@@ -183,6 +183,10 @@ public sealed class TuitionService(
         if (!validation.IsValid)
             return Result.Failure<TuitionInvoiceDto>(validation.ToError("Tuition.Validation"));
 
+        var access = await accessGuard.EnsureCanAccessStudentAsync(request.StudentId, ct);
+        if (access.IsFailure)
+            return Result.Failure<TuitionInvoiceDto>(access.Error);
+
         if (!await context.Students.AnyAsync(s => s.Id == request.StudentId, ct))
             return Result.Failure<TuitionInvoiceDto>(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
         if (request.ClassId is not null && !await context.Classes.AnyAsync(c => c.Id == request.ClassId.Value, ct))
@@ -214,6 +218,10 @@ public sealed class TuitionService(
         if (invoice is null)
             return Result.Failure<TuitionInvoiceDto>(NotFoundError);
 
+        var access = await accessGuard.EnsureCanAccessStudentAsync(invoice.StudentId, ct);
+        if (access.IsFailure)
+            return Result.Failure<TuitionInvoiceDto>(access.Error);
+
         invoice.Amount = request.Amount;
         invoice.DueDate = request.DueDate;
         invoice.Note = request.Note?.Trim();
@@ -226,6 +234,10 @@ public sealed class TuitionService(
         var invoice = await context.TuitionInvoices.FirstOrDefaultAsync(t => t.Id == id, ct);
         if (invoice is null)
             return Result.Failure<TuitionInvoiceDto>(NotFoundError);
+
+        var access = await accessGuard.EnsureCanAccessStudentAsync(invoice.StudentId, ct);
+        if (access.IsFailure)
+            return Result.Failure<TuitionInvoiceDto>(access.Error);
 
         invoice.PaidOn = request.PaidOn ?? DateOnly.FromDateTime(DateTime.Now);
         invoice.PaidAmount = Math.Max(0, invoice.Amount - invoice.DiscountAmount);
@@ -240,6 +252,10 @@ public sealed class TuitionService(
         if (invoice is null)
             return Result.Failure(NotFoundError);
 
+        var access = await accessGuard.EnsureCanAccessStudentAsync(invoice.StudentId, ct);
+        if (access.IsFailure)
+            return access;
+
         context.TuitionInvoices.Remove(invoice);
         await context.SaveChangesAsync(ct);
         return Result.Success();
@@ -250,6 +266,10 @@ public sealed class TuitionService(
         var invoice = await context.TuitionInvoices.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == id && t.IsDeleted, ct);
         if (invoice is null)
             return Result.Failure(NotFoundError);
+
+        var access = await accessGuard.EnsureCanAccessStudentAsync(invoice.StudentId, ct);
+        if (access.IsFailure)
+            return access;
 
         invoice.IsDeleted = false;
         invoice.DeletedAt = null;

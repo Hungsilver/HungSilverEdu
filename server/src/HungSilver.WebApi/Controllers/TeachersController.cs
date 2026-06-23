@@ -22,31 +22,40 @@ public class TeachersController(ITeacherService teacherService) : ControllerBase
     public async Task<ActionResult<TeacherDetailDto>> GetTeacher(Guid id, CancellationToken ct) =>
         (await teacherService.GetByIdAsync(id, ct)).ToActionResult();
 
+    // Quản lý hồ sơ giáo viên + liên kết tài khoản là thao tác quản trị — chỉ Admin.
+    // GET danh sách/chi tiết giữ TeacherOrAdmin để GV đọc (dropdown/hiển thị).
     [HttpPost]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<TeacherProfileDto>> Create(CreateTeacherRequest request, CancellationToken ct) =>
         (await teacherService.CreateAsync(request, ct)).ToActionResult();
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<TeacherProfileDto>> Update(Guid id, UpdateTeacherRequest request, CancellationToken ct) =>
         (await teacherService.UpdateAsync(id, request, ct)).ToActionResult();
 
     [HttpPost("accounts")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<TeacherProfileDto>> CreateAccount(CreateTeacherAccountRequest request, CancellationToken ct) =>
         (await teacherService.CreateAccountAsync(request, ct)).ToActionResult();
 
     [HttpGet("unlinked-users")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<List<UnlinkedUserDto>>> GetUnlinkedUsers(CancellationToken ct) =>
         (await teacherService.GetUnlinkedUsersAsync(ct)).ToActionResult();
 
     [HttpPut("{id:guid}/link-account")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<TeacherProfileDto>> LinkAccount(Guid id, LinkAccountRequest request, CancellationToken ct) =>
         (await teacherService.LinkAccountAsync(id, request, ct)).ToActionResult();
 
     [HttpDelete("{id:guid}/link-account")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<TeacherProfileDto>> UnlinkAccount(Guid id, CancellationToken ct) =>
         (await teacherService.UnlinkAccountAsync(id, ct)).ToActionResult();
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct) =>
         (await teacherService.DeleteAsync(id, ct)).ToActionResult();
 }

@@ -92,6 +92,10 @@ public sealed class StudentService(
 
     public async Task<Result<StudentDto>> CreateAsync(CreateStudentRequest request, CancellationToken ct = default)
     {
+        // Học sinh "trần" (không gắn lớp) chỉ Admin tạo; Giáo viên tạo học sinh trong lớp qua StudentAccountService.
+        if (!accessGuard.IsAdmin)
+            return Result.Failure<StudentDto>(Error.Forbidden("Student.CreateNotAllowed", "Giáo viên tạo học sinh trong lớp."));
+
         var validation = await createValidator.ValidateAsync(request, ct);
         if (!validation.IsValid)
             return Result.Failure<StudentDto>(validation.ToError("Student.Validation"));

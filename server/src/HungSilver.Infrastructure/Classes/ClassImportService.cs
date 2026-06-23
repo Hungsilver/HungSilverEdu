@@ -181,20 +181,34 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         var studentCreated = 0;
         var enrollmentCreated = 0;
 
+        // Revalidate server-side: KHÔNG tin IsValid/Id/tên do client gửi. Nạp danh mục hợp lệ (active)
+        // theo Id để dựng snapshot từ DB, chống tiêm GUID rác / tên lệch.
+        var branchById = await context.Branches.AsNoTracking().Where(b => b.IsActive).ToDictionaryAsync(b => b.Id, ct);
+        var subjectById = await context.Subjects.AsNoTracking().Where(s => s.IsActive).ToDictionaryAsync(s => s.Id, ct);
+        var gradeById = await context.GradeCategories.AsNoTracking().Where(g => g.IsActive).ToDictionaryAsync(g => g.Id, ct);
+        var teacherById = await context.TeacherProfiles.AsNoTracking().Where(t => t.IsActive).ToDictionaryAsync(t => t.Id, ct);
+
+        // Toàn bộ thao tác ghi nằm trong 1 transaction: lỗi giữa chừng ⇒ rollback sạch (dispose tx khi chưa Commit).
+        await using var tx = await context.Database.BeginTransactionAsync(ct);
+
         var classByPreview = new Dictionary<string, Guid>();
-        var gradeByPreview = request.Classes.ToDictionary(c => c.PreviewId, c => c.GradeName);
+        var gradeNameByPreview = new Dictionary<string, string?>();
         foreach (var item in request.Classes)
         {
-            if (!item.IsValid)
-            {
-                skipped++;
-                if (item.Error is not null) errors.Add($"Lớp {item.Name}: {item.Error}");
-                continue;
-            }
-
             var classId = item.ExistingClassId;
             if (classId is null)
             {
+                if (item.BranchId is null || !branchById.TryGetValue(item.BranchId.Value, out var branch))
+                { skipped++; errors.Add($"Lớp {item.Name}: cơ sở không hợp lệ."); continue; }
+                if (item.SubjectId is null || !subjectById.TryGetValue(item.SubjectId.Value, out var subject))
+                { skipped++; errors.Add($"Lớp {item.Name}: môn học không hợp lệ."); continue; }
+                if (item.GradeId is null || !gradeById.TryGetValue(item.GradeId.Value, out var grade))
+                { skipped++; errors.Add($"Lớp {item.Name}: khối không hợp lệ."); continue; }
+                if (item.TeacherProfileId is null || !teacherById.TryGetValue(item.TeacherProfileId.Value, out var teacher))
+                { skipped++; errors.Add($"Lớp {item.Name}: giáo viên không hợp lệ."); continue; }
+                if (string.IsNullOrWhiteSpace(item.Name) && string.IsNullOrWhiteSpace(item.ClassCode))
+                { skipped++; errors.Add("Thiếu tên lớp hoặc mã lớp."); continue; }
+
                 var duplicateCode = !string.IsNullOrWhiteSpace(item.ClassCode)
                     && await context.Classes.IgnoreQueryFilters().AnyAsync(c => c.ClassCode == item.ClassCode, ct);
                 if (duplicateCode)
@@ -204,31 +218,35 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                     continue;
                 }
 
-                var teacher = item.TeacherProfileId is null
-                    ? null
-                    : await context.TeacherProfiles.AsNoTracking().FirstOrDefaultAsync(t => t.Id == item.TeacherProfileId.Value, ct);
                 var cls = new ClassRoom
                 {
                     ClassCode = string.IsNullOrWhiteSpace(item.ClassCode) ? UniqueCodeGenerator.Next("LH") : item.ClassCode.Trim().ToUpperInvariant(),
                     Name = item.Name.Trim(),
-                    TeacherProfileId = item.TeacherProfileId,
-                    TeacherId = teacher?.UserId ?? Guid.Empty,
-                    TeacherName = item.TeacherName,
-                    BranchId = item.BranchId,
-                    BranchCode = item.BranchCode,
-                    BranchName = item.BranchName,
-                    SubjectId = item.SubjectId,
-                    SubjectName = item.SubjectName,
-                    GradeId = item.GradeId,
-                    GradeName = item.GradeName,
-                    GradeBand = item.GradeName,
+                    TeacherProfileId = teacher.Id,
+                    TeacherId = teacher.UserId ?? Guid.Empty,
+                    TeacherName = teacher.FullName,
+                    BranchId = branch.Id,
+                    BranchCode = branch.Code,
+                    BranchName = branch.Name,
+                    SubjectId = subject.Id,
+                    SubjectName = subject.Name,
+                    GradeId = grade.Id,
+                    GradeName = grade.Name,
+                    GradeBand = grade.Name,
                     TuitionFee = item.TuitionFee,
                     MaxCapacity = 1000,
                     IsActive = true
                 };
                 context.Classes.Add(cls);
                 classId = cls.Id;  // Id = Guid.NewGuid() — có sẵn trước khi SaveChanges
+                gradeNameByPreview[item.PreviewId] = grade.Name;
                 classCreated++;
+            }
+            else
+            {
+                // Lớp đã tồn tại: lấy tên khối từ DB (không tin client) để sinh mã học viên.
+                gradeNameByPreview[item.PreviewId] = await context.Classes.AsNoTracking()
+                    .Where(c => c.Id == classId.Value).Select(c => c.GradeName).FirstOrDefaultAsync(ct);
             }
             classByPreview[item.PreviewId] = classId.Value;
         }
@@ -237,10 +255,10 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
 
         foreach (var row in request.Students)
         {
-            if (!row.IsValid || !classByPreview.TryGetValue(row.PreviewClassId, out var classId))
+            if (string.IsNullOrWhiteSpace(row.FullName) || !classByPreview.TryGetValue(row.PreviewClassId, out var classId))
             {
                 skipped++;
-                if (row.Error is not null) errors.Add($"Dòng {row.RowNumber}: {row.Error}");
+                errors.Add($"Dòng {row.RowNumber}: {(row.Error ?? "thiếu tên học viên hoặc lớp không hợp lệ.")}");
                 continue;
             }
 
@@ -257,7 +275,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
             }
             else
             {
-                var gradeName = gradeByPreview.GetValueOrDefault(row.PreviewClassId);
+                var gradeName = gradeNameByPreview.GetValueOrDefault(row.PreviewClassId);
                 var dob = ParseDate(row.DateOfBirth);
                 code = await ResolveStudentCodeAsync(row.FullName, dob, gradeName, ct);
             }
@@ -282,11 +300,13 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                 EnrolledOn = DateOnly.FromDateTime(DateTime.Now),
                 IsActive = true
             });
+            // SaveChanges từng dòng (trong transaction) để mã học viên dòng sau thấy dòng trước; lỗi vẫn rollback toàn cục.
             await context.SaveChangesAsync(ct);
             studentCreated++;
             enrollmentCreated++;
         }
 
+        await tx.CommitAsync(ct);
         return new ClassImportResultDto(classCreated, studentCreated, enrollmentCreated, skipped, errors);
     }
 

@@ -13,6 +13,7 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzPopoverModule } from 'ng-zorro-antd/popover';
 import { NzTableModule } from 'ng-zorro-antd/table';
+import { AuthService } from '../../core/auth.service';
 import { BranchesService } from '../../core/branches.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
 import { GradesService } from '../../core/grades.service';
@@ -31,7 +32,9 @@ import { PageHeader } from '../../shared/page-header';
   ],
   template: `
     <app-page-header title="Học viên" subtitle="Hồ sơ học viên và lớp đang theo học" icon="idcard">
-      <button nz-button nzType="primary" (click)="openForm()"><nz-icon nzType="plus" /> Thêm học viên</button>
+      @if (auth.isAdmin()) {
+        <button nz-button nzType="primary" (click)="openForm()"><nz-icon nzType="plus" /> Thêm học viên</button>
+      }
     </app-page-header>
 
     <div class="filters">
@@ -151,6 +154,7 @@ export class StudentsPage {
   private readonly gradesService = inject(GradesService);
   private readonly teachersService = inject(TeachersService);
   private readonly message = inject(NzMessageService);
+  protected readonly auth = inject(AuthService);
 
   protected readonly students = signal<Student[]>([]);
   protected readonly branches = signal<Branch[]>([]);
