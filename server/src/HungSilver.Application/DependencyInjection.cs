@@ -4,6 +4,7 @@ using HungSilver.Application.Common;
 using HungSilver.Application.Grades;
 using HungSilver.Application.Journals;
 using HungSilver.Application.Materials;
+using HungSilver.Application.PointReasons;
 using HungSilver.Application.Products;
 using HungSilver.Application.Students;
 using HungSilver.Application.Subjects;
@@ -27,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<IBranchService, BranchService>();
         services.AddScoped<IGradeService, GradeService>();
+        services.AddScoped<IPointReasonService, PointReasonService>();
         return services;
     }
 }

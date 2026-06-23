@@ -19,26 +19,62 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
     public byte[] BuildTemplate()
     {
         using var wb = new XLWorkbook();
-        var ws = wb.AddWorksheet("NhapLieu");
+
+        // ── Sheet 1: Nhập liệu ──────────────────────────────────────────────
+        var ws = wb.AddWorksheet("Nhập liệu");
         for (var i = 0; i < MainHeaders.Length; i++)
-            ws.Cell(1, i + 1).Value = MainHeaders[i];
-        ws.Row(1).Style.Font.Bold = true;
+        {
+            var cell = ws.Cell(1, i + 1);
+            cell.Value = MainHeaders[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#4F46E5");
+        }
         ws.Cell(2, 3).Value = "Nguyễn Văn A";
         ws.Cell(2, 4).Value = "01/09/2010";
         ws.Cell(2, 6).Value = "Lớp toán 11 cô Phượng";
         ws.Cell(2, 10).Value = "0900000000";
 
-        AddLookupSheet(wb, "CoSo", context.Branches.AsNoTracking().OrderBy(x => x.IndexOrder).Select(x => $"{x.Code} - {x.Name}").ToList());
-        AddLookupSheet(wb, "MonHoc", context.Subjects.AsNoTracking().OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList());
-        AddLookupSheet(wb, "Khoi", context.GradeCategories.AsNoTracking().OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList());
-        AddLookupSheet(wb, "GiaoVien", context.TeacherProfiles.AsNoTracking().OrderBy(x => x.FullName).Select(x => x.FullName).ToList());
-        AddLookupSheet(wb, "LopHienCo", context.Classes.AsNoTracking().OrderBy(x => x.Name).Select(x => $"{x.ClassCode} - {x.Name}").ToList());
+        // Cột cố định: CoSo|MaHV|TenHV|NgaySinh|MaLop|TenLop|Mon|Khoi|GV|SDTPhuHuynh|SDTHocVien|GhiChu
+        int[] dataWidths = [15, 15, 25, 18, 15, 30, 20, 15, 25, 18, 18, 30];
+        for (var i = 0; i < dataWidths.Length; i++)
+            ws.Column(i + 1).Width = dataWidths[i];
 
-        AddDropdown(ws, "A2:A500", "CoSo");
-        AddDropdown(ws, "G2:G500", "MonHoc");
-        AddDropdown(ws, "H2:H500", "Khoi");
-        AddDropdown(ws, "I2:I500", "GiaoVien");
-        ws.Columns().AdjustToContents();
+        // ── Sheet 2: Danh mục ───────────────────────────────────────────────
+        // Khối(A) | Môn học(B) | Giáo viên(C) | Cơ sở(D) | Lớp hiện có(E)
+        var dmWs = wb.AddWorksheet("Danh mục");
+        string[] dmHeaders = ["Khối", "Môn học", "Giáo viên", "Cơ sở", "Lớp hiện có"];
+        for (var i = 0; i < dmHeaders.Length; i++)
+        {
+            var cell = dmWs.Cell(1, i + 1);
+            cell.Value = dmHeaders[i];
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#FFFFC8");
+        }
+
+        var grades = context.GradeCategories.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList();
+        var subjects = context.Subjects.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList();
+        var teachers = context.TeacherProfiles.AsNoTracking().OrderBy(x => x.FullName).Select(x => x.FullName).ToList();
+        var branches = context.Branches.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.IndexOrder).Select(x => x.Name).ToList();
+        var classes = context.Classes.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => x.Name).ToList();
+
+        for (var i = 0; i < grades.Count; i++) dmWs.Cell(i + 2, 1).Value = grades[i];
+        for (var i = 0; i < subjects.Count; i++) dmWs.Cell(i + 2, 2).Value = subjects[i];
+        for (var i = 0; i < teachers.Count; i++) dmWs.Cell(i + 2, 3).Value = teachers[i];
+        for (var i = 0; i < branches.Count; i++) dmWs.Cell(i + 2, 4).Value = branches[i];
+        for (var i = 0; i < classes.Count; i++) dmWs.Cell(i + 2, 5).Value = classes[i];
+
+        int[] dmWidths = [20, 20, 25, 20, 30];
+        for (var i = 0; i < dmWidths.Length; i++)
+            dmWs.Column(i + 1).Width = dmWidths[i];
+
+        // Dropdown từ "Danh mục" sheet:
+        // Cột A (Cơ sở) → Danh mục!D | Cột G (Môn) → Danh mục!B
+        // Cột H (Khối) → Danh mục!A  | Cột I (GV) → Danh mục!C
+        AddDropdown(ws, "A2:A500", "'Danh mục'", "D");
+        AddDropdown(ws, "G2:G500", "'Danh mục'", "B");
+        AddDropdown(ws, "H2:H500", "'Danh mục'", "A");
+        AddDropdown(ws, "I2:I500", "'Danh mục'", "C");
 
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
@@ -51,7 +87,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         try
         {
             using var wb = new XLWorkbook(file);
-            var ws = wb.Worksheet("NhapLieu") ?? wb.Worksheets.First();
+            var ws = wb.Worksheet("Nhập liệu") ?? wb.Worksheet("NhapLieu") ?? wb.Worksheets.First();
             rows = ws.RowsUsed().Skip(1)
                 .Select(r => new RawRow(
                     r.RowNumber(),
@@ -254,20 +290,10 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         return new ClassImportResultDto(classCreated, studentCreated, enrollmentCreated, skipped, errors);
     }
 
-    private static void AddLookupSheet(XLWorkbook wb, string name, List<string> values)
-    {
-        var ws = wb.AddWorksheet(name);
-        ws.Cell(1, 1).Value = name;
-        ws.Row(1).Style.Font.Bold = true;
-        for (var i = 0; i < values.Count; i++)
-            ws.Cell(i + 2, 1).Value = values[i];
-        ws.Columns().AdjustToContents();
-    }
-
-    private static void AddDropdown(IXLWorksheet ws, string range, string sheetName)
+    private static void AddDropdown(IXLWorksheet ws, string range, string sheetName, string col)
     {
         var validation = ws.Range(range).CreateDataValidation();
-        validation.List($"={sheetName}!$A$2:$A$500");
+        validation.List($"={sheetName}!${col}$2:${col}$500");
         validation.IgnoreBlanks = true;
         validation.InCellDropdown = true;
     }

@@ -17,14 +17,12 @@ import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import {
   AttendanceStatus, AttitudeStatus, ATTITUDE_LABELS, HomeworkStatus, HOMEWORK_LABELS,
-  PointType, SaveAttendanceRow, SessionSheet, SessionStudentRow
+  PointReason, PointReasonType, PointType, SaveAttendanceRow, SessionSheet, SessionStudentRow
 } from '../../core/models';
+import { PointReasonsService } from '../../core/point-reasons.service';
 import { ScreenService } from '../../core/screen.service';
 import { SessionsService } from '../../core/sessions.service';
-import { SettingsService } from '../../core/settings.service';
 import { PageHeader } from '../../shared/page-header';
-
-interface PointReason { label: string; points: number; }
 
 @Component({
   selector: 'app-session-page',
@@ -224,16 +222,16 @@ export class SessionPage implements OnInit {
 
   protected readonly screen = inject(ScreenService);
   private readonly sessionsService = inject(SessionsService);
-  private readonly settingsService = inject(SettingsService);
+  private readonly pointReasonsService = inject(PointReasonsService);
   private readonly message = inject(NzMessageService);
 
   protected readonly sheet = signal<SessionSheet | null>(null);
   protected readonly rows = signal<SessionStudentRow[]>([]);
   protected readonly saving = signal(false);
 
-  // Lý do cộng/trừ điểm cấu hình sẵn (Settings) → nút bấm nhanh 1 chạm.
-  protected readonly rewardReasons = signal<PointReason[]>(DEFAULT_REWARD_REASONS);
-  protected readonly penaltyReasons = signal<PointReason[]>(DEFAULT_PENALTY_REASONS);
+  // Lý do cộng/trừ điểm từ API → nút bấm nhanh 1 chạm.
+  protected readonly rewardReasons = signal<PointReason[]>([]);
+  protected readonly penaltyReasons = signal<PointReason[]>([]);
   // Là method (không phải computed) để cập nhật ngay khi sửa từng dòng (row được mutate tại chỗ).
   protected presentCount(): number {
     return this.rows().filter(r => r.attendance === AttendanceStatus.Present || r.attendance === AttendanceStatus.Late).length;
@@ -255,11 +253,9 @@ export class SessionPage implements OnInit {
   }
 
   private loadReasons(): void {
-    this.settingsService.getEffective().subscribe(s => {
-      const reward = parseReasons(s.values['Points.RewardReasons']);
-      const penalty = parseReasons(s.values['Points.PenaltyReasons']);
-      if (reward.length) this.rewardReasons.set(reward);
-      if (penalty.length) this.penaltyReasons.set(penalty);
+    this.pointReasonsService.getAll().subscribe(all => {
+      this.rewardReasons.set(all.filter(r => r.type === PointReasonType.Reward));
+      this.penaltyReasons.set(all.filter(r => r.type === PointReasonType.Penalty));
     });
   }
 
@@ -334,29 +330,3 @@ export class SessionPage implements OnInit {
   }
 }
 
-const DEFAULT_REWARD_REASONS: PointReason[] = [
-  { label: 'Trả lời đúng', points: 1 },
-  { label: 'Hoạt động nhóm', points: 1 },
-  { label: 'Thành tích xuất sắc', points: 2 }
-];
-const DEFAULT_PENALTY_REASONS: PointReason[] = [
-  { label: 'Nói chuyện riêng', points: 1 },
-  { label: 'Không làm bài', points: 1 },
-  { label: 'Vi phạm nội quy', points: 2 }
-];
-
-/** Phân tích cấu hình lý do: mỗi dòng "Nhãn=điểm" (thiếu điểm ⇒ mặc định 1). */
-function parseReasons(raw: string | undefined): PointReason[] {
-  if (!raw) return [];
-  return raw.split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .map(line => {
-      const idx = line.lastIndexOf('=');
-      if (idx < 0) return { label: line, points: 1 };
-      const label = line.slice(0, idx).trim();
-      const points = parseInt(line.slice(idx + 1).trim(), 10);
-      return { label: label || line, points: Number.isFinite(points) && points > 0 ? points : 1 };
-    })
-    .filter(r => r.label.length > 0);
-}

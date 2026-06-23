@@ -1287,6 +1287,32 @@ export const REWARD_TIER_LABELS: Record<RewardTier, string> = {
 
 export const WEEKDAY_LABELS = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
+// ----------------- Lý do điểm -----------------
+
+export enum PointReasonType {
+  Reward = 'Reward',
+  Penalty = 'Penalty'
+}
+
+export interface PointReason {
+  id: string;
+  label: string;
+  points: number;
+  type: PointReasonType;
+  indexOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface PointReasonRequest {
+  label: string;
+  points: number;
+  type: PointReasonType;
+  indexOrder: number;
+  isActive: boolean;
+}
+
 export const SKILLS: { key: keyof SkillScores; label: string }[] = [
   { key: 'listening', label: 'Nghe' },
   { key: 'speaking', label: 'Nói' },

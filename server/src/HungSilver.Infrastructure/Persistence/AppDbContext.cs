@@ -41,6 +41,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
     public DbSet<AppSetting> Settings => Set<AppSetting>();
+    public DbSet<PointReason> PointReasons => Set<PointReason>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

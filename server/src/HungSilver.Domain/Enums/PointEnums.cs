@@ -1,5 +1,12 @@
 namespace HungSilver.Domain.Enums;
 
+/// <summary>Phân loại lý do cộng/trừ điểm.</summary>
+public enum PointReasonType
+{
+    Reward = 0,   // Cộng điểm
+    Penalty = 1   // Trừ điểm
+}
+
 /// <summary>Loại điểm: thưởng (Phần 4) hoặc phạt (Phần 5).</summary>
 public enum PointType
 {

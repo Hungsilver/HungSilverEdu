@@ -51,6 +51,7 @@ public static class DbSeeder
         }
 
         await SeedGradeCategoriesAsync(context, logger);
+        await SeedPointReasonsAsync(context, logger);
 
         // Auto-seed tài khoản Admin nếu chưa có admin nào trong hệ thống.
         var userManager = services.GetRequiredService<UserManager<AppUser>>();
@@ -88,6 +89,41 @@ public static class DbSeeder
                 logger.LogWarning("No admin account exists and Admin__Username / Admin__Password not configured in environment");
             }
         }
+    }
+
+    private static async Task SeedPointReasonsAsync(AppDbContext context, ILogger logger)
+    {
+        if (await context.PointReasons.IgnoreQueryFilters().AnyAsync())
+            return;
+
+        var defaults = new List<(string Label, int Points, PointReasonType Type, int IndexOrder)>
+        {
+            ("Trả lời đúng", 1, PointReasonType.Reward, 0),
+            ("Hoạt động nhóm", 1, PointReasonType.Reward, 1),
+            ("Thành tích xuất sắc", 2, PointReasonType.Reward, 2),
+            ("Hoàn thành bài tập", 1, PointReasonType.Reward, 3),
+            ("Phát biểu đúng", 1, PointReasonType.Reward, 4),
+            ("Nói chuyện riêng", 1, PointReasonType.Penalty, 0),
+            ("Không làm bài", 1, PointReasonType.Penalty, 1),
+            ("Vi phạm nội quy", 2, PointReasonType.Penalty, 2),
+            ("Đến muộn", 1, PointReasonType.Penalty, 3),
+            ("Thiếu dụng cụ học tập", 1, PointReasonType.Penalty, 4)
+        };
+
+        foreach (var item in defaults)
+        {
+            context.PointReasons.Add(new PointReason
+            {
+                Label = item.Label,
+                Points = item.Points,
+                Type = item.Type,
+                IndexOrder = item.IndexOrder,
+                IsActive = true
+            });
+        }
+
+        await context.SaveChangesAsync();
+        logger.LogInformation("Seeded default point reasons");
     }
 
     private static async Task SeedGradeCategoriesAsync(AppDbContext context, ILogger logger)
