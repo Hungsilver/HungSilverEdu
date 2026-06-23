@@ -88,9 +88,9 @@ import { PageHeader } from '../../shared/page-header';
                 <div class="card-field"><span class="label">Sĩ số</span><span>{{ c.currentSize }}/{{ c.maxCapacity }}</span></div>
                 <div class="card-field"><span class="label">Học phí</span><span>{{ c.tuitionFee | number:'1.0-0' }}</span></div>
                 <div class="card-actions" (click)="$event.stopPropagation()">
-                  <button nz-button nzSize="small" (click)="openClassForm(c)"><nz-icon nzType="edit" /> Sửa</button>
-                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
-                    (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /> Xóa</button>
+                  <button nz-button nzSize="small" nz-tooltip nzTooltipTitle="Sửa lớp" aria-label="Sửa lớp" (click)="openClassForm(c)"><nz-icon nzType="edit" /></button>
+                  <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa lớp" aria-label="Xóa lớp"
+                    nz-popconfirm nzPopconfirmTitle="Xóa lớp này?" (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /></button>
                 </div>
               </nz-card>
             } @empty {
@@ -130,8 +130,9 @@ import { PageHeader } from '../../shared/page-header';
                   <td>{{ c.branchName || '—' }}</td>
                   <td>{{ c.tuitionFee | number:'1.0-0' }}</td>
                   <td (click)="$event.stopPropagation()">
-                    <button nz-button nzType="link" nzSize="small" (click)="openClassForm(c)"><nz-icon nzType="edit" /></button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
+                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa lớp" aria-label="Sửa lớp" (click)="openClassForm(c)"><nz-icon nzType="edit" /></button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa lớp" aria-label="Xóa lớp"
+                      nz-popconfirm nzPopconfirmTitle="Xóa lớp này?"
                       (nzOnConfirm)="deleteClass(c)"><nz-icon nzType="delete" /></button>
                   </td>
                 </tr>
@@ -157,9 +158,9 @@ import { PageHeader } from '../../shared/page-header';
               <tbody>
                 @for (s of subjects(); track s.id; let i = $index) {
                   <tr><td>{{ i + 1 }}</td><td>{{ s.code }}</td><td>{{ s.name }}</td><td>
-                    <button nz-button nzType="link" nzSize="small" (click)="editSubject(s)">Sửa</button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa môn?"
-                      (nzOnConfirm)="deleteSubject(s)">Xóa</button>
+                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa môn" aria-label="Sửa môn" (click)="editSubject(s)"><nz-icon nzType="edit" /></button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa môn" aria-label="Xóa môn"
+                      nz-popconfirm nzPopconfirmTitle="Xóa môn?" (nzOnConfirm)="deleteSubject(s)"><nz-icon nzType="delete" /></button>
                   </td></tr>
                 }
               </tbody>
@@ -179,9 +180,9 @@ import { PageHeader } from '../../shared/page-header';
               <tbody>
                 @for (g of grades(); track g.id; let i = $index) {
                   <tr><td>{{ i + 1 }}</td><td>{{ g.code }}</td><td>{{ g.name }}</td><td>
-                    <button nz-button nzType="link" nzSize="small" (click)="editGrade(g)">Sửa</button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khối?"
-                      (nzOnConfirm)="deleteGrade(g)">Xóa</button>
+                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa khối" aria-label="Sửa khối" (click)="editGrade(g)"><nz-icon nzType="edit" /></button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa khối" aria-label="Xóa khối"
+                      nz-popconfirm nzPopconfirmTitle="Xóa khối?" (nzOnConfirm)="deleteGrade(g)"><nz-icon nzType="delete" /></button>
                   </td></tr>
                 }
               </tbody>
@@ -201,9 +202,9 @@ import { PageHeader } from '../../shared/page-header';
               <tbody>
                 @for (b of branches(); track b.id; let i = $index) {
                   <tr><td>{{ i + 1 }}</td><td>{{ b.code }}</td><td>{{ b.name }}</td><td>
-                    <button nz-button nzType="link" nzSize="small" (click)="editBranch(b)">Sửa</button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa cơ sở?"
-                      (nzOnConfirm)="deleteBranch(b)">Xóa</button>
+                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa cơ sở" aria-label="Sửa cơ sở" (click)="editBranch(b)"><nz-icon nzType="edit" /></button>
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa cơ sở" aria-label="Xóa cơ sở"
+                      nz-popconfirm nzPopconfirmTitle="Xóa cơ sở?" (nzOnConfirm)="deleteBranch(b)"><nz-icon nzType="delete" /></button>
                   </td></tr>
                 }
               </tbody>
@@ -291,7 +292,7 @@ import { PageHeader } from '../../shared/page-header';
                       @if (c.isValid) { <nz-tag nzColor="green">OK</nz-tag> }
                       @else { <nz-tag nzColor="red" nz-tooltip [nzTooltipTitle]="c.error">Lỗi</nz-tag> }
                     </td>
-                    <td (click)="$event.stopPropagation()"><button nz-button nzType="text" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Bỏ lớp này khỏi import?" (nzOnConfirm)="removeImportClass(c)"><nz-icon nzType="delete" /></button></td>
+                    <td (click)="$event.stopPropagation()"><button nz-button nzType="text" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa lớp khỏi import" aria-label="Xóa lớp khỏi import" nz-popconfirm nzPopconfirmTitle="Bỏ lớp này khỏi import?" (nzOnConfirm)="removeImportClass(c)"><nz-icon nzType="delete" /></button></td>
                   }
                 </tr>
               }
@@ -320,7 +321,7 @@ import { PageHeader } from '../../shared/page-header';
                       @if (s.isValid) { <nz-tag nzColor="green">OK</nz-tag> }
                       @else { <nz-tag nzColor="red" nz-tooltip [nzTooltipTitle]="s.error">Lỗi</nz-tag> }
                     </td>
-                    <td><button nz-button nzType="text" nzSize="small" nzDanger (click)="removeImportStudent(s)"><nz-icon nzType="delete" /></button></td>
+                    <td><button nz-button nzType="text" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa học viên khỏi import" aria-label="Xóa học viên khỏi import" (click)="removeImportStudent(s)"><nz-icon nzType="delete" /></button></td>
                   </tr>
                 }
               </tbody>

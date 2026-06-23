@@ -14,6 +14,7 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { FileStorageMode, PointReason, PointReasonRequest, PointReasonType, SettingScope, UpsertSettingRequest } from '../../core/models';
 import { PointReasonsService } from '../../core/point-reasons.service';
 import { SettingsService } from '../../core/settings.service';
@@ -28,7 +29,7 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
   imports: [
     FormsModule, NzCardModule, NzFormModule, NzInputModule, NzInputNumberModule,
     NzSelectModule, NzButtonModule, NzIconModule, NzTableModule, NzTagModule,
-    NzDividerModule, NzPopconfirmModule, PageHeader
+    NzDividerModule, NzPopconfirmModule, NzTooltipModule, PageHeader
   ],
   template: `
     <app-page-header title="Cấu hình hệ thống" subtitle="Thiết lập phân tầng toàn hệ thống" icon="setting" />
@@ -93,9 +94,9 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
               <td>{{ r.label }}</td>
               <td><nz-tag nzColor="success">+{{ r.points }}</nz-tag></td>
               <td>
-                <button nz-button nzType="link" nzSize="small" (click)="editReason(r, PointReasonType.Reward)">Sửa</button>
-                <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm
-                  nzPopconfirmTitle="Xóa lý do này?" (nzOnConfirm)="deleteReason(r.id, PointReasonType.Reward)">Xóa</button>
+                <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa lý do" aria-label="Sửa lý do" (click)="editReason(r, PointReasonType.Reward)"><nz-icon nzType="edit" /></button>
+                <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa lý do" aria-label="Xóa lý do" nz-popconfirm
+                  nzPopconfirmTitle="Xóa lý do này?" (nzOnConfirm)="deleteReason(r.id, PointReasonType.Reward)"><nz-icon nzType="delete" /></button>
               </td>
             </tr>
           }
@@ -134,9 +135,9 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
               <td>{{ r.label }}</td>
               <td><nz-tag nzColor="error">−{{ r.points }}</nz-tag></td>
               <td>
-                <button nz-button nzType="link" nzSize="small" (click)="editReason(r, PointReasonType.Penalty)">Sửa</button>
-                <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm
-                  nzPopconfirmTitle="Xóa lý do này?" (nzOnConfirm)="deleteReason(r.id, PointReasonType.Penalty)">Xóa</button>
+                <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa lý do" aria-label="Sửa lý do" (click)="editReason(r, PointReasonType.Penalty)"><nz-icon nzType="edit" /></button>
+                <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa lý do" aria-label="Xóa lý do" nz-popconfirm
+                  nzPopconfirmTitle="Xóa lý do này?" (nzOnConfirm)="deleteReason(r.id, PointReasonType.Penalty)"><nz-icon nzType="delete" /></button>
               </td>
             </tr>
           }

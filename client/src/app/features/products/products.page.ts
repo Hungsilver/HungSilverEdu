@@ -16,6 +16,7 @@ import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { Product, ProductRequest } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
 import { ProductsService } from '../../core/products.service';
@@ -27,7 +28,7 @@ import { ScreenService } from '../../core/screen.service';
     FormsModule, ReactiveFormsModule, CurrencyPipe, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule, NzTagModule,
     NzModalModule, NzFormModule, NzInputNumberModule, NzSwitchModule,
-    NzPopconfirmModule, NzCheckboxModule, NzCardModule, NzPaginationModule
+    NzPopconfirmModule, NzCheckboxModule, NzCardModule, NzPaginationModule, NzTooltipModule
   ],
   template: `
     <div class="page-header">
@@ -62,8 +63,8 @@ import { ScreenService } from '../../core/screen.service';
             @if (auth.isAdmin()) {
               <div class="card-actions">
                 @if (!product.isDeleted) {
-                  <button nz-button nzSize="small" (click)="openEdit(product)"><nz-icon nzType="edit" /> Sửa</button>
-                  <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa mềm sản phẩm này?" (nzOnConfirm)="remove(product)"><nz-icon nzType="delete" /> Xóa</button>
+                  <button nz-button nzSize="small" nz-tooltip nzTooltipTitle="Sửa sản phẩm" aria-label="Sửa sản phẩm" (click)="openEdit(product)"><nz-icon nzType="edit" /></button>
+                  <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa sản phẩm" aria-label="Xóa sản phẩm" nz-popconfirm nzPopconfirmTitle="Xóa mềm sản phẩm này?" (nzOnConfirm)="remove(product)"><nz-icon nzType="delete" /></button>
                 } @else {
                   <button nz-button nzSize="small" (click)="restore(product)"><nz-icon nzType="undo" /> Khôi phục</button>
                 }
@@ -116,10 +117,10 @@ import { ScreenService } from '../../core/screen.service';
               @if (auth.isAdmin()) {
                 <td>
                   @if (!product.isDeleted) {
-                    <button nz-button nzType="link" nzSize="small" (click)="openEdit(product)">
+                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa sản phẩm" aria-label="Sửa sản phẩm" (click)="openEdit(product)">
                       <nz-icon nzType="edit" />
                     </button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger
+                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa sản phẩm" aria-label="Xóa sản phẩm"
                             nz-popconfirm nzPopconfirmTitle="Xóa mềm sản phẩm này?"
                             (nzOnConfirm)="remove(product)">
                       <nz-icon nzType="delete" />

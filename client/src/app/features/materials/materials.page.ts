@@ -15,6 +15,7 @@ import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzUploadModule, NzUploadXHRArgs } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { ClassesService } from '../../core/classes.service';
@@ -33,7 +34,7 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, ReactiveFormsModule,
     NzTableModule, NzButtonModule, NzCardModule, NzIconModule, NzTagModule, NzSelectModule, NzRadioModule, NzInputNumberModule,
-    NzModalModule, NzFormModule, NzInputModule, NzPopconfirmModule, NzUploadModule, PageHeader
+    NzModalModule, NzFormModule, NzInputModule, NzPopconfirmModule, NzTooltipModule, NzUploadModule, PageHeader
   ],
   template: `
     <app-page-header title="Kho tài liệu" subtitle="Học liệu theo lớp hoặc thư viện chung theo danh mục" icon="link">
@@ -83,8 +84,8 @@ import { PageHeader } from '../../shared/page-header';
               <div class="card-field"><span class="label">Mô tả</span><span>{{ m.description || '—' }}</span></div>
               <div class="card-actions">
                 <button nz-button nzSize="small" (click)="openMaterial(m)"><nz-icon nzType="eye" /> Mở</button>
-                <button nz-button nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /> Sửa</button>
-                <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /> Xóa</button>
+                <button nz-button nzSize="small" nz-tooltip nzTooltipTitle="Sửa tài liệu" aria-label="Sửa tài liệu" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
+                <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa tài liệu" aria-label="Xóa tài liệu" nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
               </div>
             </nz-card>
           }
@@ -102,8 +103,8 @@ import { PageHeader } from '../../shared/page-header';
                 <td>{{ m.description || '—' }}</td>
                 <td nzRight>
                   <button nz-button nzType="link" nzSize="small" (click)="openMaterial(m)"><nz-icon nzType="eye" /> Mở</button>
-                  <button nz-button nzType="link" nzSize="small" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
-                  <button nz-button nzType="link" nzSize="small" nzDanger
+                  <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa tài liệu" aria-label="Sửa tài liệu" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
+                  <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa tài liệu" aria-label="Xóa tài liệu"
                           nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
                 </td>
               </tr>
@@ -180,8 +181,8 @@ import { PageHeader } from '../../shared/page-header';
         @for (c of categories(); track c.id) {
           <div class="cat-row">
             <span class="n">{{ c.name }} <span class="muted">#{{ c.indexOrder }}</span></span>
-            <button nz-button nzType="link" nzSize="small" (click)="editCat(c)"><nz-icon nzType="edit" /></button>
-            <button nz-button nzType="link" nzSize="small" nzDanger
+            <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa danh mục" aria-label="Sửa danh mục" (click)="editCat(c)"><nz-icon nzType="edit" /></button>
+            <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa danh mục" aria-label="Xóa danh mục"
                     nz-popconfirm nzPopconfirmTitle="Xóa danh mục này?" (nzOnConfirm)="removeCat(c)"><nz-icon nzType="delete" /></button>
           </div>
         } @empty { <p class="muted">Chưa có danh mục.</p> }

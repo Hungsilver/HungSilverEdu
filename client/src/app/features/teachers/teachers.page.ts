@@ -12,6 +12,7 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { toDateOnlyOrNull } from '../../core/date-util';
 import { ClassListItem, CreateTeacherAccountRequest, TeacherProfile, TeacherRequest, UnlinkedUser } from '../../core/models';
 import { TeachersService } from '../../core/teachers.service';
@@ -22,7 +23,7 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, ReactiveFormsModule, PageHeader,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
-    NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule, NzTagModule
+    NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule, NzTagModule, NzTooltipModule
   ],
   template: `
     <app-page-header title="Giáo viên" subtitle="Hồ sơ giáo viên và tài khoản đăng nhập" icon="team">
@@ -46,9 +47,9 @@ import { PageHeader } from '../../shared/page-header';
             <td>@if (t.userName) { <nz-tag nzColor="green">{{ t.userName }}</nz-tag> } @else { <nz-tag>Chưa gắn</nz-tag> }</td>
             <td>{{ t.classCount }}</td>
             <td (click)="$event.stopPropagation()">
-              <button nz-button nzType="link" nzSize="small" (click)="openForm(t)">Sửa</button>
-              <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa giáo viên?"
-                (nzOnConfirm)="deleteTeacher(t)">Xóa</button>
+              <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa giáo viên" aria-label="Sửa giáo viên" (click)="openForm(t)"><nz-icon nzType="edit" /></button>
+              <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa giáo viên" aria-label="Xóa giáo viên"
+                nz-popconfirm nzPopconfirmTitle="Xóa giáo viên?" (nzOnConfirm)="deleteTeacher(t)"><nz-icon nzType="delete" /></button>
             </td>
           </tr>
         }

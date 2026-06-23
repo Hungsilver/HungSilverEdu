@@ -13,6 +13,7 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzPopoverModule } from 'ng-zorro-antd/popover';
 import { NzTableModule } from 'ng-zorro-antd/table';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { AuthService } from '../../core/auth.service';
 import { BranchesService } from '../../core/branches.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
@@ -28,7 +29,7 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
-    NzModalModule, NzPopconfirmModule, NzPopoverModule, NzSelectModule, NzTableModule
+    NzModalModule, NzPopconfirmModule, NzPopoverModule, NzSelectModule, NzTableModule, NzTooltipModule
   ],
   template: `
     <app-page-header title="Học viên" subtitle="Hồ sơ học viên và lớp đang theo học" icon="idcard">
@@ -86,9 +87,9 @@ import { PageHeader } from '../../shared/page-header';
               }
             </td>
             <td (click)="$event.stopPropagation()">
-              <button nz-button nzType="link" nzSize="small" (click)="openForm(s)">Sửa</button>
-              <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa học viên?"
-                (nzOnConfirm)="deleteStudent(s)">Xóa</button>
+              <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa học viên" aria-label="Sửa học viên" (click)="openForm(s)"><nz-icon nzType="edit" /></button>
+              <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa học viên" aria-label="Xóa học viên"
+                nz-popconfirm nzPopconfirmTitle="Xóa học viên?" (nzOnConfirm)="deleteStudent(s)"><nz-icon nzType="delete" /></button>
             </td>
           </tr>
         }

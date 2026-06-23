@@ -14,6 +14,7 @@ import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserListItem } from '../../core/models';
 import { AuthService } from '../../core/auth.service';
 import { ScreenService } from '../../core/screen.service';
@@ -25,7 +26,8 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, DatePipe,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
-    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzCardModule, NzPaginationModule, PageHeader
+    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzCardModule, NzPaginationModule,
+    NzTooltipModule, PageHeader
   ],
   template: `
     <app-page-header title="Quản lý người dùng" subtitle="Tài khoản & phân quyền" icon="team">
@@ -65,8 +67,9 @@ import { PageHeader } from '../../shared/page-header';
             <div class="card-actions">
               @if (!user.isDeleted) {
                 <button nz-button nzSize="small" nzDanger [disabled]="user.id === currentUserId"
+                        nz-tooltip nzTooltipTitle="Xóa người dùng" aria-label="Xóa người dùng"
                         nz-popconfirm nzPopconfirmTitle="Xóa mềm người dùng này?" (nzOnConfirm)="remove(user)">
-                  <nz-icon nzType="delete" /> Xóa
+                  <nz-icon nzType="delete" />
                 </button>
               } @else {
                 <button nz-button nzSize="small" (click)="restore(user)"><nz-icon nzType="undo" /> Khôi phục</button>
@@ -129,10 +132,10 @@ import { PageHeader } from '../../shared/page-header';
                 @if (!user.isDeleted) {
                   <button nz-button nzType="link" nzSize="small" nzDanger
                           [disabled]="user.id === currentUserId"
+                          nz-tooltip nzTooltipTitle="Xóa người dùng" aria-label="Xóa người dùng"
                           nz-popconfirm nzPopconfirmTitle="Xóa mềm người dùng này? Mọi phiên đăng nhập sẽ bị thu hồi."
                           (nzOnConfirm)="remove(user)">
                     <nz-icon nzType="delete" />
-                    Xóa
                   </button>
                 } @else {
                   <button nz-button nzType="link" nzSize="small" (click)="restore(user)">

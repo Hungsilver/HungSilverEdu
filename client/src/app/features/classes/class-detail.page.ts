@@ -21,6 +21,7 @@ import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTabsModule } from 'ng-zorro-antd/tabs';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { NzTimePickerModule } from 'ng-zorro-antd/time-picker';
 import { NzUploadModule, NzUploadFile } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
@@ -47,7 +48,7 @@ import { PageHeader } from '../../shared/page-header';
     NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzButtonModule, NzIconModule,
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
     NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule,
-    NzTabsModule, NzDescriptionsModule, PageHeader
+    NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader
   ],
   template: `
     <a routerLink="/classes" class="back"><nz-icon nzType="arrow-left" /> Danh sách lớp</a>
@@ -130,7 +131,7 @@ import { PageHeader } from '../../shared/page-header';
               @for (slot of slots(); track slot.id) {
                 <div class="row-item">
                   <span>{{ weekdays[slot.dayOfWeek] }} · {{ slot.startTime }}–{{ slot.endTime }}</span>
-                  <button nz-button nzType="link" nzSize="small" nzDanger (click)="removeSlot(slot)"><nz-icon nzType="delete" /></button>
+                  <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa khung giờ" aria-label="Xóa khung giờ" (click)="removeSlot(slot)"><nz-icon nzType="delete" /></button>
                 </div>
               } @empty { <p class="muted">Chưa có khung giờ.</p> }
               <div class="slot-add">
@@ -180,7 +181,7 @@ import { PageHeader } from '../../shared/page-header';
                     <div class="card-field"><span class="label">Hạn nộp</span><span>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</span></div>
                     <div class="card-actions">
                       <button nz-button nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                      <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /> Xóa</button>
+                      <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa bài tập" aria-label="Xóa bài tập" nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
                     </div>
                   </nz-card>
                 } @empty { <span class="muted">Chưa giao bài nào.</span> }
@@ -197,7 +198,7 @@ import { PageHeader } from '../../shared/page-header';
                       <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
                       <td nzRight>
                         <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                        <button nz-button nzType="link" nzSize="small" nzDanger
+                        <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa bài tập" aria-label="Xóa bài tập"
                                 nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
                       </td>
                     </tr>
@@ -244,7 +245,7 @@ import { PageHeader } from '../../shared/page-header';
                       <button nz-button nzSize="small" (click)="openResetPassword(r)"><nz-icon nzType="key" /> Đổi MK</button>
                     }
                     @if (canManage()) {
-                      <button nz-button nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
+                      <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa khỏi lớp" aria-label="Xóa khỏi lớp" nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)"><nz-icon nzType="delete" /></button>
                     }
                   </div>
                 </nz-card>
@@ -281,8 +282,8 @@ import { PageHeader } from '../../shared/page-header';
                         <span class="muted no-acc">Chưa có TK</span>
                       }
                       @if (canManage()) {
-                        <button nz-button nzType="link" nzSize="small" nzDanger
-                                nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)">Xóa</button>
+                        <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa khỏi lớp" aria-label="Xóa khỏi lớp"
+                                nz-popconfirm nzPopconfirmTitle="Xóa khỏi lớp?" (nzOnConfirm)="withdraw(r)"><nz-icon nzType="delete" /></button>
                       }
                     </td>
                   </tr>
