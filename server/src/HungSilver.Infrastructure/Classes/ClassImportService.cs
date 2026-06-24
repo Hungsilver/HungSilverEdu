@@ -34,7 +34,8 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         ws.Cell(2, 3).Value = "Nguyễn Văn A";
         ws.Cell(2, 4).Value = "01/09/2010";
         ws.Cell(2, 6).Value = "Lớp toán 11 cô Phượng";
-        ws.Cell(2, 10).Value = "0900000000";
+        ws.Cell(2, 10).SetValue("0900000000");
+        ApplyTextFormat(ws, [10, 11], 2, 500);
 
         // Cột cố định: CoSo|MaHV|TenHV|NgaySinh|MaLop|TenLop|Mon|Khoi|GV|SDTPhuHuynh|SDTHocVien|GhiChu
         int[] dataWidths = [15, 15, 25, 18, 15, 30, 20, 15, 25, 18, 18, 30];
@@ -323,6 +324,15 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         cell.Style.Font.Bold = true;
         cell.Style.Font.FontColor = fontColor;
         cell.Style.Fill.BackgroundColor = fillColor;
+    }
+
+    private static void ApplyTextFormat(IXLWorksheet ws, int[] columns, int firstRow, int lastRow)
+    {
+        foreach (var column in columns)
+        {
+            var range = ws.Range(firstRow, column, lastRow, column);
+            range.Style.NumberFormat.Format = "@";
+        }
     }
 
     private static string? ValidateClass(RawRow row, Branch? branch, Subject? subject, GradeCategory? grade, TeacherProfile? teacher)

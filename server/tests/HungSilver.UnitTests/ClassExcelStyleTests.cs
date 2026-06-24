@@ -7,6 +7,7 @@ using HungSilver.Infrastructure.Classes;
 using HungSilver.Infrastructure.Common;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.Infrastructure.Persistence.Interceptors;
+using HungSilver.Infrastructure.Students;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -55,6 +56,30 @@ public sealed class ClassExcelStyleTests : IDisposable
     }
 
     [Fact]
+    public void ClassImportTemplate_FormatsPhoneColumnsAsText()
+    {
+        var bytes = new ClassImportService(_context).BuildTemplate();
+
+        using var wb = OpenWorkbook(bytes);
+        var ws = wb.Worksheet("Nhập liệu");
+
+        AssertTextPhoneCell(ws.Cell("J2"), "0900000000");
+        AssertTextFormat(ws.Cell("K2"));
+    }
+
+    [Fact]
+    public void StudentImportTemplate_FormatsPhoneColumnsAsText()
+    {
+        var bytes = new StudentImportService(_context, new AdminGuard(), null!).BuildTemplate();
+
+        using var wb = OpenWorkbook(bytes);
+        var ws = wb.Worksheet("HocVien");
+
+        AssertTextPhoneCell(ws.Cell("D2"), "0900000000");
+        AssertTextPhoneCell(ws.Cell("F2"), "0900000000");
+    }
+
+    [Fact]
     public async Task ClassExport_UsesReadableHeaderColors()
     {
         var result = await NewClassService().ExportAsync();
@@ -82,6 +107,18 @@ public sealed class ClassExcelStyleTests : IDisposable
         Assert.True(cell.Style.Font.Bold);
         Assert.Equal(expectedFill.Color.ToArgb(), cell.Style.Fill.BackgroundColor.Color.ToArgb());
         Assert.Equal(expectedFont.Color.ToArgb(), cell.Style.Font.FontColor.Color.ToArgb());
+    }
+
+    private static void AssertTextPhoneCell(IXLCell cell, string expectedValue)
+    {
+        AssertTextFormat(cell);
+        Assert.Equal(XLDataType.Text, cell.DataType);
+        Assert.Equal(expectedValue, cell.GetString());
+    }
+
+    private static void AssertTextFormat(IXLCell cell)
+    {
+        Assert.Equal("@", cell.Style.NumberFormat.Format);
     }
 
     private sealed class AdminGuard : IClassAccessGuard

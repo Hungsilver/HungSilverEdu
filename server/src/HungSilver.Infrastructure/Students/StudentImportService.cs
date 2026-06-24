@@ -134,9 +134,11 @@ public sealed class StudentImportService(
         ws.Cell(2, 1).Value = "Nguyễn Văn A";
         ws.Cell(2, 2).Value = "01/09/2015";
         ws.Cell(2, 3).Value = "Tiểu học ABC";
+        ws.Cell(2, 4).SetValue("0900000000");
         ws.Cell(2, 5).Value = "Nguyễn Văn B";
-        ws.Cell(2, 6).Value = "0900000000";
+        ws.Cell(2, 6).SetValue("0900000000");
         ws.Cell(2, 7).Value = "Movers";
+        ApplyTextFormat(ws, [4, 6], 2, 500);
         ws.Columns().AdjustToContents();
 
         using var ms = new MemoryStream();
@@ -229,4 +231,13 @@ public sealed class StudentImportService(
 
     private static DateOnly? ParseDate(string? s) =>
         !string.IsNullOrWhiteSpace(s) && DateOnly.TryParseExact(s.Trim(), "dd/MM/yyyy", out var d) ? d : null;
+
+    private static void ApplyTextFormat(IXLWorksheet ws, int[] columns, int firstRow, int lastRow)
+    {
+        foreach (var column in columns)
+        {
+            var range = ws.Range(firstRow, column, lastRow, column);
+            range.Style.NumberFormat.Format = "@";
+        }
+    }
 }
