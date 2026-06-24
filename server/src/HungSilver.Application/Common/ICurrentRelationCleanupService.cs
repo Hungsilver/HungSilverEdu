@@ -9,11 +9,9 @@ public interface ICurrentRelationCleanupService
 {
     Task SoftDeleteActiveEnrollmentsForStudentAsync(Guid studentId, CancellationToken ct = default);
 
-    Task SoftDeleteInvalidActiveEnrollmentsForClassAsync(Guid classId, CancellationToken ct = default);
+    Task SoftDeleteActiveEnrollmentsForClassAsync(Guid classId, CancellationToken ct = default);
 
     Task SoftDeleteCurrentClassRelationsAsync(Guid classId, CancellationToken ct = default);
-
-    Task<bool> HasValidActiveEnrollmentsForClassAsync(Guid classId, CancellationToken ct = default);
 
     Task<Dictionary<Guid, int>> LoadValidClassSizesAsync(IEnumerable<Guid> classIds, CancellationToken ct = default);
 

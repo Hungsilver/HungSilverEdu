@@ -91,6 +91,25 @@ public sealed class CurrentRelationCleanupTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteClass_WithActiveValidStudents_SucceedsAndWithdrawsEnrollments()
+    {
+        var classId = await AddClassAsync("Lớp C");
+        var studentId = await AddStudentAsync("Lê Văn C");
+        var enrollmentId = await AddEnrollmentAsync(studentId, classId);
+
+        var classService = NewClassService();
+        var result = await classService.DeleteAsync(classId);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(await _context.Classes.IgnoreQueryFilters().AnyAsync(c => c.Id == classId && c.IsDeleted));
+
+        var enrollment = await _context.Enrollments.IgnoreQueryFilters().SingleAsync(e => e.Id == enrollmentId);
+        Assert.True(enrollment.IsDeleted);
+        Assert.False(enrollment.IsActive);
+        Assert.NotNull(enrollment.WithdrawnOn);
+    }
+
+    [Fact]
     public async Task DeleteMaterial_NullsAssignmentsThatReferenceIt()
     {
         var category = new MaterialCategory { Name = "Thư viện", SortOrder = 1 };

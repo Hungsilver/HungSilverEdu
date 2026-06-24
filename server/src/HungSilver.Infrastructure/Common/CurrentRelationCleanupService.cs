@@ -17,22 +17,13 @@ public sealed class CurrentRelationCleanupService(AppDbContext context) : ICurre
         SoftDeleteEnrollments(enrollments);
     }
 
-    public async Task SoftDeleteInvalidActiveEnrollmentsForClassAsync(Guid classId, CancellationToken ct = default)
+    public async Task SoftDeleteActiveEnrollmentsForClassAsync(Guid classId, CancellationToken ct = default)
     {
         var enrollments = await context.Enrollments
             .Where(e => e.ClassId == classId && e.IsActive)
             .ToListAsync(ct);
-        if (enrollments.Count == 0)
-            return;
 
-        var studentIds = enrollments.Select(e => e.StudentId).Distinct().ToList();
-        var liveStudentIds = await context.Students
-            .Where(s => studentIds.Contains(s.Id))
-            .Select(s => s.Id)
-            .ToHashSetAsync(ct);
-
-        var invalid = enrollments.Where(e => !liveStudentIds.Contains(e.StudentId)).ToList();
-        SoftDeleteEnrollments(invalid);
+        SoftDeleteEnrollments(enrollments);
     }
 
     public async Task SoftDeleteCurrentClassRelationsAsync(Guid classId, CancellationToken ct = default)
@@ -60,12 +51,6 @@ public sealed class CurrentRelationCleanupService(AppDbContext context) : ICurre
             .ToListAsync(ct);
         context.ClassSessions.RemoveRange(futureSessions);
     }
-
-    public Task<bool> HasValidActiveEnrollmentsForClassAsync(Guid classId, CancellationToken ct = default) =>
-        (from e in context.Enrollments.AsNoTracking()
-         join s in context.Students.AsNoTracking() on e.StudentId equals s.Id
-         where e.ClassId == classId && e.IsActive
-         select e.Id).AnyAsync(ct);
 
     public async Task<Dictionary<Guid, int>> LoadValidClassSizesAsync(IEnumerable<Guid> classIds, CancellationToken ct = default)
     {

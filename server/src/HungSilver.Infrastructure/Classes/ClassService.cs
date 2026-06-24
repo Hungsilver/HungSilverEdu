@@ -199,11 +199,9 @@ public sealed class ClassService(
         if (access.IsFailure)
             return access;
 
-        await relationCleanup.SoftDeleteInvalidActiveEnrollmentsForClassAsync(id, ct);
-        var hasStudents = await relationCleanup.HasValidActiveEnrollmentsForClassAsync(id, ct);
-        if (hasStudents)
-            return Result.Failure(Error.Conflict("Class.HasStudents", "Không thể xóa lớp khi vẫn còn học sinh đang học."));
-
+        // Xóa lớp được phép kể cả khi còn học sinh đang học: rút sạch enrollment active
+        // (set IsActive=false/WithdrawnOn) để không còn bản ghi active mồ côi dưới lớp đã xóa mềm.
+        await relationCleanup.SoftDeleteActiveEnrollmentsForClassAsync(id, ct);
         await relationCleanup.SoftDeleteCurrentClassRelationsAsync(id, ct);
         context.Classes.Remove(cls);
         await context.SaveChangesAsync(ct);
