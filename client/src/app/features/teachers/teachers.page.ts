@@ -43,7 +43,7 @@ import { PageHeader } from '../../shared/page-header';
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
       (nzPageIndexChange)="page.set($event); load()">
       <thead><tr>
-        <th>STT</th>
+        <th nzWidth="56px">STT</th>
         @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
         <th>Thao tác</th>
       </tr></thead>

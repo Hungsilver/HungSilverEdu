@@ -112,7 +112,7 @@ import { PageHeader } from '../../shared/page-header';
             (nzPageIndexChange)="page.set($event); loadClasses()" [nzScroll]="{ x: '1180px' }">
             <thead>
               <tr>
-                <th>STT</th>
+                <th nzWidth="56px">STT</th>
                 @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
                 <th>Thao tác</th>
               </tr>
@@ -161,7 +161,7 @@ import { PageHeader } from '../../shared/page-header';
               @if (editingSubject()) { <button nz-button (click)="resetSubject()">Hủy</button> }
             </form>
             <nz-table [nzData]="subjects()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th>STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
+              <thead><tr><th nzWidth="56px">STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
               <tbody>
                 @for (s of subjects(); track s.id; let i = $index) {
                   <tr><td>{{ i + 1 }}</td><td>{{ s.code }}</td><td>{{ s.name }}</td><td>
@@ -183,7 +183,7 @@ import { PageHeader } from '../../shared/page-header';
               @if (editingGrade()) { <button nz-button (click)="resetGrade()">Hủy</button> }
             </form>
             <nz-table [nzData]="grades()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th>STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
+              <thead><tr><th nzWidth="56px">STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
               <tbody>
                 @for (g of grades(); track g.id; let i = $index) {
                   <tr><td>{{ i + 1 }}</td><td>{{ g.code }}</td><td>{{ g.name }}</td><td>
@@ -205,7 +205,7 @@ import { PageHeader } from '../../shared/page-header';
               @if (editingBranch()) { <button nz-button (click)="resetBranch()">Hủy</button> }
             </form>
             <nz-table [nzData]="branches()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th>STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
+              <thead><tr><th nzWidth="56px">STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
               <tbody>
                 @for (b of branches(); track b.id; let i = $index) {
                   <tr><td>{{ i + 1 }}</td><td>{{ b.code }}</td><td>{{ b.name }}</td><td>

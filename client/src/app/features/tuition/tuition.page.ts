@@ -64,7 +64,7 @@ import { PageHeader } from '../../shared/page-header';
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
       (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '900px' }">
       <thead><tr>
-        <th>STT</th>
+        <th nzWidth="56px">STT</th>
         @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
       </tr></thead>
       <tbody>
