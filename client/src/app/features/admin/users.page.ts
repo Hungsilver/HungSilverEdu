@@ -19,12 +19,13 @@ import { ROLE_ADMIN, ROLE_TEACHER, ROLE_USER, UserListItem } from '../../core/mo
 import { AuthService } from '../../core/auth.service';
 import { ScreenService } from '../../core/screen.service';
 import { UsersService } from '../../core/users.service';
+import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-users-page',
   imports: [
-    FormsModule, DatePipe,
+    FormsModule, DatePipe, ColumnSettings,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
     NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzCardModule, NzPaginationModule,
     NzTooltipModule, PageHeader
@@ -32,7 +33,8 @@ import { PageHeader } from '../../shared/page-header';
   template: `
     <app-page-header title="Quản lý người dùng" subtitle="Tài khoản & phân quyền" icon="team">
       <input nz-input placeholder="Tìm theo email hoặc tên..." class="search"
-             [ngModel]="search()" (ngModelChange)="onSearch($event)" />
+             [ngModel]="search()" (ngModelChange)="search.set($event)" (keyup.enter)="applyFilters()" />
+      <button nz-button (click)="applyFilters()"><nz-icon nzType="search" /> Tìm kiếm</button>
       <button nz-button nzType="primary" (click)="openCreate()">
         <nz-icon nzType="user-add" /> Tạo tài khoản
       </button>
@@ -80,6 +82,10 @@ import { PageHeader } from '../../shared/page-header';
       </div>
       <nz-pagination class="mobile-pagination" [nzPageIndex]="page()" [nzTotal]="total()" [nzPageSize]="pageSize()" (nzPageIndexChange)="onPageChange($event)" />
     } @else {
+      <div class="table-toolbar">
+        <span class="spacer"></span>
+        <app-column-settings #cols storageKey="hs-cols-users" [columns]="COLUMNS" />
+      </div>
       <nz-table
         #table
         [nzData]="users()"
@@ -92,42 +98,40 @@ import { PageHeader } from '../../shared/page-header';
         [nzScroll]="{ x: '760px' }">
         <thead>
           <tr>
-            <th>Tài khoản</th>
-            <th>Email</th>
-            <th>Họ tên</th>
-            <th>Quyền</th>
-            <th>Trạng thái</th>
-            <th>Ngày tạo</th>
+            @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
             <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
           @for (user of table.data; track user.id) {
             <tr>
-              <td [class.text-deleted]="user.isDeleted"><strong>{{ user.userName }}</strong></td>
-              <td>{{ user.email }}</td>
-              <td>{{ user.fullName }}</td>
-              <td>
-                <nz-select
-                  [ngModel]="user.roles"
-                  (ngModelChange)="assignRoles(user, $event)"
-                  nzMode="multiple"
-                  nzPlaceHolder="Chọn quyền"
-                  [nzDisabled]="user.isDeleted || user.id === currentUserId"
-                  class="roles-select">
-                  <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
-                  <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
-                  <nz-option [nzValue]="ROLE_USER" nzLabel="Học sinh" />
-                </nz-select>
-              </td>
-              <td>
-                @if (user.isDeleted) {
-                  <nz-tag nzColor="red">Đã xóa</nz-tag>
-                } @else {
-                  <nz-tag nzColor="green">Hoạt động</nz-tag>
-                }
-              </td>
-              <td>{{ user.createdAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+              @for (col of cols.visibleColumns(); track col.key) {
+                <td>
+                  @switch (col.key) {
+                    @case ('account') { <strong [class.text-deleted]="user.isDeleted">{{ user.userName }}</strong> }
+                    @case ('email') { {{ user.email }} }
+                    @case ('fullName') { {{ user.fullName }} }
+                    @case ('roles') {
+                      <nz-select
+                        [ngModel]="user.roles"
+                        (ngModelChange)="assignRoles(user, $event)"
+                        nzMode="multiple"
+                        nzPlaceHolder="Chọn quyền"
+                        [nzDisabled]="user.isDeleted || user.id === currentUserId"
+                        class="roles-select">
+                        <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
+                        <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
+                        <nz-option [nzValue]="ROLE_USER" nzLabel="Học sinh" />
+                      </nz-select>
+                    }
+                    @case ('status') {
+                      @if (user.isDeleted) { <nz-tag nzColor="red">Đã xóa</nz-tag> }
+                      @else { <nz-tag nzColor="green">Hoạt động</nz-tag> }
+                    }
+                    @case ('createdAt') { {{ user.createdAt | date: 'dd/MM/yyyy HH:mm' }} }
+                  }
+                </td>
+              }
               <td>
                 @if (!user.isDeleted) {
                   <button nz-button nzType="link" nzSize="small" nzDanger
@@ -197,6 +201,9 @@ import { PageHeader } from '../../shared/page-header';
       min-width: 160px;
     }
 
+    .table-toolbar { display: flex; align-items: center; margin-bottom: 12px; }
+    .table-toolbar .spacer { flex: 1; }
+
     .full { width: 100%; }
 
     .mobile-card-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
@@ -229,6 +236,16 @@ export class UsersPage {
   protected readonly search = signal('');
   protected readonly loading = signal(false);
 
+  // Cột cấu hình được (Thao tác cố định cuối).
+  protected readonly COLUMNS: ColumnDef[] = [
+    { key: 'account', label: 'Tài khoản' },
+    { key: 'email', label: 'Email' },
+    { key: 'fullName', label: 'Họ tên' },
+    { key: 'roles', label: 'Quyền' },
+    { key: 'status', label: 'Trạng thái' },
+    { key: 'createdAt', label: 'Ngày tạo' }
+  ];
+
   // Tạo tài khoản mới
   protected readonly createOpen = signal(false);
   protected readonly createBusy = signal(false);
@@ -237,8 +254,6 @@ export class UsersPage {
   protected cFullName = '';
   protected cEmail = '';
   protected cPassword = '';
-
-  private searchDebounce?: ReturnType<typeof setTimeout>;
 
   constructor() {
     this.load();
@@ -291,13 +306,9 @@ export class UsersPage {
     });
   }
 
-  protected onSearch(value: string): void {
-    this.search.set(value);
-    clearTimeout(this.searchDebounce);
-    this.searchDebounce = setTimeout(() => {
-      this.page.set(1);
-      this.load();
-    }, 350);
+  protected applyFilters(): void {
+    this.page.set(1);
+    this.load();
   }
 
   protected onPageChange(page: number): void {

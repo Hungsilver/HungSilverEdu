@@ -22,12 +22,13 @@ import { Branch, Grade, Student, StudentRequest, Subject, TeacherProfile } from 
 import { StudentsService } from '../../core/students.service';
 import { SubjectsService } from '../../core/subjects.service';
 import { TeachersService } from '../../core/teachers.service';
+import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-students-page',
   imports: [
-    DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader,
+    DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzModalModule, NzPopconfirmModule, NzPopoverModule, NzSelectModule, NzTableModule, NzTooltipModule
   ],
@@ -39,53 +40,69 @@ import { PageHeader } from '../../shared/page-header';
     </app-page-header>
 
     <div class="filters">
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="branchId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="branchId">
         @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Môn học" [(ngModel)]="subjectId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Môn học" [(ngModel)]="subjectId">
         @for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId">
         @for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId">
         @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
       </nz-select>
-      <input nz-input placeholder="Tên, mã, SĐT học viên, SĐT phụ huynh" [(ngModel)]="search" (ngModelChange)="onSearch()" />
+      <input nz-input placeholder="Tên, mã, SĐT học viên, SĐT phụ huynh" [(ngModel)]="search" (keyup.enter)="applyFilters()" />
+    </div>
+    <div class="filter-actions">
+      <button nz-button nzType="primary" (click)="applyFilters()"><nz-icon nzType="search" /> Tìm kiếm</button>
+      <button nz-button (click)="resetFilters()"><nz-icon nzType="reload" /> Đặt lại</button>
+      <span class="spacer"></span>
+      <app-column-settings #cols storageKey="hs-cols-students" [columns]="COLUMNS" />
     </div>
 
     <nz-table #table [nzData]="students()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
       (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '1160px' }">
-      <thead><tr><th>STT</th><th>Mã học viên</th><th>Tên học viên</th><th>SĐT</th><th>SĐT phụ huynh</th><th>Ngày sinh</th><th>Email</th><th>Ghi chú</th><th>Lớp đang theo học</th><th>Thao tác</th></tr></thead>
+      <thead><tr>
+        <th>STT</th>
+        @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
+        <th>Thao tác</th>
+      </tr></thead>
       <tbody>
         @for (s of table.data; track s.id; let i = $index) {
           <tr class="clickable" (click)="openDetail(s)">
             <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
-            <td>{{ s.studentCode }}</td>
-            <td>{{ s.fullName }}</td>
-            <td>{{ s.phone || '—' }}</td>
-            <td>{{ s.parentPhone || '—' }}</td>
-            <td>{{ s.dateOfBirth | date:'dd/MM/yyyy' }}</td>
-            <td>{{ s.email || '—' }}</td>
-            <td>{{ s.note || '—' }}</td>
-            <td>
-              @if (!s.classes || s.classes.length === 0) {
-                <span class="muted">Chưa có lớp</span>
-              } @else {
-                <span nz-popover nzPopoverTrigger="hover" nzPopoverTitle="Lớp đang theo học"
-                      [nzPopoverContent]="classPopContent" class="classes-badge">
-                  {{ s.classes.length === 1 ? s.classes[0].className : (s.classes.length + ' lớp') }}
-                </span>
-                <ng-template #classPopContent>
-                  <div class="pop-class-list">
-                    @for (c of s.classes; track c.classId) {
-                      <div>{{ c.className }}</div>
+            @for (col of cols.visibleColumns(); track col.key) {
+              <td>
+                @switch (col.key) {
+                  @case ('code') { {{ s.studentCode }} }
+                  @case ('name') { {{ s.fullName }} }
+                  @case ('phone') { {{ s.phone || '—' }} }
+                  @case ('parentPhone') { {{ s.parentPhone || '—' }} }
+                  @case ('dob') { {{ s.dateOfBirth | date:'dd/MM/yyyy' }} }
+                  @case ('email') { {{ s.email || '—' }} }
+                  @case ('note') { {{ s.note || '—' }} }
+                  @case ('classes') {
+                    @if (!s.classes || s.classes.length === 0) {
+                      <span class="muted">Chưa có lớp</span>
+                    } @else {
+                      <span nz-popover nzPopoverTrigger="hover" nzPopoverTitle="Lớp đang theo học"
+                            [nzPopoverContent]="classPopContent" class="classes-badge">
+                        {{ s.classes.length === 1 ? s.classes[0].className : (s.classes.length + ' lớp') }}
+                      </span>
+                      <ng-template #classPopContent>
+                        <div class="pop-class-list">
+                          @for (c of s.classes; track c.classId) {
+                            <div>{{ c.className }}</div>
+                          }
+                        </div>
+                      </ng-template>
                     }
-                  </div>
-                </ng-template>
-              }
-            </td>
+                  }
+                }
+              </td>
+            }
             <td (click)="$event.stopPropagation()">
               <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa học viên" aria-label="Sửa học viên" (click)="openForm(s)"><nz-icon nzType="edit" /></button>
               <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa học viên" aria-label="Xóa học viên"
@@ -135,7 +152,9 @@ import { PageHeader } from '../../shared/page-header';
     </nz-modal>
   `,
   styles: `
-    .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .filter-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .filter-actions .spacer { flex: 1; }
     .clickable { cursor: pointer; }
     .classes-badge { cursor: default; color: var(--hs-primary, #1890ff); }
     .pop-class-list { min-width: 140px; }
@@ -171,7 +190,18 @@ export class StudentsPage {
   protected subjectId: string | null = null;
   protected gradeId: string | null = null;
   protected teacherProfileId: string | null = null;
-  private timer?: ReturnType<typeof setTimeout>;
+
+  // Cột cấu hình được (ngoài STT cố định đầu & Thao tác cố định cuối).
+  protected readonly COLUMNS: ColumnDef[] = [
+    { key: 'code', label: 'Mã học viên' },
+    { key: 'name', label: 'Tên học viên' },
+    { key: 'phone', label: 'SĐT' },
+    { key: 'parentPhone', label: 'SĐT phụ huynh' },
+    { key: 'dob', label: 'Ngày sinh' },
+    { key: 'email', label: 'Email' },
+    { key: 'note', label: 'Ghi chú' },
+    { key: 'classes', label: 'Lớp đang theo học' }
+  ];
 
   protected readonly modalOpen = signal(false);
   protected readonly editing = signal<Student | null>(null);
@@ -205,9 +235,19 @@ export class StudentsPage {
     });
   }
 
-  protected onSearch(): void {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => { this.page.set(1); this.load(); }, 250);
+  protected applyFilters(): void {
+    this.page.set(1);
+    this.load();
+  }
+
+  protected resetFilters(): void {
+    this.search = '';
+    this.branchId = null;
+    this.subjectId = null;
+    this.gradeId = null;
+    this.teacherProfileId = null;
+    this.page.set(1);
+    this.load();
   }
 
   private loadLookups(): void {

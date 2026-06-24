@@ -5,7 +5,6 @@ using HungSilver.Application.Grades;
 using HungSilver.Application.Journals;
 using HungSilver.Application.Materials;
 using HungSilver.Application.PointReasons;
-using HungSilver.Application.Products;
 using HungSilver.Application.Students;
 using HungSilver.Application.Subjects;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +18,6 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddAutoMapper(typeof(DependencyInjection).Assembly);
 
-        services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IClassAccessGuard, ClassAccessGuard>();
         services.AddScoped<ITeacherJournalService, TeacherJournalService>();

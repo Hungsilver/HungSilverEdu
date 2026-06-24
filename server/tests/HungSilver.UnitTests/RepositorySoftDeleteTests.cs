@@ -33,42 +33,42 @@ public sealed class RepositorySoftDeleteTests : IDisposable
         _connection.Dispose();
     }
 
-    private static Product NewProduct(string sku = "SKU-001") => new()
+    // Branch là entity BaseEntity đơn giản, dùng làm mẫu để kiểm Repository generic.
+    private static Branch NewBranch(string code = "B-001") => new()
     {
-        Name = "Test product",
-        Sku = sku,
-        Price = 100
+        Code = code,
+        Name = "Cơ sở test"
     };
 
     [Fact]
     public async Task Add_SetsCreatedAt()
     {
-        var repo = new Repository<Product>(_context);
+        var repo = new Repository<Branch>(_context);
 
-        var product = NewProduct();
-        await repo.AddAsync(product);
+        var branch = NewBranch();
+        await repo.AddAsync(branch);
         await _context.SaveChangesAsync();
 
-        Assert.NotEqual(default, product.CreatedAt);
-        Assert.False(product.IsDeleted);
+        Assert.NotEqual(default, branch.CreatedAt);
+        Assert.False(branch.IsDeleted);
     }
 
     [Fact]
     public async Task SoftDelete_ConvertsRemoveToUpdate_AndHidesFromQueries()
     {
-        var repo = new Repository<Product>(_context);
-        var product = NewProduct();
-        await repo.AddAsync(product);
+        var repo = new Repository<Branch>(_context);
+        var branch = NewBranch();
+        await repo.AddAsync(branch);
         await _context.SaveChangesAsync();
 
-        repo.SoftDelete(product);
+        repo.SoftDelete(branch);
         await _context.SaveChangesAsync();
 
         // Query mặc định không thấy bản ghi đã xóa mềm
-        Assert.Null(await repo.GetByIdAsync(product.Id));
+        Assert.Null(await repo.GetByIdAsync(branch.Id));
 
         // Nhưng row vẫn tồn tại trong database với IsDeleted = true
-        var raw = await _context.Products.IgnoreQueryFilters().SingleAsync(p => p.Id == product.Id);
+        var raw = await _context.Branches.IgnoreQueryFilters().SingleAsync(b => b.Id == branch.Id);
         Assert.True(raw.IsDeleted);
         Assert.NotNull(raw.DeletedAt);
     }
@@ -76,19 +76,19 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     [Fact]
     public async Task Restore_MakesEntityVisibleAgain()
     {
-        var repo = new Repository<Product>(_context);
-        var product = NewProduct();
-        await repo.AddAsync(product);
+        var repo = new Repository<Branch>(_context);
+        var branch = NewBranch();
+        await repo.AddAsync(branch);
         await _context.SaveChangesAsync();
 
-        repo.SoftDelete(product);
+        repo.SoftDelete(branch);
         await _context.SaveChangesAsync();
 
-        var restored = await repo.RestoreAsync(product.Id);
+        var restored = await repo.RestoreAsync(branch.Id);
         await _context.SaveChangesAsync();
 
         Assert.True(restored);
-        var found = await repo.GetByIdAsync(product.Id);
+        var found = await repo.GetByIdAsync(branch.Id);
         Assert.NotNull(found);
         Assert.False(found.IsDeleted);
         Assert.Null(found.DeletedAt);
@@ -97,12 +97,12 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     [Fact]
     public async Task GetPaged_RespectsFilterAndIncludeDeleted()
     {
-        var repo = new Repository<Product>(_context);
+        var repo = new Repository<Branch>(_context);
         for (var i = 0; i < 5; i++)
-            await repo.AddAsync(NewProduct($"SKU-{i:000}"));
+            await repo.AddAsync(NewBranch($"B-{i:000}"));
         await _context.SaveChangesAsync();
 
-        var toDelete = await repo.GetByIdAsync((await repo.FindAsync(p => p.Sku == "SKU-000")).Single().Id);
+        var toDelete = await repo.GetByIdAsync((await repo.FindAsync(b => b.Code == "B-000")).Single().Id);
         repo.SoftDelete(toDelete!);
         await _context.SaveChangesAsync();
 
@@ -116,9 +116,9 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     [Fact]
     public async Task FindAsync_ReturnsNewestCreatedFirst()
     {
-        var repo = new Repository<Product>(_context);
-        var older = NewProduct("SKU-OLD");
-        var newer = NewProduct("SKU-NEW");
+        var repo = new Repository<Branch>(_context);
+        var older = NewBranch("B-OLD");
+        var newer = NewBranch("B-NEW");
         await repo.AddAsync(older);
         await repo.AddAsync(newer);
         await _context.SaveChangesAsync();
@@ -140,15 +140,15 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     [Fact]
     public async Task Update_SetsUpdatedAt()
     {
-        var repo = new Repository<Product>(_context);
-        var product = NewProduct();
-        await repo.AddAsync(product);
+        var repo = new Repository<Branch>(_context);
+        var branch = NewBranch();
+        await repo.AddAsync(branch);
         await _context.SaveChangesAsync();
 
-        product.Name = "Renamed";
-        repo.Update(product);
+        branch.Name = "Đổi tên";
+        repo.Update(branch);
         await _context.SaveChangesAsync();
 
-        Assert.NotNull(product.UpdatedAt);
+        Assert.NotNull(branch.UpdatedAt);
     }
 }

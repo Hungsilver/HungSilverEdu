@@ -23,12 +23,13 @@ import {
 import { SubjectsService } from '../../core/subjects.service';
 import { TeachersService } from '../../core/teachers.service';
 import { TuitionService } from '../../core/tuition.service';
+import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-tuition-page',
   imports: [
-    CurrencyPipe, DatePipe, FormsModule, ReactiveFormsModule, PageHeader,
+    CurrencyPipe, DatePipe, FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzInputNumberModule, NzModalModule, NzSelectModule, NzTableModule, NzTagModule
   ],
@@ -36,38 +37,53 @@ import { PageHeader } from '../../shared/page-header';
     <app-page-header title="Học phí" subtitle="Quản lý học phí theo học viên" icon="dollar" />
 
     <div class="filters">
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="branchId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Cơ sở" [(ngModel)]="branchId">
         @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Môn học" [(ngModel)]="subjectId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Môn học" [(ngModel)]="subjectId">
         @for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId">
         @for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId" (ngModelChange)="load()">
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId">
         @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
       </nz-select>
-      <input nz-input placeholder="Tên, mã, SĐT" [(ngModel)]="search" (ngModelChange)="onSearch()" />
-      <nz-date-picker [(ngModel)]="periodDate" (ngModelChange)="onPeriodChange()" nzMode="month" />
-      <nz-date-picker [(ngModel)]="dueDate" (ngModelChange)="load()" nzPlaceHolder="Hạn đóng" />
+      <input nz-input placeholder="Tên, mã, SĐT" [(ngModel)]="search" (keyup.enter)="applyFilters()" />
+      <nz-date-picker [(ngModel)]="periodDate" nzMode="month" />
+      <nz-date-picker [(ngModel)]="dueDate" nzPlaceHolder="Hạn đóng" />
+    </div>
+    <div class="filter-actions">
+      <button nz-button nzType="primary" (click)="applyFilters()"><nz-icon nzType="search" /> Tìm kiếm</button>
+      <button nz-button (click)="resetFilters()"><nz-icon nzType="reload" /> Đặt lại</button>
+      <span class="spacer"></span>
+      <app-column-settings #cols storageKey="hs-cols-tuition" [columns]="COLUMNS" />
     </div>
 
     <nz-table #table [nzData]="items()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
       (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '900px' }">
-      <thead><tr><th>STT</th><th>Tên học viên</th><th>Kỳ</th><th>Hạn đóng</th><th>Tổng</th><th>Đã đóng</th><th>Còn thiếu</th><th>Trạng thái</th></tr></thead>
+      <thead><tr>
+        <th>STT</th>
+        @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
+      </tr></thead>
       <tbody>
         @for (row of table.data; track row.studentId; let i = $index) {
           <tr class="clickable" (click)="openBill(row)">
             <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
-            <td>{{ row.studentName }}</td>
-            <td>{{ row.periodMonth }}/{{ row.periodYear }}</td>
-            <td>{{ row.dueDate | date:'dd/MM/yyyy' }}</td>
-            <td>{{ row.totalAmount | currency:'VND' }}</td>
-            <td>{{ row.paidAmount | currency:'VND' }}</td>
-            <td>{{ row.remainingAmount | currency:'VND' }}</td>
-            <td><nz-tag [nzColor]="statusColors[row.status]">{{ statusLabels[row.status] }}</nz-tag></td>
+            @for (col of cols.visibleColumns(); track col.key) {
+              <td>
+                @switch (col.key) {
+                  @case ('name') { {{ row.studentName }} }
+                  @case ('period') { {{ row.periodMonth }}/{{ row.periodYear }} }
+                  @case ('dueDate') { {{ row.dueDate | date:'dd/MM/yyyy' }} }
+                  @case ('total') { {{ row.totalAmount | currency:'VND' }} }
+                  @case ('paid') { {{ row.paidAmount | currency:'VND' }} }
+                  @case ('remaining') { {{ row.remainingAmount | currency:'VND' }} }
+                  @case ('status') { <nz-tag [nzColor]="statusColors[row.status]">{{ statusLabels[row.status] }}</nz-tag> }
+                }
+              </td>
+            }
           </tr>
         }
       </tbody>
@@ -106,7 +122,9 @@ import { PageHeader } from '../../shared/page-header';
     </nz-modal>
   `,
   styles: `
-    .filters { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .filters { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .filter-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .filter-actions .spacer { flex: 1; }
     .clickable { cursor: pointer; }
     .bill-head { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
     .bill-head div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; }
@@ -142,7 +160,17 @@ export class TuitionPage {
   protected teacherProfileId: string | null = null;
   protected periodDate = new Date();
   protected dueDate: Date | null = new Date();
-  private timer?: ReturnType<typeof setTimeout>;
+
+  // Cột cấu hình được (STT cố định đầu).
+  protected readonly COLUMNS: ColumnDef[] = [
+    { key: 'name', label: 'Tên học viên' },
+    { key: 'period', label: 'Kỳ' },
+    { key: 'dueDate', label: 'Hạn đóng' },
+    { key: 'total', label: 'Tổng' },
+    { key: 'paid', label: 'Đã đóng' },
+    { key: 'remaining', label: 'Còn thiếu' },
+    { key: 'status', label: 'Trạng thái' }
+  ];
 
   protected readonly billOpen = signal(false);
   protected readonly bill = signal<TuitionBill | null>(null);
@@ -171,12 +199,19 @@ export class TuitionPage {
     });
   }
 
-  protected onSearch(): void {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => { this.page.set(1); this.load(); }, 250);
+  protected applyFilters(): void {
+    this.page.set(1);
+    this.load();
   }
 
-  protected onPeriodChange(): void {
+  protected resetFilters(): void {
+    this.search = '';
+    this.branchId = null;
+    this.subjectId = null;
+    this.gradeId = null;
+    this.teacherProfileId = null;
+    this.periodDate = new Date();
+    this.dueDate = new Date();
     this.page.set(1);
     this.load();
   }

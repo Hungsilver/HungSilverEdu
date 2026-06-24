@@ -16,36 +16,53 @@ import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { toDateOnlyOrNull } from '../../core/date-util';
 import { ClassListItem, CreateTeacherAccountRequest, TeacherProfile, TeacherRequest, UnlinkedUser } from '../../core/models';
 import { TeachersService } from '../../core/teachers.service';
+import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
   selector: 'app-teachers-page',
   imports: [
-    FormsModule, ReactiveFormsModule, PageHeader,
+    FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule, NzTagModule, NzTooltipModule
   ],
   template: `
     <app-page-header title="Giáo viên" subtitle="Hồ sơ giáo viên và tài khoản đăng nhập" icon="team">
-      <input nz-input placeholder="Tìm mã, tên, SĐT" class="search" [(ngModel)]="search" (ngModelChange)="onSearch()" />
+      <input nz-input placeholder="Tìm mã, tên, SĐT" class="search" [(ngModel)]="search" (keyup.enter)="applyFilters()" />
+      <button nz-button (click)="applyFilters()"><nz-icon nzType="search" /> Tìm kiếm</button>
       <button nz-button nzType="primary" (click)="openForm()"><nz-icon nzType="plus" /> Thêm giáo viên</button>
       <button nz-button (click)="openAccountForm()"><nz-icon nzType="user-add" /> Tạo tài khoản GV</button>
     </app-page-header>
 
+    <div class="table-toolbar">
+      <span class="spacer"></span>
+      <app-column-settings #cols storageKey="hs-cols-teachers" [columns]="COLUMNS" />
+    </div>
+
     <nz-table #table [nzData]="teachers()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
       (nzPageIndexChange)="page.set($event); load()">
-      <thead><tr><th>STT</th><th>Mã GV</th><th>Giáo viên</th><th>SĐT</th><th>Email</th><th>Tài khoản</th><th>Lớp</th><th>Thao tác</th></tr></thead>
+      <thead><tr>
+        <th>STT</th>
+        @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
+        <th>Thao tác</th>
+      </tr></thead>
       <tbody>
         @for (t of table.data; track t.id; let i = $index) {
           <tr class="clickable" (click)="openDetail(t)">
             <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
-            <td>{{ t.teacherCode }}</td>
-            <td>{{ t.fullName }}</td>
-            <td>{{ t.phone || '—' }}</td>
-            <td>{{ t.email || '—' }}</td>
-            <td>@if (t.userName) { <nz-tag nzColor="green">{{ t.userName }}</nz-tag> } @else { <nz-tag>Chưa gắn</nz-tag> }</td>
-            <td>{{ t.classCount }}</td>
+            @for (col of cols.visibleColumns(); track col.key) {
+              <td>
+                @switch (col.key) {
+                  @case ('code') { {{ t.teacherCode }} }
+                  @case ('name') { {{ t.fullName }} }
+                  @case ('phone') { {{ t.phone || '—' }} }
+                  @case ('email') { {{ t.email || '—' }} }
+                  @case ('account') { @if (t.userName) { <nz-tag nzColor="green">{{ t.userName }}</nz-tag> } @else { <nz-tag>Chưa gắn</nz-tag> } }
+                  @case ('classes') { {{ t.classCount }} }
+                }
+              </td>
+            }
             <td (click)="$event.stopPropagation()">
               <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa giáo viên" aria-label="Sửa giáo viên" (click)="openForm(t)"><nz-icon nzType="edit" /></button>
               <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa giáo viên" aria-label="Xóa giáo viên"
@@ -128,6 +145,8 @@ import { PageHeader } from '../../shared/page-header';
   `,
   styles: `
     .search { width: 260px; }
+    .table-toolbar { display: flex; align-items: center; margin-bottom: 12px; }
+    .table-toolbar .spacer { flex: 1; }
     .clickable { cursor: pointer; }
     .detail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
     .detail div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; }
@@ -144,7 +163,16 @@ export class TeachersPage {
   protected readonly pageSize = signal(10);
   protected readonly total = signal(0);
   protected search = '';
-  private timer?: ReturnType<typeof setTimeout>;
+
+  // Cột cấu hình được (ngoài STT & Thao tác cố định).
+  protected readonly COLUMNS: ColumnDef[] = [
+    { key: 'code', label: 'Mã GV' },
+    { key: 'name', label: 'Giáo viên' },
+    { key: 'phone', label: 'SĐT' },
+    { key: 'email', label: 'Email' },
+    { key: 'account', label: 'Tài khoản' },
+    { key: 'classes', label: 'Lớp' }
+  ];
 
   protected readonly modalOpen = signal(false);
   protected readonly editing = signal<TeacherProfile | null>(null);
@@ -188,9 +216,9 @@ export class TeachersPage {
     });
   }
 
-  protected onSearch(): void {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => { this.page.set(1); this.load(); }, 250);
+  protected applyFilters(): void {
+    this.page.set(1);
+    this.load();
   }
 
   protected openForm(t?: TeacherProfile): void {

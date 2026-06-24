@@ -10,7 +10,6 @@ namespace HungSilver.Infrastructure.Persistence;
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<AppUser, AppRole, Guid>(options)
 {
-    public DbSet<Product> Products => Set<Product>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     // Nghiệp vụ trung tâm (lớp ClassRoom map sang bảng "Classes").
@@ -46,15 +45,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-
-        builder.Entity<Product>(e =>
-        {
-            e.Property(p => p.Name).HasMaxLength(200);
-            e.Property(p => p.Sku).HasMaxLength(50);
-            e.Property(p => p.Description).HasMaxLength(2000);
-            e.Property(p => p.Price).HasPrecision(18, 2);
-            e.HasIndex(p => p.Sku);
-        });
 
         builder.Entity<RefreshToken>(e =>
         {

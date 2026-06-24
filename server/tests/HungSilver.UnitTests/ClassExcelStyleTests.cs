@@ -63,8 +63,10 @@ public sealed class ClassExcelStyleTests : IDisposable
         using var wb = OpenWorkbook(bytes);
         var ws = wb.Worksheet("Nhập liệu");
 
-        AssertTextPhoneCell(ws.Cell("J2"), "0900000000");
-        AssertTextFormat(ws.Cell("K2"));
+        // Sau khi chèn cột "Học phí" (J), SĐT phụ huynh dời sang K, SĐT học viên sang L.
+        Assert.Equal("Học phí", ws.Cell("J1").GetString());
+        AssertTextPhoneCell(ws.Cell("K2"), "0900000000");
+        AssertTextFormat(ws.Cell("L2"));
     }
 
     [Fact]

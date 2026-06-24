@@ -39,6 +39,7 @@ import { StudentsService } from '../../core/students.service';
 import { TuitionService } from '../../core/tuition.service';
 import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
+import { ClassFormModal } from './class-form-modal';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
@@ -48,7 +49,7 @@ import { PageHeader } from '../../shared/page-header';
     NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzButtonModule, NzIconModule,
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
     NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule,
-    NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader
+    NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader, ClassFormModal
   ],
   template: `
     <a routerLink="/classes" class="back"><nz-icon nzType="arrow-left" /> Danh sách lớp</a>
@@ -56,6 +57,9 @@ import { PageHeader } from '../../shared/page-header';
     @if (detail(); as c) {
       <app-page-header [title]="c.name" subtitle="Chi tiết lớp học" icon="book">
         <div class="actions">
+          @if (canManage()) {
+            <button nz-button (click)="classEditOpen.set(true)"><nz-icon nzType="edit" /> Sửa lớp</button>
+          }
           <a nz-button routerLink="/evaluations"><nz-icon nzType="audit" /> Đánh giá tháng</a>
           <button nz-button nzType="primary" (click)="openCreateSession()"><nz-icon nzType="plus" /> Tạo buổi học</button>
           @if (canManage()) {
@@ -64,6 +68,8 @@ import { PageHeader } from '../../shared/page-header';
           }
         </div>
       </app-page-header>
+
+      <app-class-form-modal [(open)]="classEditOpen" [classId]="id()" (saved)="onClassEdited()" />
 
       <nz-tabs nzType="line" class="detail-tabs">
 
@@ -583,6 +589,9 @@ export class ClassDetailPage implements OnInit {
   private readonly router = inject(Router);
   protected readonly canManage = computed(() => this.auth.isAdmin() || this.auth.isTeacher());
 
+  // Modal sửa lớp dùng chung (class-form-modal).
+  protected readonly classEditOpen = signal(false);
+
   protected readonly weekdays = WEEKDAY_LABELS;
   protected readonly statuses = [SubmissionStatus.NotSubmitted, SubmissionStatus.Submitted, SubmissionStatus.Late];
   protected readonly statusLabels = SUBMISSION_STATUS_LABELS;
@@ -682,6 +691,11 @@ export class ClassDetailPage implements OnInit {
     if (this.canManage()) {
       this.studentsService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.allStudents.set(r.items));
     }
+  }
+
+  /** Sau khi sửa lớp ở modal dùng chung → nạp lại chi tiết. */
+  protected onClassEdited(): void {
+    this.reload();
   }
 
   private reload(): void {

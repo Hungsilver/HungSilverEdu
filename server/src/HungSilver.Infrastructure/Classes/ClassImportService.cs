@@ -16,7 +16,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
     private static readonly string[] MainHeaders =
     [
         "Cơ sở", "Mã học viên", "Tên học viên", "Ngày sinh (dd/MM/yyyy)", "Mã lớp", "Tên lớp",
-        "Môn", "Khối", "Giáo viên", "SĐT phụ huynh", "SĐT học viên", "Ghi chú"
+        "Môn", "Khối", "Giáo viên", "Học phí", "SĐT phụ huynh", "SĐT học viên", "Ghi chú"
     ];
 
     public byte[] BuildTemplate()
@@ -34,11 +34,12 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         ws.Cell(2, 3).Value = "Nguyễn Văn A";
         ws.Cell(2, 4).Value = "01/09/2010";
         ws.Cell(2, 6).Value = "Lớp toán 11 cô Phượng";
-        ws.Cell(2, 10).SetValue("0900000000");
-        ApplyTextFormat(ws, [10, 11], 2, 500);
+        ws.Cell(2, 10).Value = 500000;          // Học phí mẫu
+        ws.Cell(2, 11).SetValue("0900000000");  // SĐT phụ huynh
+        ApplyTextFormat(ws, [11, 12], 2, 500);
 
-        // Cột cố định: CoSo|MaHV|TenHV|NgaySinh|MaLop|TenLop|Mon|Khoi|GV|SDTPhuHuynh|SDTHocVien|GhiChu
-        int[] dataWidths = [15, 15, 25, 18, 15, 30, 20, 15, 25, 18, 18, 30];
+        // Cột cố định: CoSo|MaHV|TenHV|NgaySinh|MaLop|TenLop|Mon|Khoi|GV|HocPhi|SDTPhuHuynh|SDTHocVien|GhiChu
+        int[] dataWidths = [15, 15, 25, 18, 15, 30, 20, 15, 25, 15, 18, 18, 30];
         for (var i = 0; i < dataWidths.Length; i++)
             ws.Column(i + 1).Width = dataWidths[i];
 
@@ -93,7 +94,8 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                 .Select(r => new RawRow(
                     r.RowNumber(),
                     Cell(r, 1), Cell(r, 2), Cell(r, 3), Cell(r, 4), Cell(r, 5),
-                    Cell(r, 6), Cell(r, 7), Cell(r, 8), Cell(r, 9), Cell(r, 10), Cell(r, 11), Cell(r, 12)))
+                    Cell(r, 6), Cell(r, 7), Cell(r, 8), Cell(r, 9), Cell(r, 10),
+                    Cell(r, 11), Cell(r, 12), Cell(r, 13)))
                 .Where(r => !string.IsNullOrWhiteSpace(r.StudentName) || !string.IsNullOrWhiteSpace(r.ClassName) || !string.IsNullOrWhiteSpace(r.ClassCode))
                 .ToList();
         }
@@ -126,7 +128,19 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                 ? existingClasses.FirstOrDefault(c => c.ClassCode.Equals(row.ClassCode.Trim(), StringComparison.OrdinalIgnoreCase))
                 : null;
 
-            var classError = existingClass != null ? null : ValidateClass(row, branch, subject, grade, teacher);
+            // Lớp MỚI (không khớp mã lớp) nhưng trùng TÊN trong cùng CƠ SỞ với 1 lớp đang sống → cần user quyết định.
+            var duplicate = existingClass is null && !string.IsNullOrWhiteSpace(row.ClassName) && branch is not null
+                ? existingClasses.FirstOrDefault(c =>
+                    !c.IsDeleted
+                    && c.BranchId == branch.Id
+                    && c.Name.Trim().Equals(row.ClassName.Trim(), StringComparison.OrdinalIgnoreCase))
+                : null;
+
+            var classError = existingClass != null
+                ? null
+                : duplicate != null
+                    ? $"Tên lớp '{row.ClassName.Trim()}' đã tồn tại trong cơ sở — đổi tên khác hoặc chọn dùng lớp đã có."
+                    : ValidateClass(row, branch, subject, grade, teacher);
             var classKey = existingClass?.ClassCode
                 ?? (!string.IsNullOrWhiteSpace(row.ClassCode)
                     ? row.ClassCode.Trim().ToUpperInvariant()
@@ -140,6 +154,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                     existingClass?.ClassCode ?? Clean(row.ClassCode),
                     existingClass?.Name ?? row.ClassName.Trim(),
                     existingClass?.Id,
+                    duplicate?.Id,
                     existingClass?.BranchId ?? branch?.Id,
                     existingClass?.BranchCode ?? branch?.Code,
                     existingClass?.BranchName ?? branch?.Name,
@@ -149,7 +164,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                     existingClass?.GradeName ?? grade?.Name,
                     existingClass?.TeacherProfileId ?? teacher?.Id,
                     existingClass?.TeacherName ?? teacher?.FullName,
-                    existingClass?.TuitionFee ?? 0,
+                    existingClass?.TuitionFee ?? ParseMoney(row.TuitionFee),
                     classError is null,
                     classError);
             }
@@ -169,8 +184,13 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
 
         var classes = classMap.Values.ToList();
         var invalid = classes.Count(c => !c.IsValid) + students.Count(s => !s.IsValid);
+        // Trả danh sách lớp đang sống (Id, Tên, Cơ sở) để FE kiểm trùng tên+cơ sở ngay khi user sửa tên trong preview.
+        var existingClassList = existingClasses
+            .Where(c => !c.IsDeleted)
+            .Select(c => new ClassImportExistingClassDto(c.Id, c.Name, c.BranchId))
+            .ToList();
         return new ClassImportPreviewDto(
-            classes, students,
+            classes, students, existingClassList,
             classes.Count(c => c.IsValid), students.Count(s => s.IsValid), invalid);
     }
 
@@ -194,6 +214,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
 
         var classByPreview = new Dictionary<string, Guid>();
         var gradeNameByPreview = new Dictionary<string, string?>();
+        var createdNameBranchKeys = new HashSet<string>();  // chống trùng tên+cơ sở giữa các dòng trong cùng file
         foreach (var item in request.Classes)
         {
             var classId = item.ExistingClassId;
@@ -218,6 +239,19 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
                     errors.Add($"Lớp {item.Name}: mã lớp '{item.ClassCode}' đã tồn tại.");
                     continue;
                 }
+
+                // Lưới an toàn: 1 cơ sở không được có 2 lớp trùng tên (lớp đang sống + trong cùng file import).
+                var normalizedName = item.Name.Trim();
+                var nameBranchKey = $"{normalizedName.ToLowerInvariant()}|{branch.Id}";
+                var duplicateName = createdNameBranchKeys.Contains(nameBranchKey)
+                    || await context.Classes.AnyAsync(c => c.BranchId == branch.Id && c.Name.ToLower() == normalizedName.ToLower(), ct);
+                if (duplicateName)
+                {
+                    skipped++;
+                    errors.Add($"Lớp {item.Name}: tên lớp đã tồn tại trong cơ sở.");
+                    continue;
+                }
+                createdNameBranchKeys.Add(nameBranchKey);
 
                 var cls = new ClassRoom
                 {
@@ -395,6 +429,16 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
     private static DateOnly? ParseDate(string? s) =>
         !string.IsNullOrWhiteSpace(s) && DateOnly.TryParseExact(s.Trim(), "dd/MM/yyyy", out var d) ? d : null;
 
+    // Học phí nhập tay: bỏ dấu phân tách nghìn (. , khoảng trắng) rồi parse; không hợp lệ → 0.
+    private static decimal ParseMoney(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return 0;
+        var cleaned = s.Replace(".", string.Empty).Replace(",", string.Empty)
+            .Replace(" ", string.Empty).Replace(" ", string.Empty).Trim();
+        return decimal.TryParse(cleaned, System.Globalization.NumberStyles.Number,
+            System.Globalization.CultureInfo.InvariantCulture, out var v) && v >= 0 ? v : 0;
+    }
+
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     private sealed record RawRow(
@@ -408,6 +452,7 @@ public sealed class ClassImportService(AppDbContext context) : IClassImportServi
         string Subject,
         string Grade,
         string Teacher,
+        string TuitionFee,
         string ParentPhone,
         string Phone,
         string Note);

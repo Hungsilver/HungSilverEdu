@@ -21,26 +21,6 @@ export interface PagedResult<T> {
   totalPages: number;
 }
 
-export interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  description: string | null;
-  price: number;
-  isActive: boolean;
-  isDeleted: boolean;
-  createdAt: string;
-  updatedAt: string | null;
-}
-
-export interface ProductRequest {
-  name: string;
-  sku: string;
-  description: string | null;
-  price: number;
-  isActive: boolean;
-}
-
 export interface UserListItem {
   id: string;
   userName: string;
@@ -933,6 +913,8 @@ export interface ClassImportClassPreview {
   classCode: string | null;
   name: string;
   existingClassId: string | null;
+  // Lớp mới trùng tên trong cùng cơ sở với 1 lớp đã có → id lớp trùng (để chọn "dùng lớp đã có").
+  duplicateClassId: string | null;
   branchId: string | null;
   branchCode: string | null;
   branchName: string | null;
@@ -960,9 +942,16 @@ export interface ClassImportStudentPreview {
   error: string | null;
 }
 
+export interface ClassImportExistingClass {
+  id: string;
+  name: string;
+  branchId: string | null;
+}
+
 export interface ClassImportPreview {
   classes: ClassImportClassPreview[];
   students: ClassImportStudentPreview[];
+  existingClasses: ClassImportExistingClass[];
   validClassCount: number;
   validStudentCount: number;
   invalidCount: number;

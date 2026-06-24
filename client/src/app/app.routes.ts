@@ -90,11 +90,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings.page').then(m => m.SettingsPage)
       },
 
-      // Demo cũ (giữ làm tham chiếu, không hiện trên menu).
-      {
-        path: 'products',
-        loadComponent: () => import('./features/products/products.page').then(m => m.ProductsPage)
-      },
       {
         path: 'admin/users',
         canActivate: [roleGuard],

@@ -14,6 +14,8 @@ public sealed record ClassImportClassPreviewDto(
     string? ClassCode,
     string Name,
     Guid? ExistingClassId,
+    // Lớp MỚI nhưng trùng tên trong cùng cơ sở với 1 lớp đã có → id lớp trùng (để FE cho chọn "dùng lớp đã có").
+    Guid? DuplicateClassId,
     Guid? BranchId,
     string? BranchCode,
     string? BranchName,
@@ -39,9 +41,13 @@ public sealed record ClassImportStudentPreviewDto(
     bool IsValid,
     string? Error);
 
+// Danh sách lớp đang có (Id, Tên, Cơ sở) để FE kiểm trùng tên+cơ sở ngay khi user đổi tên lớp trong preview.
+public sealed record ClassImportExistingClassDto(Guid Id, string Name, Guid? BranchId);
+
 public sealed record ClassImportPreviewDto(
     IReadOnlyList<ClassImportClassPreviewDto> Classes,
     IReadOnlyList<ClassImportStudentPreviewDto> Students,
+    IReadOnlyList<ClassImportExistingClassDto> ExistingClasses,
     int ValidClassCount,
     int ValidStudentCount,
     int InvalidCount);
