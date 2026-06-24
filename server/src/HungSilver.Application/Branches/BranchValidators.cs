@@ -10,6 +10,7 @@ public sealed class CreateBranchRequestValidator : AbstractValidator<CreateBranc
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Address).MaximumLength(500);
         RuleFor(x => x.Phone).MaximumLength(20);
+        RuleFor(x => x.TeacherCodePrefix).MaximumLength(30);
     }
 }
 
@@ -21,5 +22,6 @@ public sealed class UpdateBranchRequestValidator : AbstractValidator<UpdateBranc
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Address).MaximumLength(500);
         RuleFor(x => x.Phone).MaximumLength(20);
+        RuleFor(x => x.TeacherCodePrefix).MaximumLength(30);
     }
 }

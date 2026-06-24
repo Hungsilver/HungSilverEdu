@@ -5,6 +5,7 @@ namespace HungSilver.Application.Tuition;
 public sealed record TuitionInvoiceDto(
     Guid Id,
     Guid StudentId,
+    string StudentCode,
     string StudentName,
     Guid? ClassId,
     int PeriodYear,

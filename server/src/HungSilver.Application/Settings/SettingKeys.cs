@@ -12,7 +12,10 @@ public static class SettingKeys
     /// <summary>Ngưỡng điểm giảm để cảnh báo "giảm mạnh".</summary>
     public const string WarningScoreDropThreshold = "Warning.ScoreDropThreshold";
 
-    /// <summary>Tiền tố dùng trong mã giáo viên (vd "TriViet" → "TriViet-TrangNTT0"). Mặc định "HV".</summary>
+    /// <summary>
+    /// Prefix FALLBACK sinh mã giáo viên khi GV chưa gắn cơ sở chính. Mặc định "HV".
+    /// Khi GV có cơ sở, prefix lấy theo cơ sở (Branch.TeacherCodePrefix; trống → tên cơ sở + "@").
+    /// </summary>
     public const string CenterCodePrefix = "Center.CodePrefix";
 
     /// <summary>Giá trị mặc định khi chưa có cấu hình ở scope nào.</summary>

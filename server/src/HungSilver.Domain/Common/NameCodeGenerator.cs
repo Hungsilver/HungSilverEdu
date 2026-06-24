@@ -58,16 +58,31 @@ public static class NameCodeGenerator
         => GenerateStudentCode(fullName, null, gradeLevel, counter);
 
     /// <summary>
-    /// Sinh mã giáo viên: {prefix}-{Ten}{VietTat}{counter} (tên PascalCase, viết tắt in hoa).
-    /// Ví dụ: "Nguyễn Thị Thu Trang", centerPrefix="TriViet", counter=0 → "TriViet-TrangNTT0"
+    /// Sinh mã giáo viên: {prefix}{Ten}{VietTat}{counter} (tên PascalCase, viết tắt in hoa).
+    /// Prefix TỰ MANG dấu phân tách của nó (không thêm "-" cứng).
+    /// Ví dụ: "Nguyễn Thị Thu Trang", prefix="DongTho@", counter=0 → "DongTho@TrangNTT0"
     /// </summary>
-    public static string GenerateTeacherCode(string fullName, string centerPrefix, int counter = 0)
+    public static string GenerateTeacherCode(string fullName, string prefix, int counter = 0)
     {
         var (first, initials) = SplitName(fullName);
         var firstPascal = first.Length > 0
             ? char.ToUpperInvariant(first[0]) + first[1..].ToLowerInvariant()
             : first;
-        return $"{centerPrefix}-{firstPascal}{initials}{counter}";
+        return $"{prefix}{firstPascal}{initials}{counter}";
+    }
+
+    /// <summary>
+    /// Ghép tên thành PascalCase liền (bỏ dấu, mỗi từ: chữ đầu hoa + còn lại thường).
+    /// Dùng làm prefix mặc định theo tên cơ sở: "Đông Thọ" → "DongTho".
+    /// </summary>
+    public static string PascalCompact(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts
+            .Select(p => RemoveDiacritics(p))
+            .Where(p => p.Length > 0)
+            .Select(p => char.ToUpperInvariant(p[0]) + p[1..].ToLowerInvariant()));
     }
 
     /// <summary>Slug ngắn từ tên danh mục để tự sinh Code (không dấu, không khoảng trắng).</summary>

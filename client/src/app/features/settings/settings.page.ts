@@ -15,7 +15,8 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
-import { FileStorageMode, PointReason, PointReasonRequest, PointReasonType, SettingScope, UpsertSettingRequest } from '../../core/models';
+import { Branch, BranchRequest, FileStorageMode, PointReason, PointReasonRequest, PointReasonType, SettingScope, UpsertSettingRequest } from '../../core/models';
+import { BranchesService } from '../../core/branches.service';
 import { PointReasonsService } from '../../core/point-reasons.service';
 import { SettingsService } from '../../core/settings.service';
 import { PageHeader } from '../../shared/page-header';
@@ -61,6 +62,33 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
           <nz-icon nzType="save" /> Lưu cấu hình
         </button>
       </form>
+    </nz-card>
+
+    <!-- Tiền tố mã giáo viên theo cơ sở -->
+    <nz-card nzTitle="Tiền tố mã giáo viên theo cơ sở" style="margin-bottom:16px">
+      <p class="hint">
+        Để trống → tự lấy theo tên cơ sở (vd "Đông Thọ" → <code>DongTho&#64;</code>); mã GV sẽ là
+        <code>DongTho&#64;TrangNTT0</code>. Prefix tự mang dấu phân tách của nó (vd <code>&#64;</code>, <code>-</code>).
+      </p>
+      <nz-table [nzData]="branches()" [nzShowPagination]="false" nzSize="small">
+        <thead><tr><th>Cơ sở</th><th style="width:300px">Tiền tố mã GV</th><th style="width:90px">Thao tác</th></tr></thead>
+        <tbody>
+          @for (b of branches(); track b.id) {
+            <tr>
+              <td>{{ b.name }}</td>
+              <td><input nz-input [(ngModel)]="b.teacherCodePrefix" [name]="'pfx-' + b.id"
+                [placeholder]="'Mặc định: ' + defaultPrefix(b.name)" /></td>
+              <td>
+                <button nz-button nzType="link" nzSize="small" [nzLoading]="savingBranchId() === b.id"
+                  (click)="saveBranchPrefix(b)"><nz-icon nzType="save" /> Lưu</button>
+              </td>
+            </tr>
+          }
+          @if (branches().length === 0) {
+            <tr><td colspan="3" class="empty">Chưa có cơ sở nào.</td></tr>
+          }
+        </tbody>
+      </nz-table>
     </nz-card>
 
     <!-- Lý do cộng điểm -->
@@ -145,16 +173,26 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
       </nz-table>
     </nz-card>
   `,
-  styles: `.field { width: 100%; max-width: 360px; }`
+  styles: `
+    .field { width: 100%; max-width: 360px; }
+    .hint { color: var(--hs-text-muted); margin-bottom: 12px; }
+    .hint code { background: var(--hs-fill, rgba(0,0,0,.04)); padding: 1px 5px; border-radius: 4px; }
+    .empty { text-align: center; color: var(--hs-text-muted); }
+  `
 })
 export class SettingsPage implements OnInit {
   private readonly settingsService = inject(SettingsService);
   private readonly pointReasonsService = inject(PointReasonsService);
+  private readonly branchesService = inject(BranchesService);
   private readonly message = inject(NzMessageService);
 
   protected readonly FileStorageMode = FileStorageMode;
   protected readonly PointReasonType = PointReasonType;
   protected readonly saving = signal(false);
+
+  // Tiền tố mã GV theo cơ sở
+  protected readonly branches = signal<Branch[]>([]);
+  protected readonly savingBranchId = signal<string | null>(null);
 
   protected fileMode: FileStorageMode = FileStorageMode.ExternalUrl;
   protected dueSoonDays = 7;
@@ -180,6 +218,39 @@ export class SettingsPage implements OnInit {
       if (v[KEY_SCORE_DROP]) this.scoreDrop = Number(v[KEY_SCORE_DROP]);
     });
     this.loadReasons();
+    this.branchesService.getAll(true).subscribe(x => this.branches.set(x));
+  }
+
+  // Prefix mặc định theo tên cơ sở (PascalCase liền + "@") — đồng bộ NameCodeGenerator.PascalCompact ở BE.
+  protected defaultPrefix(name: string): string {
+    const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+    const pascal = parts.map(p => {
+      const ascii = p.replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .normalize('NFD').replace(/[^A-Za-z0-9]/g, '');
+      return ascii ? ascii[0].toUpperCase() + ascii.slice(1).toLowerCase() : '';
+    }).join('');
+    return pascal + '@';
+  }
+
+  protected saveBranchPrefix(b: Branch): void {
+    this.savingBranchId.set(b.id);
+    const req: BranchRequest = {
+      code: b.code,
+      name: b.name,
+      address: b.address,
+      phone: b.phone,
+      teacherCodePrefix: b.teacherCodePrefix?.trim() || null,
+      indexOrder: b.indexOrder,
+      isActive: b.isActive
+    };
+    this.branchesService.update(b.id, req).subscribe({
+      next: updated => {
+        this.branches.update(list => list.map(x => x.id === updated.id ? updated : x));
+        this.savingBranchId.set(null);
+        this.message.success('Đã lưu tiền tố mã GV.');
+      },
+      error: (err: HttpErrorResponse) => { this.savingBranchId.set(null); this.message.error(err.error?.message ?? err.message); }
+    });
   }
 
   private loadReasons(): void {

@@ -12,6 +12,7 @@ public sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
         e.Property(x => x.Name).HasMaxLength(200);
         e.Property(x => x.Address).HasMaxLength(500);
         e.Property(x => x.Phone).HasMaxLength(20);
+        e.Property(x => x.TeacherCodePrefix).HasMaxLength(30);
         e.HasIndex(x => x.Code).IsUnique();
         e.HasIndex(x => x.IndexOrder);
     }
@@ -41,6 +42,7 @@ public sealed class TeacherProfileConfiguration : IEntityTypeConfiguration<Teach
         e.HasIndex(x => x.TeacherCode).IsUnique();
         e.HasIndex(x => x.UserId).IsUnique().HasFilter("\"UserId\" IS NOT NULL AND NOT \"IsDeleted\"");
         e.HasIndex(x => x.FullName);
+        e.HasIndex(x => x.BranchId);
     }
 }
 

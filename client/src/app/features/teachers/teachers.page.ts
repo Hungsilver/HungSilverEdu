@@ -13,8 +13,9 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
+import { BranchesService } from '../../core/branches.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
-import { ClassListItem, CreateTeacherAccountRequest, TeacherProfile, TeacherRequest, UnlinkedUser } from '../../core/models';
+import { Branch, ClassListItem, CreateTeacherAccountRequest, TeacherProfile, TeacherRequest, UnlinkedUser } from '../../core/models';
 import { TeachersService } from '../../core/teachers.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
@@ -79,6 +80,11 @@ import { PageHeader } from '../../shared/page-header';
         <form nz-form [formGroup]="form" nzLayout="vertical">
           <nz-form-item><nz-form-label>Mã GV</nz-form-label><nz-form-control><input nz-input formControlName="teacherCode" placeholder="Trống để tự sinh" /></nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label nzRequired>Họ tên</nz-form-label><nz-form-control><input nz-input formControlName="fullName" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Cơ sở (sinh mã)</nz-form-label><nz-form-control>
+            <nz-select formControlName="branchId" nzAllowClear nzShowSearch nzPlaceHolder="Trống → prefix mặc định toàn hệ thống">
+              @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
+            </nz-select>
+          </nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>SĐT</nz-form-label><nz-form-control><input nz-input formControlName="phone" /></nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Email</nz-form-label><nz-form-control><input nz-input formControlName="email" /></nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Ngày sinh</nz-form-label><nz-form-control><nz-date-picker formControlName="dateOfBirth" /></nz-form-control></nz-form-item>
@@ -98,6 +104,11 @@ import { PageHeader } from '../../shared/page-header';
             </nz-select>
           </nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Họ tên giáo viên mới</nz-form-label><nz-form-control><input nz-input formControlName="fullName" /></nz-form-control></nz-form-item>
+          <nz-form-item><nz-form-label>Cơ sở (sinh mã)</nz-form-label><nz-form-control>
+            <nz-select formControlName="branchId" nzAllowClear nzShowSearch nzPlaceHolder="Trống → prefix mặc định toàn hệ thống">
+              @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
+            </nz-select>
+          </nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>SĐT</nz-form-label><nz-form-control><input nz-input formControlName="phone" /></nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Tên đăng nhập</nz-form-label><nz-form-control><input nz-input formControlName="userName" /></nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Email đăng nhập</nz-form-label><nz-form-control><input nz-input formControlName="loginEmail" /></nz-form-control></nz-form-item>
@@ -112,6 +123,7 @@ import { PageHeader } from '../../shared/page-header';
           <div class="detail">
             <div><b>Mã GV</b><span>{{ t.teacherCode }}</span></div>
             <div><b>Họ tên</b><span>{{ t.fullName }}</span></div>
+            <div><b>Cơ sở</b><span>{{ t.branchName || '—' }}</span></div>
             <div><b>Tài khoản</b><span>
               @if (t.userName) {
                 {{ t.userName }}
@@ -155,9 +167,11 @@ import { PageHeader } from '../../shared/page-header';
 })
 export class TeachersPage {
   private readonly service = inject(TeachersService);
+  private readonly branchesService = inject(BranchesService);
   private readonly message = inject(NzMessageService);
 
   protected readonly teachers = signal<TeacherProfile[]>([]);
+  protected readonly branches = signal<Branch[]>([]);
   protected readonly loading = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
@@ -179,6 +193,7 @@ export class TeachersPage {
   protected readonly form = new FormGroup({
     teacherCode: new FormControl<string | null>(null),
     fullName: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    branchId: new FormControl<string | null>(null),
     phone: new FormControl<string | null>(null),
     email: new FormControl<string | null>(null),
     dateOfBirth: new FormControl<Date | null>(null),
@@ -190,6 +205,7 @@ export class TeachersPage {
   protected readonly accountForm = new FormGroup({
     teacherProfileId: new FormControl<string | null>(null),
     fullName: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    branchId: new FormControl<string | null>(null),
     phone: new FormControl<string | null>(null),
     userName: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     loginEmail: new FormControl<string | null>(null),
@@ -206,6 +222,7 @@ export class TeachersPage {
 
   constructor() {
     this.load();
+    this.branchesService.getAll().subscribe(x => this.branches.set(x));
   }
 
   protected load(): void {
@@ -226,6 +243,7 @@ export class TeachersPage {
     this.form.reset({
       teacherCode: t?.teacherCode ?? null,
       fullName: t?.fullName ?? '',
+      branchId: t?.branchId ?? null,
       phone: t?.phone ?? null,
       email: t?.email ?? null,
       dateOfBirth: t?.dateOfBirth ? new Date(t.dateOfBirth) : null,
@@ -247,6 +265,7 @@ export class TeachersPage {
       address: v.address,
       note: v.note,
       userId: this.editing()?.userId ?? null,
+      branchId: v.branchId,
       isActive: true
     };
     const editing = this.editing();
@@ -255,7 +274,7 @@ export class TeachersPage {
   }
 
   protected openAccountForm(): void {
-    this.accountForm.reset({ teacherProfileId: null, fullName: '', phone: null, userName: '', loginEmail: null, password: '' });
+    this.accountForm.reset({ teacherProfileId: null, fullName: '', branchId: null, phone: null, userName: '', loginEmail: null, password: '' });
     this.accountOpen.set(true);
   }
 
@@ -271,6 +290,7 @@ export class TeachersPage {
       dateOfBirth: null,
       address: null,
       note: null,
+      branchId: v.branchId,
       userName: v.userName,
       loginEmail: v.loginEmail,
       password: v.password

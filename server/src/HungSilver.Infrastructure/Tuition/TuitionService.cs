@@ -320,14 +320,18 @@ public sealed class TuitionService(
         var today = DateOnly.FromDateTime(DateTime.Now);
         var dueSoonDays = await GetDueSoonDaysAsync(ct);
         var studentIds = items.Select(i => i.StudentId).Distinct().ToList();
-        var names = await context.Students.AsNoTracking()
+        var students = await context.Students.AsNoTracking()
             .Where(s => studentIds.Contains(s.Id))
-            .ToDictionaryAsync(s => s.Id, s => s.FullName, ct);
+            .ToDictionaryAsync(s => s.Id, s => new { s.FullName, s.StudentCode }, ct);
 
-        return items.Select(i => new TuitionInvoiceDto(
-            i.Id, i.StudentId, names.GetValueOrDefault(i.StudentId, string.Empty), i.ClassId,
-            i.PeriodYear, i.PeriodMonth, i.Amount, i.DiscountAmount, i.PaidAmount, i.DueDate,
-            EffectiveStatus(i, today, dueSoonDays), i.PaidOn, i.Note, i.IsDeleted, i.CreatedAt)).ToList();
+        return items.Select(i =>
+        {
+            var s = students.GetValueOrDefault(i.StudentId);
+            return new TuitionInvoiceDto(
+                i.Id, i.StudentId, s?.StudentCode ?? string.Empty, s?.FullName ?? string.Empty, i.ClassId,
+                i.PeriodYear, i.PeriodMonth, i.Amount, i.DiscountAmount, i.PaidAmount, i.DueDate,
+                EffectiveStatus(i, today, dueSoonDays), i.PaidOn, i.Note, i.IsDeleted, i.CreatedAt);
+        }).ToList();
     }
 
     private static TuitionStatus EffectiveStatus(TuitionInvoice? invoice, DateOnly todayOrDueDate, int dueSoonDays)

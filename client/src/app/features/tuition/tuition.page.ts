@@ -74,6 +74,7 @@ import { PageHeader } from '../../shared/page-header';
             @for (col of cols.visibleColumns(); track col.key) {
               <td>
                 @switch (col.key) {
+                  @case ('code') { {{ row.studentCode }} }
                   @case ('name') { {{ row.studentName }} }
                   @case ('period') { {{ row.periodMonth }}/{{ row.periodYear }} }
                   @case ('dueDate') { {{ row.dueDate | date:'dd/MM/yyyy' }} }
@@ -163,6 +164,7 @@ export class TuitionPage {
 
   // Cột cấu hình được (STT cố định đầu).
   protected readonly COLUMNS: ColumnDef[] = [
+    { key: 'code', label: 'Mã HV' },
     { key: 'name', label: 'Tên học viên' },
     { key: 'period', label: 'Kỳ' },
     { key: 'dueDate', label: 'Hạn đóng' },

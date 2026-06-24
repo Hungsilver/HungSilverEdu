@@ -84,7 +84,7 @@ public sealed class TeacherService(
         if (!validation.IsValid)
             return Result.Failure<TeacherProfileDto>(validation.ToError("Teacher.Validation"));
 
-        var codeResult = await NextTeacherCodeAsync(request.TeacherCode, request.FullName, ct);
+        var codeResult = await NextTeacherCodeAsync(request.TeacherCode, request.FullName, request.BranchId, ct);
         if (codeResult.IsFailure)
             return Result.Failure<TeacherProfileDto>(codeResult.Error);
 
@@ -102,6 +102,7 @@ public sealed class TeacherService(
             Address = Clean(request.Address),
             Note = Clean(request.Note),
             UserId = Normalize(request.UserId),
+            BranchId = Normalize(request.BranchId),
             IsActive = request.IsActive
         };
 
@@ -120,8 +121,11 @@ public sealed class TeacherService(
         if (teacher is null)
             return Result.Failure<TeacherProfileDto>(NotFoundError);
 
-        var code = request.TeacherCode.Trim().ToUpperInvariant();
-        if (teacher.TeacherCode != code && await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode == code, ct))
+        // Giữ nguyên hoa/thường (mã sinh tự động có thể là "DongTho@TrangNTT0"); trùng không phân biệt hoa/thường.
+        var code = request.TeacherCode.Trim();
+        var codeLower = code.ToLower();
+        if (!string.Equals(teacher.TeacherCode, code, StringComparison.OrdinalIgnoreCase)
+            && await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode.ToLower() == codeLower, ct))
             return Result.Failure<TeacherProfileDto>(Error.Conflict("Teacher.DuplicateCode", $"Mã giáo viên '{request.TeacherCode}' đã tồn tại."));
 
         var userCheck = await ValidateUserLinkAsync(request.UserId, id, ct);
@@ -136,6 +140,7 @@ public sealed class TeacherService(
         teacher.Address = Clean(request.Address);
         teacher.Note = Clean(request.Note);
         teacher.UserId = Normalize(request.UserId);
+        teacher.BranchId = Normalize(request.BranchId);
         teacher.IsActive = request.IsActive;
 
         await context.SaveChangesAsync(ct);
@@ -161,7 +166,7 @@ public sealed class TeacherService(
         }
         else
         {
-            var codeResult = await NextTeacherCodeAsync(request.TeacherCode, request.FullName, ct);
+            var codeResult = await NextTeacherCodeAsync(request.TeacherCode, request.FullName, request.BranchId, ct);
             if (codeResult.IsFailure)
                 return Result.Failure<TeacherProfileDto>(codeResult.Error);
 
@@ -174,6 +179,7 @@ public sealed class TeacherService(
                 DateOfBirth = request.DateOfBirth,
                 Address = Clean(request.Address),
                 Note = Clean(request.Note),
+                BranchId = Normalize(request.BranchId),
                 IsActive = true
             };
             context.TeacherProfiles.Add(teacher);
@@ -301,24 +307,44 @@ public sealed class TeacherService(
             : Result.Success();
     }
 
-    private async Task<Result<string>> NextTeacherCodeAsync(string? requested, string fullName, CancellationToken ct)
+    private async Task<Result<string>> NextTeacherCodeAsync(string? requested, string fullName, Guid? branchId, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(requested))
         {
-            var manual = requested.Trim().ToUpperInvariant();
-            return await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode == manual, ct)
+            // Giữ nguyên hoa/thường người dùng nhập (prefix có thể chứa chữ thường, vd "DongTho@");
+            // kiểm trùng không phân biệt hoa/thường.
+            var manual = requested.Trim();
+            var manualLower = manual.ToLower();
+            return await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode.ToLower() == manualLower, ct)
                 ? Result.Failure<string>(Error.Conflict("Teacher.DuplicateCode", $"Mã giáo viên '{manual}' đã tồn tại."))
                 : (Result<string>)manual;
         }
-        // Tự sinh theo rule: {prefix}-{Ten}{VietTat}{counter}
-        var prefix = await settingsResolver.GetEffectiveValueAsync(SettingKeys.CenterCodePrefix, ct: ct) ?? "HV";
+        // Tự sinh theo rule: {prefix}{Ten}{VietTat}{counter} — prefix theo cơ sở (tự mang dấu phân tách).
+        var prefix = await ResolveCodePrefixAsync(branchId, ct);
         for (var i = 0; i <= 99; i++)
         {
             var generated = NameCodeGenerator.GenerateTeacherCode(fullName, prefix, i);
             if (!await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.TeacherCode == generated, ct))
                 return generated;
         }
-        return UniqueCodeGenerator.Next("GV");
+        return UniqueCodeGenerator.Next(prefix);
+    }
+
+    /// <summary>
+    /// Tiền tố sinh mã GV: lấy theo cơ sở (TeacherCodePrefix; trống → tên cơ sở PascalCase + "@").
+    /// Không gắn cơ sở → fallback prefix toàn hệ thống (Center.CodePrefix).
+    /// </summary>
+    private async Task<string> ResolveCodePrefixAsync(Guid? branchId, CancellationToken ct)
+    {
+        if (Normalize(branchId) is { } id)
+        {
+            var branch = await context.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id, ct);
+            if (branch is not null)
+                return string.IsNullOrWhiteSpace(branch.TeacherCodePrefix)
+                    ? NameCodeGenerator.PascalCompact(branch.Name) + "@"
+                    : branch.TeacherCodePrefix.Trim();
+        }
+        return await settingsResolver.GetEffectiveValueAsync(SettingKeys.CenterCodePrefix, ct: ct) ?? "HV";
     }
 
     private async Task SnapshotTeacherNameAsync(TeacherProfile teacher, CancellationToken ct)
@@ -343,9 +369,15 @@ public sealed class TeacherService(
             .Where(u => userIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.UserName, ct);
 
+        var branchIds = items.Where(t => t.BranchId.HasValue).Select(t => t.BranchId!.Value).Distinct().ToList();
+        var branchNames = await context.Branches.IgnoreQueryFilters().AsNoTracking()
+            .Where(b => branchIds.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.Name, ct);
+
         return items.Select(t => new TeacherProfileDto(
             t.Id, t.TeacherCode, t.FullName, t.Phone, t.Email, t.DateOfBirth, t.Address, t.Note,
             t.UserId, t.UserId.HasValue ? userNames.GetValueOrDefault(t.UserId.Value) : null,
+            t.BranchId, t.BranchId.HasValue ? branchNames.GetValueOrDefault(t.BranchId.Value) : null,
             t.IsActive, counts.GetValueOrDefault(t.Id), t.IsDeleted, t.CreatedAt, t.UpdatedAt)).ToList();
     }
 

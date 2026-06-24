@@ -13,6 +13,8 @@ public sealed record TeacherProfileDto(
     string? Note,
     Guid? UserId,
     string? UserName,
+    Guid? BranchId,
+    string? BranchName,
     bool IsActive,
     int ClassCount,
     bool IsDeleted,
@@ -32,6 +34,7 @@ public sealed record CreateTeacherRequest(
     string? Address,
     string? Note,
     Guid? UserId,
+    Guid? BranchId,
     bool IsActive = true);
 
 public sealed record UpdateTeacherRequest(
@@ -43,6 +46,7 @@ public sealed record UpdateTeacherRequest(
     string? Address,
     string? Note,
     Guid? UserId,
+    Guid? BranchId,
     bool IsActive);
 
 public sealed record LinkAccountRequest(Guid UserId);
@@ -58,6 +62,7 @@ public sealed record CreateTeacherAccountRequest(
     DateOnly? DateOfBirth,
     string? Address,
     string? Note,
+    Guid? BranchId,
     string UserName,
     string? LoginEmail,
     string Password);

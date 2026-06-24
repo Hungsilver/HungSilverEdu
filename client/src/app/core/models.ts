@@ -321,6 +321,7 @@ export interface Branch {
   name: string;
   address: string | null;
   phone: string | null;
+  teacherCodePrefix: string | null;
   indexOrder: number;
   isActive: boolean;
   isDeleted: boolean;
@@ -333,6 +334,7 @@ export interface BranchRequest {
   name: string;
   address: string | null;
   phone: string | null;
+  teacherCodePrefix: string | null;
   indexOrder: number;
   isActive: boolean;
 }
@@ -370,6 +372,8 @@ export interface TeacherProfile {
   note: string | null;
   userId: string | null;
   userName: string | null;
+  branchId: string | null;
+  branchName: string | null;
   isActive: boolean;
   classCount: number;
   isDeleted: boolean;
@@ -391,6 +395,7 @@ export interface TeacherRequest {
   address: string | null;
   note: string | null;
   userId: string | null;
+  branchId: string | null;
   isActive: boolean;
 }
 
@@ -409,6 +414,7 @@ export interface CreateTeacherAccountRequest {
   dateOfBirth: string | null;
   address: string | null;
   note: string | null;
+  branchId: string | null;
   userName: string;
   loginEmail: string | null;
   password: string;
@@ -764,6 +770,7 @@ export interface StoredFile {
 export interface TuitionInvoice {
   id: string;
   studentId: string;
+  studentCode: string;
   studentName: string;
   classId: string | null;
   periodYear: number;

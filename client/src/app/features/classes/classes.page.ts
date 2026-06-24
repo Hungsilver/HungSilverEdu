@@ -631,7 +631,7 @@ export class ClassesPage {
   protected deleteGrade(g: Grade): void { this.gradesService.delete(g.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa khối thất bại.') }); }
 
   protected saveBranch(): void {
-    const req: BranchRequest = { name: this.branchName.trim(), address: null, phone: null, indexOrder: this.branchIndex, isActive: true };
+    const req: BranchRequest = { name: this.branchName.trim(), address: null, phone: null, teacherCodePrefix: this.editingBranch()?.teacherCodePrefix ?? null, indexOrder: this.branchIndex, isActive: true };
     if (!req.name) return;
     const editing = this.editingBranch();
     const op = editing ? this.branchesService.update(editing.id, req) : this.branchesService.create(req);

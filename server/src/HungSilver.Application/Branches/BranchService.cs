@@ -45,6 +45,7 @@ public sealed class BranchService(
             Name = request.Name.Trim(),
             Address = request.Address?.Trim(),
             Phone = request.Phone?.Trim(),
+            TeacherCodePrefix = NormalizePrefix(request.TeacherCodePrefix),
             IndexOrder = request.IndexOrder,
             IsActive = request.IsActive
         };
@@ -69,6 +70,7 @@ public sealed class BranchService(
         branch.Name = request.Name.Trim();
         branch.Address = request.Address?.Trim();
         branch.Phone = request.Phone?.Trim();
+        branch.TeacherCodePrefix = NormalizePrefix(request.TeacherCodePrefix);
         branch.IndexOrder = request.IndexOrder;
         branch.IsActive = request.IsActive;
         branches.Update(branch);
@@ -109,7 +111,11 @@ public sealed class BranchService(
             : (Result<string>)code;
     }
 
+    // Prefix giữ nguyên hoa/thường (vd "DongTho@") — chỉ trim, rỗng → null để dùng mặc định theo tên.
+    private static string? NormalizePrefix(string? prefix) =>
+        string.IsNullOrWhiteSpace(prefix) ? null : prefix.Trim();
+
     private static BranchDto ToDto(Branch b) => new(
-        b.Id, b.Code, b.Name, b.Address, b.Phone,
+        b.Id, b.Code, b.Name, b.Address, b.Phone, b.TeacherCodePrefix,
         b.IndexOrder, b.IsActive, b.IsDeleted, b.CreatedAt, b.UpdatedAt);
 }

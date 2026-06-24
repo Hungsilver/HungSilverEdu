@@ -13,5 +13,10 @@ public class TeacherProfile : BaseEntity
     public string? Address { get; set; }
     public string? Note { get; set; }
     public Guid? UserId { get; set; }
+
+    /// <summary>Cơ sở tạo mã (cơ sở chính). Quyết định prefix khi sinh mã; mã là định danh cố định
+    /// dù sau này GV dạy thêm cơ sở khác. Không FK — chỉ Guid + index.</summary>
+    public Guid? BranchId { get; set; }
+
     public bool IsActive { get; set; } = true;
 }
