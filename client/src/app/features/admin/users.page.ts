@@ -98,7 +98,7 @@ import { PageHeader } from '../../shared/page-header';
         [nzScroll]="{ x: '760px' }">
         <thead>
           <tr>
-            <th nzWidth="56px">STT</th>
+            <th nzWidth="64px" style="white-space: nowrap">STT</th>
             @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
             <th>Thao tác</th>
           </tr>
