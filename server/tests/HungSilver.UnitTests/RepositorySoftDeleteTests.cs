@@ -114,6 +114,30 @@ public sealed class RepositorySoftDeleteTests : IDisposable
     }
 
     [Fact]
+    public async Task FindAsync_ReturnsNewestCreatedFirst()
+    {
+        var repo = new Repository<Product>(_context);
+        var older = NewProduct("SKU-OLD");
+        var newer = NewProduct("SKU-NEW");
+        await repo.AddAsync(older);
+        await repo.AddAsync(newer);
+        await _context.SaveChangesAsync();
+
+        // Gán CreatedAt rõ ràng để kiểm thứ tự tất định (interceptor chỉ set CreatedAt khi Added).
+        older.CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Local);
+        newer.CreatedAt = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Local);
+        repo.Update(older);
+        repo.Update(newer);
+        await _context.SaveChangesAsync();
+
+        var list = await repo.FindAsync(_ => true);
+
+        // Mặc định mới nhất lên đầu
+        Assert.Equal(newer.Id, list[0].Id);
+        Assert.Equal(older.Id, list[1].Id);
+    }
+
+    [Fact]
     public async Task Update_SetsUpdatedAt()
     {
         var repo = new Repository<Product>(_context);

@@ -21,8 +21,10 @@ public class Repository<T>(AppDbContext context) : IRepository<T> where T : Base
     public Task<T?> GetByIdAsync(Guid id, bool includeDeleted = false, CancellationToken ct = default) =>
         Query(includeDeleted).FirstOrDefaultAsync(e => e.Id == id, ct);
 
+    // Mặc định trả mới nhất trước (CreatedAt desc) — đồng bộ với GetPagedAsync, tránh thứ tự DB ngẫu nhiên.
+    // Caller cần thứ tự khác (vd danh mục theo IndexOrder) tự sắp lại sau khi nhận list.
     public Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) =>
-        Query().Where(predicate).ToListAsync(ct);
+        Query().Where(predicate).OrderByDescending(e => e.CreatedAt).ToListAsync(ct);
 
     public Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default, bool includeDeleted = false) =>
         Query(includeDeleted).AnyAsync(predicate, ct);

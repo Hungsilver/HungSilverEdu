@@ -27,7 +27,9 @@ public sealed class EvaluationService(
             .Where(m => studentIds.Contains(m.StudentId) && m.Year == year && m.Month == month)
             .ToListAsync(ct);
 
-        return await ToDtosAsync(evals, ct);
+        // Lưới đánh giá theo lớp/tháng: sắp theo tên học sinh (đồng nhất roster), tránh thứ tự DB ngẫu nhiên.
+        var dtos = await ToDtosAsync(evals, ct);
+        return dtos.OrderBy(d => d.StudentName, StringComparer.CurrentCulture).ToList();
     }
 
     public async Task<Result<List<MonthlyEvaluationDto>>> GetByStudentAsync(Guid studentId, CancellationToken ct = default)
