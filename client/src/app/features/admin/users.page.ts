@@ -98,13 +98,15 @@ import { PageHeader } from '../../shared/page-header';
         [nzScroll]="{ x: '760px' }">
         <thead>
           <tr>
+            <th nzWidth="56px">STT</th>
             @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
             <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
-          @for (user of table.data; track user.id) {
+          @for (user of table.data; track user.id; let i = $index) {
             <tr>
+              <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
               @for (col of cols.visibleColumns(); track col.key) {
                 <td>
                   @switch (col.key) {
