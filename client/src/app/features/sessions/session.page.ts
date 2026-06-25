@@ -1,8 +1,8 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
@@ -33,6 +33,7 @@ import { PageHeader } from '../../shared/page-header';
   ],
   template: `
     @if (sheet(); as s) {
+      <button type="button" class="back" (click)="goBack()"><nz-icon nzType="arrow-left" /> Quay lại</button>
       <app-page-header
         [title]="s.className + ' · Buổi ' + s.sessionNumber"
         [subtitle]="(s.sessionDate | date: 'EEEE, dd/MM/yyyy') + (s.topic ? ' · ' + s.topic : '')"
@@ -189,6 +190,8 @@ import { PageHeader } from '../../shared/page-header';
     </nz-modal>
   `,
   styles: `
+    .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;
+      background: none; border: none; padding: 0; cursor: pointer; color: var(--hs-primary); font: inherit; }
     .links { display: flex; gap: 8px; flex-wrap: wrap; }
     .bulk-actions { display: flex; gap: 8px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
     .counter { margin-left: auto; }
@@ -224,6 +227,8 @@ export class SessionPage implements OnInit {
   private readonly sessionsService = inject(SessionsService);
   private readonly pointReasonsService = inject(PointReasonsService);
   private readonly message = inject(NzMessageService);
+  private readonly location = inject(Location);
+  private readonly router = inject(Router);
 
   protected readonly sheet = signal<SessionSheet | null>(null);
   protected readonly rows = signal<SessionStudentRow[]>([]);
@@ -250,6 +255,12 @@ export class SessionPage implements OnInit {
   ngOnInit(): void {
     this.reload();
     this.loadReasons();
+  }
+
+  /** Quay về trang trước đó (Lịch học hoặc chi tiết Lớp học); fallback /schedule khi mở trực tiếp. */
+  protected goBack(): void {
+    if (history.length > 1) this.location.back();
+    else this.router.navigate(['/schedule']);
   }
 
   private loadReasons(): void {
