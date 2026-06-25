@@ -1,5 +1,6 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Account;
+using HungSilver.Application.Accounts;
 using HungSilver.Application.Assignments;
 using HungSilver.Application.Auth;
 using HungSilver.Application.Files;
@@ -18,6 +19,7 @@ using HungSilver.Application.Students;
 using HungSilver.Application.Teachers;
 using HungSilver.Application.Tuition;
 using HungSilver.Application.Warnings;
+using HungSilver.Infrastructure.Accounts;
 using HungSilver.Infrastructure.Assignments;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Classes;
@@ -88,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IGoogleAuthVerifier, GoogleAuthVerifier>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
+        services.AddScoped<IAccountProvisioningService, AccountProvisioningService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IUserDirectory, UserDirectory>();
 

@@ -89,7 +89,9 @@ public sealed record RosterItemDto(
     string? Email,
     string? Note,
     DateOnly EnrolledOn,
-    Guid? UserId);
+    Guid? UserId,
+    string? UserName = null,
+    bool IsLocked = false);
 
 /// <summary>Tình hình học tập từng học sinh trong lớp (điểm thưởng/phạt, chuyên cần, BTVN).</summary>
 public sealed record ClassStudentOverviewDto(

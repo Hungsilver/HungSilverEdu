@@ -10,6 +10,7 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzSelectModule } from 'ng-zorro-antd/select';
+import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzTableModule } from 'ng-zorro-antd/table';
@@ -27,7 +28,7 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, DatePipe, ColumnSettings,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
-    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzCardModule, NzPaginationModule,
+    NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzAlertModule, NzCardModule, NzPaginationModule,
     NzTooltipModule, PageHeader
   ],
   template: `
@@ -156,20 +157,13 @@ import { PageHeader } from '../../shared/page-header';
       </nz-table>
     }
 
-    <!-- Tạo tài khoản Admin/Giáo viên -->
-    <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo tài khoản" [nzOkLoading]="createBusy()"
+    <!-- Tạo tài khoản Quản trị viên. Tài khoản Giáo viên/Học sinh cấp ở trang tương ứng (tên đăng nhập = mã). -->
+    <nz-modal [nzVisible]="createOpen()" nzTitle="Tạo tài khoản quản trị" [nzOkLoading]="createBusy()"
       nzOkText="Tạo" (nzOnOk)="submitCreate()" (nzOnCancel)="createOpen.set(false)">
       <ng-container *nzModalContent>
         <form nz-form nzLayout="vertical">
-          <nz-form-item>
-            <nz-form-label nzRequired>Vai trò</nz-form-label>
-            <nz-form-control>
-              <nz-select [(ngModel)]="cRole" name="role" class="full">
-                <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
-                <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
-              </nz-select>
-            </nz-form-control>
-          </nz-form-item>
+          <nz-alert nzType="info" nzShowIcon class="hint-alert"
+            nzMessage="Trang này chỉ tạo tài khoản Quản trị viên. Tài khoản Giáo viên cấp ở trang Giáo viên, Học sinh ở trang Học viên (tên đăng nhập = mã)." />
           <nz-form-item>
             <nz-form-label nzRequired>Tên đăng nhập</nz-form-label>
             <nz-form-control>
@@ -207,6 +201,7 @@ import { PageHeader } from '../../shared/page-header';
     .table-toolbar .spacer { flex: 1; }
 
     .full { width: 100%; }
+    .hint-alert { margin-bottom: 14px; }
 
     .mobile-card-list { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
     .mobile-card-list nz-card { border-radius: 8px; }
@@ -251,7 +246,7 @@ export class UsersPage {
   // Tạo tài khoản mới
   protected readonly createOpen = signal(false);
   protected readonly createBusy = signal(false);
-  protected cRole = ROLE_TEACHER;
+  protected cRole = ROLE_ADMIN;
   protected cUserName = '';
   protected cFullName = '';
   protected cEmail = '';
@@ -262,7 +257,7 @@ export class UsersPage {
   }
 
   protected openCreate(): void {
-    this.cRole = ROLE_TEACHER;
+    this.cRole = ROLE_ADMIN;
     this.cUserName = '';
     this.cFullName = '';
     this.cEmail = '';

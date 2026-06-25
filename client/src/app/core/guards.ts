@@ -8,6 +8,15 @@ export const authGuard: CanActivateFn = () => {
   return auth.isLoggedIn() ? true : router.createUrlTree(['/login']);
 };
 
+/** Tài khoản vừa được cấp/đặt lại bị buộc đổi mật khẩu trước khi dùng hệ thống. */
+export const mustChangePasswordGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  return auth.currentUser()?.mustChangePassword
+    ? router.createUrlTree(['/must-change-password'])
+    : true;
+};
+
 /** Đã đăng nhập thì không vào lại trang login/register. */
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);

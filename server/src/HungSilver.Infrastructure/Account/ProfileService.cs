@@ -39,7 +39,7 @@ public sealed class ProfileService(
                 "Profile.UpdateFailed", string.Join(" | ", updated.Errors.Select(e => e.Description))));
 
         var roles = await userManager.GetRolesAsync(user);
-        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles]);
+        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles], user.MustChangePassword);
     }
 
     public async Task<Result<UserDto>> UpdateProfileAsync(
@@ -58,7 +58,7 @@ public sealed class ProfileService(
                 "Profile.UpdateFailed", string.Join(" | ", updated.Errors.Select(e => e.Description))));
 
         var roles = await userManager.GetRolesAsync(user);
-        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles]);
+        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles], user.MustChangePassword);
     }
 
     public async Task<Result> ChangePasswordAsync(Guid userId, ChangeOwnPasswordRequest request, CancellationToken ct = default)
@@ -74,6 +74,13 @@ public sealed class ProfileService(
         if (!result.Succeeded)
             return Result.Failure(Error.Validation(
                 "Profile.ChangePasswordFailed", string.Join(" | ", result.Errors.Select(e => e.Description))));
+
+        // Đã tự đổi mật khẩu ⇒ gỡ cờ "bắt buộc đổi" (nếu tài khoản vừa được cấp/đặt lại).
+        if (user.MustChangePassword)
+        {
+            user.MustChangePassword = false;
+            await userManager.UpdateAsync(user);
+        }
 
         // Đổi mật khẩu ⇒ thu hồi mọi refresh token còn hiệu lực (đăng xuất các phiên cũ/bị lộ).
         var activeTokens = await context.RefreshTokens

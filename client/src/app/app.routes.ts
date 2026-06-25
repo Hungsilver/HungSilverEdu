@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, roleGuard } from './core/guards';
+import { authGuard, guestGuard, mustChangePasswordGuard, roleGuard } from './core/guards';
 import { ROLE_ADMIN, ROLE_TEACHER, ROLE_USER } from './core/models';
 
 const teacherOrAdmin = { roles: [ROLE_ADMIN, ROLE_TEACHER] };
@@ -11,10 +11,16 @@ export const routes: Routes = [
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login.page').then(m => m.LoginPage)
   },
+  // Bắt buộc đổi mật khẩu lần đầu (tài khoản vừa cấp/đặt lại) — ngoài shell, không vào hệ thống được.
+  {
+    path: 'must-change-password',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/auth/must-change-password.page').then(m => m.MustChangePasswordPage)
+  },
   // Đăng ký đang tạm khóa — chỉ Admin tạo tài khoản. Giữ file register.page để bật lại sau.
   {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [authGuard, mustChangePasswordGuard],
     loadComponent: () => import('./layout/shell').then(m => m.Shell),
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },

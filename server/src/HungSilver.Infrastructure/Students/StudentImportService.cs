@@ -1,13 +1,11 @@
 using ClosedXML.Excel;
+using HungSilver.Application.Accounts;
 using HungSilver.Application.Common;
 using HungSilver.Application.Students;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
-
-using HungSilver.Infrastructure.Identity;
 using HungSilver.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace HungSilver.Infrastructure.Students;
@@ -15,10 +13,8 @@ namespace HungSilver.Infrastructure.Students;
 public sealed class StudentImportService(
     AppDbContext context,
     IClassAccessGuard accessGuard,
-    UserManager<AppUser> userManager) : IStudentImportService
+    IAccountProvisioningService accountProvisioning) : IStudentImportService
 {
-    private const string DefaultPassword = "Hocvien@123";
-
     private static readonly string[] Headers =
     [
         "Họ tên", "Ngày sinh (dd/MM/yyyy)", "Trường", "SĐT học sinh",
@@ -192,29 +188,9 @@ public sealed class StudentImportService(
         return rows;
     }
 
-    private async Task<bool> TryCreateAccountAsync(Student student, CancellationToken ct)
-    {
-        var digits = new string((student.ParentPhone ?? student.Phone ?? "").Where(char.IsDigit).ToArray());
-        var email = digits.Length >= 4 ? $"{digits}@hocvien.hungsilver.local" : $"hv{student.Id:N}@hocvien.hungsilver.local";
-
-        // Trùng email (vd 2 HS cùng SĐT phụ huynh) ⇒ dùng email theo Id (luôn duy nhất).
-        if (await userManager.FindByEmailAsync(email) is not null)
-            email = $"hv{student.Id:N}@hocvien.hungsilver.local";
-
-        var user = new AppUser { UserName = email, Email = email, FullName = student.FullName, EmailConfirmed = true };
-        var create = await userManager.CreateAsync(user, DefaultPassword);
-        if (!create.Succeeded)
-            return false;
-
-        var role = await userManager.AddToRoleAsync(user, AppRoles.User);
-        if (!role.Succeeded)
-            return false;
-
-        student.UserId = user.Id;
-        context.Students.Update(student);
-        await context.SaveChangesAsync(ct);
-        return true;
-    }
+    // Cấp tài khoản qua service chung: tên đăng nhập = Mã HV, mật khẩu mặc định, bắt đổi lần đầu.
+    private async Task<bool> TryCreateAccountAsync(Student student, CancellationToken ct) =>
+        (await accountProvisioning.ProvisionStudentAsync(student.Id, ct: ct)).IsSuccess;
 
     private async Task<string> ResolveStudentCodeAsync(string fullName, DateOnly? dateOfBirth, string? gradeLevel, CancellationToken ct)
     {

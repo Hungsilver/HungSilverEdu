@@ -259,6 +259,21 @@ public sealed class ClassService(
             select new RosterItemDto(e.Id, s.Id, s.StudentCode, s.FullName, s.Phone, s.ParentPhone, s.Email, s.Note, e.EnrolledOn, s.UserId))
             .ToListAsync(ct);
 
+        // Bổ sung trạng thái tài khoản (tên đăng nhập + đang khóa) cho học sinh đã có tài khoản.
+        var userIds = roster.Where(r => r.UserId.HasValue).Select(r => r.UserId!.Value).ToList();
+        if (userIds.Count > 0)
+        {
+            var now = DateTimeOffset.Now;
+            var accounts = await context.Users.IgnoreQueryFilters().AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .Select(u => new { u.Id, u.UserName, u.LockoutEnd })
+                .ToDictionaryAsync(u => u.Id, u => u, ct);
+
+            roster = roster.Select(r => r.UserId.HasValue && accounts.TryGetValue(r.UserId.Value, out var a)
+                ? r with { UserName = a.UserName, IsLocked = a.LockoutEnd.HasValue && a.LockoutEnd.Value > now }
+                : r).ToList();
+        }
+
         return roster;
     }
 

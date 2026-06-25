@@ -482,19 +482,16 @@ import { PageHeader } from '../../shared/page-header';
             </div>
           </div>
           <nz-form-item>
-            <label nz-checkbox [(ngModel)]="sCreateAccount" name="sca">Tạo tài khoản đăng nhập cho học sinh</label>
+            <label nz-checkbox [(ngModel)]="sCreateAccount" name="sca">Cấp tài khoản đăng nhập cho học sinh</label>
           </nz-form-item>
           @if (sCreateAccount) {
-            <div nz-row [nzGutter]="12">
-              <div nz-col [nzSpan]="12">
-                <nz-form-item><nz-form-label nzRequired>Tên đăng nhập</nz-form-label>
-                  <nz-form-control><input nz-input [(ngModel)]="sUserName" name="su" placeholder="vd: hs_an" autocomplete="off" /></nz-form-control></nz-form-item>
-              </div>
-              <div nz-col [nzSpan]="12">
-                <nz-form-item><nz-form-label nzRequired>Mật khẩu</nz-form-label>
-                  <nz-form-control><input nz-input [(ngModel)]="sPassword" name="sp" type="text" placeholder="tối thiểu 8 ký tự" autocomplete="new-password" /></nz-form-control></nz-form-item>
-              </div>
-            </div>
+            <nz-form-item>
+              <nz-form-label>Mật khẩu (tùy chọn)</nz-form-label>
+              <nz-form-control>
+                <input nz-input [(ngModel)]="sPassword" name="sp" type="text" placeholder="Trống = mật khẩu mặc định" autocomplete="new-password" />
+              </nz-form-control>
+              <div class="acc-hint">Tên đăng nhập = Mã học viên (tự sinh). Học sinh bị buộc đổi mật khẩu ở lần đăng nhập đầu.</div>
+            </nz-form-item>
           }
         </form>
       </ng-container>
@@ -535,6 +532,7 @@ import { PageHeader } from '../../shared/page-header';
     </nz-modal>
   `,
   styles: `
+    .acc-hint { color: var(--hs-text-muted); font-size: 12px; margin-top: 4px; }
     .back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .tags-line { margin: 0 0 12px; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -652,7 +650,6 @@ export class ClassDetailPage implements OnInit {
   protected sParentName = '';
   protected sParentPhone = '';
   protected sCreateAccount = false;
-  protected sUserName = '';
   protected sPassword = '';
 
   // Đổi mật khẩu học sinh
@@ -845,32 +842,26 @@ export class ClassDetailPage implements OnInit {
     this.sParentName = '';
     this.sParentPhone = '';
     this.sCreateAccount = false;
-    this.sUserName = '';
     this.sPassword = '';
     this.studentOpen.set(true);
   }
 
   protected createStudent(): void {
     if (!this.sFullName.trim()) { this.message.warning('Nhập họ tên học sinh.'); return; }
-    if (this.sCreateAccount) {
-      if (!this.sUserName.trim()) { this.message.warning('Nhập tên đăng nhập.'); return; }
-      if (!this.sPassword) { this.message.warning('Nhập mật khẩu.'); return; }
-    }
     this.studentBusy.set(true);
     this.classesService.createStudent(this.id(), {
       fullName: this.sFullName.trim(),
       parentName: this.sParentName.trim() || null,
       parentPhone: this.sParentPhone.trim() || null,
       createAccount: this.sCreateAccount,
-      userName: this.sCreateAccount ? this.sUserName.trim() : null,
-      password: this.sCreateAccount ? this.sPassword : null
+      password: this.sCreateAccount ? (this.sPassword || null) : null
     }).subscribe({
       next: res => {
         this.studentBusy.set(false);
         this.studentOpen.set(false);
-        this.message.success(res.accountCreated
-          ? `Đã tạo học sinh + tài khoản "${res.userName}".`
-          : 'Đã tạo học sinh.');
+        if (res.accountCreated) this.message.success(`Đã tạo học sinh + tài khoản "${res.userName}".`);
+        else if (res.accountError) this.message.warning(`Đã tạo học sinh nhưng chưa cấp được tài khoản: ${res.accountError}`);
+        else this.message.success('Đã tạo học sinh.');
         this.reloadPublic();
       },
       error: (e: HttpErrorResponse) => { this.studentBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Tạo học sinh thất bại.'); }

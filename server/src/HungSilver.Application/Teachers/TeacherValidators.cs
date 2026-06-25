@@ -33,8 +33,8 @@ public sealed class CreateTeacherAccountRequestValidator : AbstractValidator<Cre
     public CreateTeacherAccountRequestValidator()
     {
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.UserName).NotEmpty().MaximumLength(256);
-        RuleFor(x => x.Password).NotEmpty().MinimumLength(8);
+        // Tên đăng nhập = Mã giáo viên (tự sinh) ⇒ không nhập tay. Mật khẩu trống ⇒ dùng mặc định.
+        RuleFor(x => x.Password).MinimumLength(8).When(x => !string.IsNullOrWhiteSpace(x.Password));
         RuleFor(x => x.LoginEmail).MaximumLength(256).EmailAddress().When(x => !string.IsNullOrWhiteSpace(x.LoginEmail));
     }
 }

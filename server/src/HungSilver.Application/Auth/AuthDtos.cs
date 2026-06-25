@@ -12,7 +12,8 @@ public sealed record UserDto(
     string? FullName,
     string? PhoneNumber,
     string? AvatarUrl,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    bool MustChangePassword = false);
 
 /// <summary>
 /// Kết quả đăng nhập đầy đủ ở tầng Application. Controller chỉ trả AccessToken trong body,

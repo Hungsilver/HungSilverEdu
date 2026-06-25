@@ -18,12 +18,21 @@ public static class SettingKeys
     /// </summary>
     public const string CenterCodePrefix = "Center.CodePrefix";
 
+    /// <summary>Mật khẩu mặc định khi cấp/đặt lại tài khoản (HS &amp; GV). Phải đạt chính sách Identity
+    /// (≥8 ký tự, có chữ hoa/thường/số). Người dùng vẫn bị buộc đổi ở lần đăng nhập đầu.</summary>
+    public const string AccountDefaultPassword = "Account.DefaultPassword";
+
+    /// <summary>Tên miền email "ảo" cho tài khoản không có email thật (Identity bắt buộc email duy nhất).</summary>
+    public const string AccountLocalEmailDomain = "Account.LocalEmailDomain";
+
     /// <summary>Giá trị mặc định khi chưa có cấu hình ở scope nào.</summary>
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
         [FileStorageMode] = "Server",
         [TuitionDueSoonDays] = "7",
         [WarningScoreDropThreshold] = "1.5",
-        [CenterCodePrefix] = "HV"
+        [CenterCodePrefix] = "HV",
+        [AccountDefaultPassword] = "Hocvien@123",
+        [AccountLocalEmailDomain] = "hs.local"
     };
 }

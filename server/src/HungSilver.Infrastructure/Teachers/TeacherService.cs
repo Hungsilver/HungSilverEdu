@@ -1,4 +1,5 @@
 using FluentValidation;
+using HungSilver.Application.Accounts;
 using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
 using HungSilver.Application.Settings;
@@ -17,6 +18,7 @@ public sealed class TeacherService(
     AppDbContext context,
     UserManager<AppUser> userManager,
     ISettingsResolver settingsResolver,
+    IAccountProvisioningService accountProvisioning,
     IValidator<CreateTeacherRequest> createValidator,
     IValidator<UpdateTeacherRequest> updateValidator,
     IValidator<CreateTeacherAccountRequest> createAccountValidator) : ITeacherService
@@ -183,40 +185,15 @@ public sealed class TeacherService(
                 IsActive = true
             };
             context.TeacherProfiles.Add(teacher);
+            await context.SaveChangesAsync(ct); // lưu để hồ sơ có Id trước khi cấp tài khoản
         }
 
-        var userName = request.UserName.Trim();
-        var email = string.IsNullOrWhiteSpace(request.LoginEmail)
-            ? (userName.Contains('@') ? userName : $"{userName}@hedu.local")
-            : request.LoginEmail.Trim();
+        // Cấp tài khoản qua service chung: tên đăng nhập = Mã GV, mật khẩu mặc định/nhập, bắt đổi lần đầu.
+        var provision = await accountProvisioning.ProvisionTeacherAsync(
+            teacher.Id, new ProvisionAccountOptions(Password: request.Password, LoginEmail: request.LoginEmail), ct);
+        if (provision.IsFailure)
+            return Result.Failure<TeacherProfileDto>(provision.Error);
 
-        if (await context.Users.IgnoreQueryFilters().AnyAsync(u => u.NormalizedUserName == userManager.NormalizeName(userName), ct))
-            return Result.Failure<TeacherProfileDto>(Error.Conflict("Users.UserNameTaken", "Tên đăng nhập đã tồn tại."));
-        if (await context.Users.IgnoreQueryFilters().AnyAsync(u => u.NormalizedEmail == userManager.NormalizeEmail(email), ct))
-            return Result.Failure<TeacherProfileDto>(Error.Conflict("Users.EmailTaken", "Email đăng nhập đã được sử dụng."));
-
-        var user = new AppUser
-        {
-            UserName = userName,
-            Email = email,
-            EmailConfirmed = true,
-            FullName = teacher.FullName,
-            PhoneNumber = teacher.Phone
-        };
-
-        var created = await userManager.CreateAsync(user, request.Password);
-        if (!created.Succeeded)
-            return Result.Failure<TeacherProfileDto>(Error.Validation("Users.CreateFailed", string.Join(" | ", created.Errors.Select(e => e.Description))));
-
-        var role = await userManager.AddToRoleAsync(user, AppRoles.Teacher);
-        if (!role.Succeeded)
-            return Result.Failure<TeacherProfileDto>(Error.Failure("Users.AssignRoleFailed", string.Join(" | ", role.Errors.Select(e => e.Description))));
-
-        teacher.UserId = user.Id;
-        if (string.IsNullOrWhiteSpace(teacher.Email))
-            teacher.Email = email;
-
-        await context.SaveChangesAsync(ct);
         return (await ToDtosAsync([teacher], ct))[0];
     }
 
@@ -365,20 +342,28 @@ public sealed class TeacherService(
             .ToDictionaryAsync(g => g.Key, g => g.Count(), ct);
 
         var userIds = items.Where(t => t.UserId.HasValue).Select(t => t.UserId!.Value).Distinct().ToList();
-        var userNames = await context.Users.IgnoreQueryFilters().AsNoTracking()
+        var now = DateTimeOffset.Now;
+        var accounts = await context.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, u => u.UserName, ct);
+            .Select(u => new { u.Id, u.UserName, u.LockoutEnd, u.MustChangePassword })
+            .ToDictionaryAsync(u => u.Id, u => u, ct);
 
         var branchIds = items.Where(t => t.BranchId.HasValue).Select(t => t.BranchId!.Value).Distinct().ToList();
         var branchNames = await context.Branches.IgnoreQueryFilters().AsNoTracking()
             .Where(b => branchIds.Contains(b.Id))
             .ToDictionaryAsync(b => b.Id, b => b.Name, ct);
 
-        return items.Select(t => new TeacherProfileDto(
-            t.Id, t.TeacherCode, t.FullName, t.Phone, t.Email, t.DateOfBirth, t.Address, t.Note,
-            t.UserId, t.UserId.HasValue ? userNames.GetValueOrDefault(t.UserId.Value) : null,
-            t.BranchId, t.BranchId.HasValue ? branchNames.GetValueOrDefault(t.BranchId.Value) : null,
-            t.IsActive, counts.GetValueOrDefault(t.Id), t.IsDeleted, t.CreatedAt, t.UpdatedAt)).ToList();
+        return items.Select(t =>
+        {
+            var acc = t.UserId.HasValue ? accounts.GetValueOrDefault(t.UserId.Value) : null;
+            return new TeacherProfileDto(
+                t.Id, t.TeacherCode, t.FullName, t.Phone, t.Email, t.DateOfBirth, t.Address, t.Note,
+                t.UserId, acc?.UserName,
+                acc is not null && acc.LockoutEnd.HasValue && acc.LockoutEnd.Value > now,
+                acc?.MustChangePassword ?? false,
+                t.BranchId, t.BranchId.HasValue ? branchNames.GetValueOrDefault(t.BranchId.Value) : null,
+                t.IsActive, counts.GetValueOrDefault(t.Id), t.IsDeleted, t.CreatedAt, t.UpdatedAt);
+        }).ToList();
     }
 
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;

@@ -5,6 +5,7 @@ export interface UserDto {
   phoneNumber: string | null;
   avatarUrl: string | null;
   roles: string[];
+  mustChangePassword: boolean;
 }
 
 export interface AuthResponse {
@@ -200,6 +201,9 @@ export interface Student {
   entryScore?: number | null;
   curriculum: string | null;
   userId: string | null;
+  userName: string | null;
+  isLocked: boolean;
+  mustChangePassword: boolean;
   isActive: boolean;
   isDeleted: boolean;
   createdAt: string;
@@ -372,6 +376,8 @@ export interface TeacherProfile {
   note: string | null;
   userId: string | null;
   userName: string | null;
+  isLocked: boolean;
+  mustChangePassword: boolean;
   branchId: string | null;
   branchName: string | null;
   isActive: boolean;
@@ -405,6 +411,8 @@ export interface UnlinkedUser {
   fullName: string | null;
 }
 
+/** Tạo hồ sơ GV (hoặc dùng hồ sơ có sẵn) + cấp tài khoản. Tên đăng nhập = Mã GV (tự sinh);
+ *  mật khẩu trống ⇒ dùng mật khẩu mặc định; bắt buộc đổi ở lần đăng nhập đầu. */
 export interface CreateTeacherAccountRequest {
   teacherProfileId: string | null;
   teacherCode: string | null;
@@ -415,9 +423,34 @@ export interface CreateTeacherAccountRequest {
   address: string | null;
   note: string | null;
   branchId: string | null;
-  userName: string;
   loginEmail: string | null;
-  password: string;
+  password: string | null;
+}
+
+/** Cấp tài khoản cho một HS/GV (mật khẩu trống ⇒ dùng mặc định). */
+export interface ProvisionAccountRequest {
+  password?: string | null;
+  loginEmail?: string | null;
+}
+
+export interface AccountProvisionResult {
+  userId: string;
+  userName: string;
+  mustChangePassword: boolean;
+}
+
+export interface BulkProvisionItem {
+  id: string;
+  success: boolean;
+  userName: string | null;
+  error: string | null;
+}
+
+export interface BulkProvisionResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  items: BulkProvisionItem[];
 }
 
 // ----------------- Môn học (Subject — Đợt 7) -----------------
@@ -450,9 +483,12 @@ export interface RosterItem {
   note: string | null;
   enrolledOn: string;
   userId: string | null;
+  userName: string | null;
+  isLocked: boolean;
 }
 
-/** Giáo viên tạo học sinh trong lớp (kèm tùy chọn tài khoản đăng nhập). */
+/** Giáo viên tạo học sinh trong lớp (kèm tùy chọn cấp tài khoản).
+ *  Khi cấp: tên đăng nhập = Mã học viên (tự sinh); mật khẩu trống ⇒ dùng mật khẩu mặc định. */
 export interface CreateClassStudentRequest {
   studentCode?: string | null;
   fullName: string;
@@ -467,7 +503,6 @@ export interface CreateClassStudentRequest {
   englishLevel?: string | null;
   learningGoal?: string | null;
   createAccount: boolean;
-  userName?: string | null;
   password?: string | null;
 }
 
@@ -477,6 +512,7 @@ export interface CreateClassStudentResult {
   fullName: string;
   accountCreated: boolean;
   userName: string | null;
+  accountError: string | null;
 }
 
 export interface ClassStudentOverview {

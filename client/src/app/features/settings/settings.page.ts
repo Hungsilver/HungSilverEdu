@@ -24,6 +24,8 @@ import { PageHeader } from '../../shared/page-header';
 const KEY_FILE_MODE = 'FileStorage.Mode';
 const KEY_DUE_SOON = 'Tuition.DueSoonDays';
 const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
+const KEY_ACC_PWD = 'Account.DefaultPassword';
+const KEY_ACC_DOMAIN = 'Account.LocalEmailDomain';
 
 @Component({
   selector: 'app-settings-page',
@@ -60,6 +62,31 @@ const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
 
         <button nz-button nzType="primary" [nzLoading]="saving()" (click)="save()">
           <nz-icon nzType="save" /> Lưu cấu hình
+        </button>
+      </form>
+    </nz-card>
+
+    <!-- Tài khoản đăng nhập (HS & GV) -->
+    <nz-card nzTitle="Tài khoản đăng nhập" style="margin-bottom:16px">
+      <p class="hint">
+        Khi cấp/đặt lại tài khoản cho học sinh, giáo viên: tên đăng nhập là <b>mã</b> của họ;
+        mật khẩu khởi tạo dùng giá trị dưới đây và <b>buộc đổi ở lần đăng nhập đầu</b>.
+      </p>
+      <form nz-form nzLayout="vertical">
+        <nz-form-item>
+          <nz-form-label>Mật khẩu mặc định khi cấp tài khoản</nz-form-label>
+          <nz-form-control nzExtra="≥ 8 ký tự, có chữ hoa, chữ thường và số.">
+            <input nz-input [(ngModel)]="accDefaultPassword" name="adp" class="field" placeholder="vd: Hocvien@123" />
+          </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+          <nz-form-label>Tên miền email ảo</nz-form-label>
+          <nz-form-control nzExtra="Dùng cho tài khoản không có email thật (Identity yêu cầu email duy nhất).">
+            <input nz-input [(ngModel)]="accEmailDomain" name="aed" class="field" placeholder="vd: hs.local" />
+          </nz-form-control>
+        </nz-form-item>
+        <button nz-button nzType="primary" [nzLoading]="savingAccount()" (click)="saveAccount()">
+          <nz-icon nzType="save" /> Lưu cấu hình tài khoản
         </button>
       </form>
     </nz-card>
@@ -198,6 +225,11 @@ export class SettingsPage implements OnInit {
   protected dueSoonDays = 7;
   protected scoreDrop = 1.5;
 
+  // Cấu hình tài khoản
+  protected readonly savingAccount = signal(false);
+  protected accDefaultPassword = 'Hocvien@123';
+  protected accEmailDomain = 'hs.local';
+
   // Reward CRUD state
   protected readonly rewardReasons = signal<PointReason[]>([]);
   protected readonly editingReward = signal<PointReason | null>(null);
@@ -216,6 +248,8 @@ export class SettingsPage implements OnInit {
       if (v[KEY_FILE_MODE]) this.fileMode = v[KEY_FILE_MODE] as FileStorageMode;
       if (v[KEY_DUE_SOON]) this.dueSoonDays = Number(v[KEY_DUE_SOON]);
       if (v[KEY_SCORE_DROP]) this.scoreDrop = Number(v[KEY_SCORE_DROP]);
+      if (v[KEY_ACC_PWD]) this.accDefaultPassword = v[KEY_ACC_PWD];
+      if (v[KEY_ACC_DOMAIN]) this.accEmailDomain = v[KEY_ACC_DOMAIN];
     });
     this.loadReasons();
     this.branchesService.getAll(true).subscribe(x => this.branches.set(x));
@@ -272,6 +306,26 @@ export class SettingsPage implements OnInit {
     ]).subscribe({
       next: () => { this.saving.set(false); this.message.success('Đã lưu cấu hình.'); },
       error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message); }
+    });
+  }
+
+  protected saveAccount(): void {
+    const pwd = this.accDefaultPassword?.trim() ?? '';
+    const strong = pwd.length >= 8 && /[a-z]/.test(pwd) && /[A-Z]/.test(pwd) && /\d/.test(pwd);
+    if (!strong) { this.message.error('Mật khẩu mặc định cần ≥ 8 ký tự, có chữ hoa, chữ thường và số.'); return; }
+    const domain = this.accEmailDomain?.trim() ?? '';
+    if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) { this.message.error('Tên miền email không hợp lệ (vd: hs.local).'); return; }
+
+    const sys = (key: string, value: string): UpsertSettingRequest =>
+      ({ key, value, scope: SettingScope.System, scopeId: null, dataType: null, description: null });
+
+    this.savingAccount.set(true);
+    forkJoin([
+      this.settingsService.upsert(sys(KEY_ACC_PWD, pwd)),
+      this.settingsService.upsert(sys(KEY_ACC_DOMAIN, domain))
+    ]).subscribe({
+      next: () => { this.savingAccount.set(false); this.message.success('Đã lưu cấu hình tài khoản.'); },
+      error: (err: HttpErrorResponse) => { this.savingAccount.set(false); this.message.error(err.error?.message ?? err.message); }
     });
   }
 

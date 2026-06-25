@@ -26,6 +26,24 @@ public sealed class UserDirectory(AppDbContext context) : IUserDirectory
             .ToDictionaryAsync(u => u.Id, u => u.FullName ?? u.Email ?? u.Id.ToString(), ct);
     }
 
+    public async Task<Dictionary<Guid, AccountInfo>> GetAccountInfosAsync(IEnumerable<Guid> userIds, CancellationToken ct = default)
+    {
+        var ids = userIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return [];
+
+        // IgnoreQueryFilters: vẫn lấy thông tin kể cả tài khoản đã xóa mềm (hiển thị trạng thái chính xác).
+        var rows = await context.Users.IgnoreQueryFilters().AsNoTracking()
+            .Where(u => ids.Contains(u.Id))
+            .Select(u => new { u.Id, u.UserName, u.LockoutEnd, u.MustChangePassword })
+            .ToListAsync(ct);
+
+        var now = DateTimeOffset.Now;
+        return rows.ToDictionary(
+            u => u.Id,
+            u => new AccountInfo(u.UserName ?? string.Empty, u.LockoutEnd.HasValue && u.LockoutEnd.Value > now, u.MustChangePassword));
+    }
+
     public Task<List<UserSummary>> GetUsersInRoleAsync(string role, CancellationToken ct = default) =>
         (from u in context.Users
          join ur in context.UserRoles on u.Id equals ur.UserId

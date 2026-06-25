@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { PagedResult, ParentReport, RedeemRewardRequest, Student, StudentProgress, StudentRequest } from './models';
+import { AccountProvisionResult, BulkProvisionResult, PagedResult, ParentReport, ProvisionAccountRequest, RedeemRewardRequest, Student, StudentProgress, StudentRequest } from './models';
 
 export interface StudentQuery {
   page: number;
@@ -68,8 +68,28 @@ export class StudentsService {
     return this.http.put<void>(`${this.apiUrl}/${studentId}/link-user`, { userId });
   }
 
-  /** Giáo viên/Admin đặt lại mật khẩu tài khoản học sinh. */
-  resetPassword(studentId: string, newPassword: string): Observable<void> {
-    return this.http.put<void>(`${this.apiUrl}/${studentId}/password`, { newPassword });
+  /** Cấp tài khoản đăng nhập cho học sinh (tên đăng nhập = Mã HV; mật khẩu trống ⇒ mặc định). */
+  provisionAccount(studentId: string, request: ProvisionAccountRequest = {}): Observable<AccountProvisionResult> {
+    return this.http.post<AccountProvisionResult>(`${this.apiUrl}/${studentId}/account`, request);
+  }
+
+  /** Cấp tài khoản hàng loạt cho nhiều học sinh chưa có tài khoản. */
+  bulkProvision(ids: string[], password?: string | null): Observable<BulkProvisionResult> {
+    return this.http.post<BulkProvisionResult>(`${this.apiUrl}/accounts/provision`, { ids, password });
+  }
+
+  /** Đặt lại mật khẩu tài khoản học sinh (trống ⇒ mật khẩu mặc định, bắt đổi lần đầu). */
+  resetPassword(studentId: string, password?: string | null): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${studentId}/account/reset-password`, { password });
+  }
+
+  /** Khóa/mở khóa đăng nhập tài khoản học sinh. */
+  setLocked(studentId: string, locked: boolean): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${studentId}/account/lock`, { locked });
+  }
+
+  /** Gỡ liên kết tài khoản khỏi học sinh. */
+  unlinkAccount(studentId: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/${studentId}/account`);
   }
 }

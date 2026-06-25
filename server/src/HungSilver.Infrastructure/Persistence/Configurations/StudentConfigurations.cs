@@ -23,7 +23,9 @@ public sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         e.Property(x => x.LearningGoal).HasMaxLength(500);
         e.Property(x => x.Curriculum).HasMaxLength(500);
         e.Property(x => x.EntryScore).HasPrecision(5, 2);
-        e.HasIndex(x => x.UserId);
+        // 1-1 học sinh ↔ tài khoản: partial unique index trên UserId (đồng bộ TeacherProfile).
+        // Filter cú pháp chung hợp lệ cả Postgres lẫn SQLite (giống Enrollment active unique).
+        e.HasIndex(x => x.UserId).IsUnique().HasFilter("\"UserId\" IS NOT NULL AND NOT \"IsDeleted\"");
         e.HasIndex(x => x.IsActive);
     }
 }

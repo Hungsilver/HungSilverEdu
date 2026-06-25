@@ -1,4 +1,5 @@
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Accounts;
 using HungSilver.Application.Classes;
 using HungSilver.Application.Common;
 using HungSilver.Application.Materials;
@@ -186,6 +187,7 @@ public sealed class CurrentRelationCleanupTests : IDisposable
             _cleanup,
             new UnitOfWork(_context),
             new FakeUserDirectory(),
+            new FakeAccountProvisioning(),
             new CreateStudentRequestValidator(),
             new UpdateStudentRequestValidator());
 
@@ -258,11 +260,31 @@ public sealed class CurrentRelationCleanupTests : IDisposable
         public bool IsInRole(string role) => true;
     }
 
+    private sealed class FakeAccountProvisioning : IAccountProvisioningService
+    {
+        private static readonly Task<Result> Ok = Task.FromResult(Result.Success());
+        public Task<Result<AccountProvisionResultDto>> ProvisionStudentAsync(Guid studentId, ProvisionAccountOptions? options = null, CancellationToken ct = default)
+            => Task.FromResult(Result.Success(new AccountProvisionResultDto(Guid.NewGuid(), "x", true)));
+        public Task<BulkProvisionResultDto> ProvisionStudentsAsync(IReadOnlyCollection<Guid> studentIds, ProvisionAccountOptions? options = null, CancellationToken ct = default)
+            => Task.FromResult(new BulkProvisionResultDto(0, 0, 0, []));
+        public Task<Result> ResetStudentPasswordAsync(Guid studentId, string? newPassword = null, CancellationToken ct = default) => Ok;
+        public Task<Result> SetStudentLockedAsync(Guid studentId, bool locked, CancellationToken ct = default) => Ok;
+        public Task<Result> UnlinkStudentAsync(Guid studentId, CancellationToken ct = default) => Ok;
+        public Task<Result> LinkStudentAsync(Guid studentId, Guid userId, CancellationToken ct = default) => Ok;
+        public Task<Result<AccountProvisionResultDto>> ProvisionTeacherAsync(Guid teacherProfileId, ProvisionAccountOptions? options = null, CancellationToken ct = default)
+            => Task.FromResult(Result.Success(new AccountProvisionResultDto(Guid.NewGuid(), "x", true)));
+        public Task<BulkProvisionResultDto> ProvisionTeachersAsync(IReadOnlyCollection<Guid> teacherProfileIds, ProvisionAccountOptions? options = null, CancellationToken ct = default)
+            => Task.FromResult(new BulkProvisionResultDto(0, 0, 0, []));
+        public Task<Result> ResetTeacherPasswordAsync(Guid teacherProfileId, string? newPassword = null, CancellationToken ct = default) => Ok;
+        public Task<Result> SetTeacherLockedAsync(Guid teacherProfileId, bool locked, CancellationToken ct = default) => Ok;
+    }
+
     private sealed class FakeUserDirectory : IUserDirectory
     {
         public Task<bool> ExistsAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(true);
         public Task<bool> IsInRoleAsync(Guid userId, string role, CancellationToken ct = default) => Task.FromResult(false);
         public Task<Dictionary<Guid, string>> GetDisplayNamesAsync(IEnumerable<Guid> userIds, CancellationToken ct = default) => Task.FromResult(new Dictionary<Guid, string>());
+        public Task<Dictionary<Guid, AccountInfo>> GetAccountInfosAsync(IEnumerable<Guid> userIds, CancellationToken ct = default) => Task.FromResult(new Dictionary<Guid, AccountInfo>());
         public Task<List<UserSummary>> GetUsersInRoleAsync(string role, CancellationToken ct = default) => Task.FromResult(new List<UserSummary>());
         public Task<IReadOnlyList<string>> GetRolesAsync(Guid userId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
         public Task<Guid?> GetRoleIdAsync(string role, CancellationToken ct = default) => Task.FromResult<Guid?>(null);

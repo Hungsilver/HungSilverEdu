@@ -230,13 +230,13 @@ public sealed class AuthService(
         });
         await context.SaveChangesAsync(ct);
 
-        var userDto = new UserDto(user.Id, identity, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles]);
+        var userDto = new UserDto(user.Id, identity, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles], user.MustChangePassword);
         return new AuthTokens(access.Token, access.ExpiresAt, refreshRaw, refreshExpiresAt, userDto);
     }
 
     private async Task<UserDto> ToUserDtoAsync(AppUser user)
     {
         var roles = await userManager.GetRolesAsync(user);
-        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles]);
+        return new UserDto(user.Id, user.Email ?? user.UserName!, user.FullName, user.PhoneNumber, user.AvatarUrl, [.. roles], user.MustChangePassword);
     }
 }

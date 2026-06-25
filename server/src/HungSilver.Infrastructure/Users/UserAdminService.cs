@@ -72,11 +72,13 @@ public sealed class UserAdminService(
 
     public async Task<Result<UserListItemDto>> CreateUserAsync(CreateUserRequest request, CancellationToken ct = default)
     {
-        // Admin chỉ tạo Admin/Giáo viên; học sinh do giáo viên tạo trong lớp.
+        // Trang Người dùng chỉ tạo tài khoản QUẢN TRỊ. Tài khoản Giáo viên cấp ở trang Giáo viên
+        // (tên đăng nhập = Mã GV), tài khoản Học sinh cấp ở trang Học viên — đều qua service cấp
+        // tài khoản chung để đảm bảo nhất quán (username = mã, 1-1, bắt đổi mật khẩu lần đầu).
         var role = request.Role?.Trim();
-        if (role != AppRoles.Admin && role != AppRoles.Teacher)
+        if (role != AppRoles.Admin)
             return Result.Failure<UserListItemDto>(Error.Validation(
-                "Users.InvalidRole", "Vai trò chỉ được là Quản trị viên hoặc Giáo viên."));
+                "Users.InvalidRole", "Trang Người dùng chỉ tạo tài khoản Quản trị viên. Tài khoản Giáo viên/Học sinh cấp ở trang tương ứng."));
 
         var userName = request.UserName?.Trim();
         if (string.IsNullOrWhiteSpace(userName))
@@ -113,20 +115,6 @@ public sealed class UserAdminService(
         if (!addRole.Succeeded)
             return Result.Failure<UserListItemDto>(Error.Failure(
                 "Users.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
-
-        if (role == AppRoles.Teacher)
-        {
-            var teacherCode = UniqueCodeGenerator.Next("GV");
-            context.TeacherProfiles.Add(new TeacherProfile
-            {
-                TeacherCode = teacherCode,
-                FullName = user.FullName ?? userName,
-                Email = string.Equals(email, $"{userName}@hedu.local", StringComparison.OrdinalIgnoreCase) ? null : email,
-                UserId = user.Id,
-                IsActive = true
-            });
-            await context.SaveChangesAsync(ct);
-        }
 
         return new UserListItemDto(user.Id, user.UserName!, user.Email!, user.FullName, [role], user.IsDeleted, user.CreatedAt);
     }

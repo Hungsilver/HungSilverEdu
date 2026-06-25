@@ -13,6 +13,8 @@ public sealed record TeacherProfileDto(
     string? Note,
     Guid? UserId,
     string? UserName,
+    bool IsLocked,
+    bool MustChangePassword,
     Guid? BranchId,
     string? BranchName,
     bool IsActive,
@@ -53,6 +55,8 @@ public sealed record LinkAccountRequest(Guid UserId);
 
 public sealed record UnlinkedUserDto(Guid Id, string UserName, string? FullName);
 
+/// <summary>Tạo hồ sơ GV mới (hoặc dùng hồ sơ có sẵn) + cấp tài khoản. Tên đăng nhập = Mã GV (tự sinh);
+/// mật khẩu trống ⇒ dùng mật khẩu mặc định; bắt buộc đổi ở lần đăng nhập đầu.</summary>
 public sealed record CreateTeacherAccountRequest(
     Guid? TeacherProfileId,
     string? TeacherCode,
@@ -63,6 +67,5 @@ public sealed record CreateTeacherAccountRequest(
     string? Address,
     string? Note,
     Guid? BranchId,
-    string UserName,
     string? LoginEmail,
-    string Password);
+    string? Password);

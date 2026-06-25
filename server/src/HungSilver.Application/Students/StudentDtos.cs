@@ -34,6 +34,9 @@ public sealed record StudentDto(
     string? LearningGoal,
     string? Curriculum,
     Guid? UserId,
+    string? UserName,
+    bool IsLocked,
+    bool MustChangePassword,
     bool IsActive,
     bool IsDeleted,
     DateTime CreatedAt,
@@ -60,7 +63,8 @@ public sealed record CreateStudentRequest(
 
 public sealed record LinkUserRequest(Guid UserId);
 
-/// <summary>Giáo viên/Admin tạo học sinh trong lớp, kèm tùy chọn tạo tài khoản đăng nhập.</summary>
+/// <summary>Giáo viên/Admin tạo học sinh trong lớp, kèm tùy chọn cấp tài khoản đăng nhập.
+/// Khi cấp: tên đăng nhập = Mã học viên (tự sinh); mật khẩu trống ⇒ dùng mật khẩu mặc định.</summary>
 public sealed record CreateClassStudentRequest(
     string? StudentCode,
     string FullName,
@@ -75,7 +79,6 @@ public sealed record CreateClassStudentRequest(
     string? EnglishLevel,
     string? LearningGoal,
     bool CreateAccount = false,
-    string? UserName = null,
     string? Password = null);
 
 public sealed record CreateClassStudentResultDto(
@@ -83,9 +86,8 @@ public sealed record CreateClassStudentResultDto(
     string StudentCode,
     string FullName,
     bool AccountCreated,
-    string? UserName);
-
-public sealed record ResetStudentPasswordRequest(string NewPassword);
+    string? UserName,
+    string? AccountError = null);
 
 public sealed record UpdateStudentRequest(
     string? StudentCode,

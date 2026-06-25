@@ -10,6 +10,9 @@ public interface IUserDirectory
     /// <summary>Tên hiển thị (FullName hoặc Email) theo từng userId.</summary>
     Task<Dictionary<Guid, string>> GetDisplayNamesAsync(IEnumerable<Guid> userIds, CancellationToken ct = default);
 
+    /// <summary>Thông tin tài khoản (tên đăng nhập, đang khóa, bắt buộc đổi mật khẩu) theo userId — cho hiển thị trạng thái.</summary>
+    Task<Dictionary<Guid, AccountInfo>> GetAccountInfosAsync(IEnumerable<Guid> userIds, CancellationToken ct = default);
+
     Task<List<UserSummary>> GetUsersInRoleAsync(string role, CancellationToken ct = default);
 
     Task<IReadOnlyList<string>> GetRolesAsync(Guid userId, CancellationToken ct = default);
@@ -19,3 +22,5 @@ public interface IUserDirectory
 }
 
 public sealed record UserSummary(Guid Id, string Email, string? FullName);
+
+public sealed record AccountInfo(string UserName, bool IsLocked, bool MustChangePassword);

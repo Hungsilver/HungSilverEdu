@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using FluentValidation;
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Accounts;
 using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
 using HungSilver.Domain.Common;
@@ -28,6 +29,7 @@ public sealed class StudentService(
     ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork,
     IUserDirectory userDirectory,
+    IAccountProvisioningService accountProvisioning,
     IValidator<CreateStudentRequest> createValidator,
     IValidator<UpdateStudentRequest> updateValidator) : IStudentService
 {
@@ -198,23 +200,10 @@ public sealed class StudentService(
         return Result.Success();
     }
 
-    public async Task<Result> LinkUserAsync(Guid studentId, Guid userId, CancellationToken ct = default)
-    {
-        var student = await students.GetByIdAsync(studentId, ct: ct);
-        if (student is null)
-            return Result.Failure(NotFoundError);
-
-        if (!await userDirectory.ExistsAsync(userId, ct))
-            return Result.Failure(Error.Validation("Student.UserNotFound", "Không tìm thấy tài khoản người dùng."));
-
-        if (await students.AnyAsync(s => s.UserId == userId && s.Id != studentId, ct))
-            return Result.Failure(Error.Conflict("Student.UserAlreadyLinked", "Tài khoản này đã liên kết với học sinh khác."));
-
-        student.UserId = userId;
-        students.Update(student);
-        await unitOfWork.SaveChangesAsync(ct);
-        return Result.Success();
-    }
+    public Task<Result> LinkUserAsync(Guid studentId, Guid userId, CancellationToken ct = default) =>
+        // Liên kết tài khoản (role User) có sẵn vào học sinh — qua service cấp tài khoản chung
+        // (kiểm vai trò + enforce 1-1 + lưới an toàn unique index).
+        accountProvisioning.LinkStudentAsync(studentId, userId, ct);
 
     private async Task<HashSet<Guid>?> ResolveFilteredStudentIdsAsync(Guid? branchId, Guid? subjectId, Guid? gradeId, Guid? teacherProfileId, CancellationToken ct)
     {
@@ -259,12 +248,22 @@ public sealed class StudentService(
             ? await LoadStudentClassesAsync(items.Select(s => s.Id).ToList(), ct)
             : [];
 
-        return items.Select(s => new StudentDto(
-            s.Id, s.StudentCode, s.FullName, s.DateOfBirth, s.School, s.GradeLevel,
-            s.Phone, s.ParentName, s.ParentPhone, s.Address, s.Email, s.Note,
-            s.EnrollmentDate, s.EnglishLevel, s.LearningGoal, s.Curriculum, s.UserId,
-            s.IsActive, s.IsDeleted, s.CreatedAt, s.UpdatedAt,
-            classMap.GetValueOrDefault(s.Id) ?? [])).ToList();
+        var userIds = items.Where(s => s.UserId.HasValue).Select(s => s.UserId!.Value).ToList();
+        var accounts = userIds.Count > 0
+            ? await userDirectory.GetAccountInfosAsync(userIds, ct)
+            : [];
+
+        return items.Select(s =>
+        {
+            var acc = s.UserId.HasValue ? accounts.GetValueOrDefault(s.UserId.Value) : null;
+            return new StudentDto(
+                s.Id, s.StudentCode, s.FullName, s.DateOfBirth, s.School, s.GradeLevel,
+                s.Phone, s.ParentName, s.ParentPhone, s.Address, s.Email, s.Note,
+                s.EnrollmentDate, s.EnglishLevel, s.LearningGoal, s.Curriculum, s.UserId,
+                acc?.UserName, acc?.IsLocked ?? false, acc?.MustChangePassword ?? false,
+                s.IsActive, s.IsDeleted, s.CreatedAt, s.UpdatedAt,
+                classMap.GetValueOrDefault(s.Id) ?? []);
+        }).ToList();
     }
 
     private async Task<Dictionary<Guid, IReadOnlyList<StudentClassDto>>> LoadStudentClassesAsync(List<Guid> studentIds, CancellationToken ct)

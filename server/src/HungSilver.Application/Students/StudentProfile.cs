@@ -12,6 +12,7 @@ public sealed class StudentProfile : Profile
                 s.Id, s.StudentCode, s.FullName, s.DateOfBirth, s.School, s.GradeLevel,
                 s.Phone, s.ParentName, s.ParentPhone, s.Address, s.Email, s.Note,
                 s.EnrollmentDate, s.EnglishLevel, s.LearningGoal, s.Curriculum, s.UserId,
+                null, false, false,
                 s.IsActive, s.IsDeleted, s.CreatedAt, s.UpdatedAt, Array.Empty<StudentClassDto>()));
     }
 }
