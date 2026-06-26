@@ -540,6 +540,25 @@ export interface CalendarSession {
   endTime: string | null;
   topic: string | null;
   status: SessionStatus;
+  // Snapshot từ lớp để nhóm/hiển thị lịch theo cơ sở · môn · khối · giáo viên.
+  teacherProfileId: string | null;
+  teacherName: string | null;
+  branchId: string | null;
+  branchName: string | null;
+  branchCode: string | null;
+  subjectName: string | null;
+  gradeName: string | null;
+  // "Ca" tính sẵn ở server theo cấu hình. shiftOrder lớn (vd 2147483647) = chưa xếp giờ.
+  shiftName: string | null;
+  shiftOrder: number;
+}
+
+/** Bộ lọc lịch học (tùy role: GV bỏ qua teacherProfileId, server tự scope). */
+export interface ScheduleFilter {
+  branchId?: string;
+  subjectId?: string;
+  gradeId?: string;
+  teacherProfileId?: string;
 }
 
 export interface ScheduleSlot {

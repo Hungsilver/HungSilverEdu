@@ -2,17 +2,21 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { CalendarSession, CreateSessionRequest, CreateSlotRequest, GenerateSessionsRequest, ScheduleSlot } from './models';
+import { CalendarSession, CreateSessionRequest, CreateSlotRequest, GenerateSessionsRequest, ScheduleFilter, ScheduleSlot } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/schedule`;
 
-  /** from/to dạng yyyy-MM-dd. */
-  getRange(from: string, to: string, classId?: string): Observable<CalendarSession[]> {
+  /** from/to dạng yyyy-MM-dd. Bộ lọc tùy chọn (cơ sở/môn/khối/giáo viên). */
+  getRange(from: string, to: string, classId?: string, filter?: ScheduleFilter): Observable<CalendarSession[]> {
     let params = new HttpParams().set('from', from).set('to', to);
     if (classId) params = params.set('classId', classId);
+    if (filter?.branchId) params = params.set('branchId', filter.branchId);
+    if (filter?.subjectId) params = params.set('subjectId', filter.subjectId);
+    if (filter?.gradeId) params = params.set('gradeId', filter.gradeId);
+    if (filter?.teacherProfileId) params = params.set('teacherProfileId', filter.teacherProfileId);
     return this.http.get<CalendarSession[]>(this.apiUrl, { params });
   }
 

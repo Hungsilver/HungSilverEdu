@@ -1,6 +1,8 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
 using HungSilver.Application.Portal;
+using HungSilver.Application.Schedule;
+using HungSilver.Application.Settings;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
 using HungSilver.Domain.Enums;
@@ -12,7 +14,8 @@ namespace HungSilver.Infrastructure.Portal;
 public sealed class PortalService(
     AppDbContext context,
     ICurrentRelationCleanupService relationCleanup,
-    ICurrentUser currentUser) : IPortalService
+    ICurrentUser currentUser,
+    ISettingsResolver settings) : IPortalService
 {
     public async Task<Result<PortalProfileDto>> GetMyProfileAsync(CancellationToken ct = default)
     {
@@ -104,6 +107,45 @@ public sealed class PortalService(
             return new PortalAssignmentDto(x.a.Id, x.Name, x.a.Title, x.a.Instructions, matTitle, matUrl,
                 x.a.DueDate, status, sub?.SubmittedOn, sub?.Link);
         }).ToList();
+    }
+
+    public async Task<Result<List<CalendarSessionDto>>> GetScheduleRangeAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        var studentResult = await GetLinkedStudentAsync(ct);
+        if (studentResult.IsFailure)
+            return Result.Failure<List<CalendarSessionDto>>(studentResult.Error);
+        var student = studentResult.Value;
+
+        var classIds = await LoadStudentClassIdsAsync(student.Id, ct);
+        if (classIds.Count == 0)
+            return new List<CalendarSessionDto>();
+
+        var rows = await (
+            from s in context.ClassSessions.AsNoTracking()
+            join c in context.Classes.AsNoTracking() on s.ClassId equals c.Id
+            where classIds.Contains(s.ClassId) && s.SessionDate >= fromDate && s.SessionDate <= toDate
+            orderby s.SessionDate, s.StartTime
+            select new
+            {
+                s.Id, s.ClassId, c.Name, s.SessionNumber, s.SessionDate, s.StartTime, s.EndTime, s.Topic, s.Status,
+                c.TeacherProfileId, c.TeacherName, c.BranchId, c.BranchName, c.BranchCode, c.SubjectName, c.GradeName
+            }).ToListAsync(ct);
+
+        var shiftJson = await settings.GetEffectiveValueAsync(SettingKeys.ScheduleShifts, ct: ct);
+        var shifts = ShiftResolver.Parse(shiftJson);
+
+        return rows
+            .Select(r =>
+            {
+                var (shiftName, shiftOrder) = shifts.Resolve(r.BranchId, r.StartTime);
+                return new CalendarSessionDto(
+                    r.Id, r.ClassId, r.Name, r.SessionNumber, r.SessionDate,
+                    r.StartTime, r.EndTime, r.Topic, r.Status,
+                    r.TeacherProfileId, r.TeacherName, r.BranchId, r.BranchName, r.BranchCode,
+                    r.SubjectName, r.GradeName, shiftName, shiftOrder);
+            })
+            .OrderBy(i => i.SessionDate).ThenBy(i => i.ShiftOrder).ThenBy(i => i.StartTime)
+            .ToList();
     }
 
     public async Task<Result> SubmitAssignmentAsync(Guid assignmentId, SubmitAssignmentRequest request, CancellationToken ct = default)

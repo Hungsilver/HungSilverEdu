@@ -50,6 +50,22 @@ public static class DbSeeder
             logger.LogInformation("Seeded default settings (FileStorage.Mode = Server)");
         }
 
+        // Đảm bảo có row Khung Ca học (Schedule.Shifts) để màn Cấu hình chỉnh tay được — idempotent.
+        // (Resolver vẫn fallback về Default nếu thiếu, đây chỉ tạo bản ghi có DataType=Json cho UI.)
+        if (!await context.Settings.IgnoreQueryFilters().AnyAsync(x => x.Key == SettingKeys.ScheduleShifts))
+        {
+            context.Settings.Add(new AppSetting
+            {
+                Key = SettingKeys.ScheduleShifts,
+                Value = SettingKeys.Defaults[SettingKeys.ScheduleShifts],
+                Scope = SettingScope.System,
+                DataType = "Json",
+                Description = "Khung Ca học (mặc định + theo cơ sở)"
+            });
+            await context.SaveChangesAsync();
+            logger.LogInformation("Seeded default Schedule.Shifts setting");
+        }
+
         await SeedGradeCategoriesAsync(context, logger);
         await SeedPointReasonsAsync(context, logger);
 

@@ -1,3 +1,4 @@
+using HungSilver.Application.Schedule;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Enums;
 
@@ -36,4 +37,7 @@ public interface IPortalService
     Task<Result<PortalProfileDto>> GetMyProfileAsync(CancellationToken ct = default);
     Task<Result<List<PortalAssignmentDto>>> GetMyAssignmentsAsync(CancellationToken ct = default);
     Task<Result> SubmitAssignmentAsync(Guid assignmentId, SubmitAssignmentRequest request, CancellationToken ct = default);
+
+    /// <summary>Lịch học của chính học sinh (các lớp đang ghi danh active) trong khoảng ngày — cùng dạng DTO với lịch Admin/GV.</summary>
+    Task<Result<List<CalendarSessionDto>>> GetScheduleRangeAsync(DateOnly from, DateOnly to, CancellationToken ct = default);
 }

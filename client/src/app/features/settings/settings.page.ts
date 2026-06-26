@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -26,6 +26,10 @@ const KEY_DUE_SOON = 'Tuition.DueSoonDays';
 const KEY_SCORE_DROP = 'Warning.ScoreDropThreshold';
 const KEY_ACC_PWD = 'Account.DefaultPassword';
 const KEY_ACC_DOMAIN = 'Account.LocalEmailDomain';
+const KEY_SHIFTS = 'Schedule.Shifts';
+
+/** Một dòng "Ca" trong trình soạn khung Ca (tên + giờ bắt đầu/kết thúc dạng "HH:mm"). */
+interface BandRow { name: string; from: string; to: string; }
 
 @Component({
   selector: 'app-settings-page',
@@ -116,6 +120,51 @@ const KEY_ACC_DOMAIN = 'Account.LocalEmailDomain';
           }
         </tbody>
       </nz-table>
+    </nz-card>
+
+    <!-- Khung Ca học (nhóm lịch theo Ca) -->
+    <nz-card nzTitle="Khung Ca học" style="margin-bottom:16px">
+      <p class="hint">
+        Định nghĩa các "Ca" theo giờ. Mỗi buổi học tự rơi vào Ca có khoảng <code>[bắt đầu, kết thúc)</code> chứa giờ vào lớp,
+        dùng để nhóm trang Lịch học theo <b>Cơ sở → Ca</b>. Áp khung <b>Mặc định</b> cho mọi cơ sở; có thể tùy chỉnh riêng từng cơ sở.
+      </p>
+      <nz-form-item>
+        <nz-form-label>Áp dụng cho</nz-form-label>
+        <nz-form-control>
+          <nz-select [ngModel]="shiftScope()" (ngModelChange)="shiftScope.set($event)" name="ssc" class="field">
+            <nz-option nzValue="default" nzLabel="Mặc định (mọi cơ sở)" />
+            @for (b of branches(); track b.id) { <nz-option [nzValue]="b.id" [nzLabel]="b.name" /> }
+          </nz-select>
+        </nz-form-control>
+      </nz-form-item>
+      @if (shiftScope() !== 'default') {
+        <p class="hint">Để bảng trống = cơ sở này dùng khung <b>Mặc định</b>.</p>
+      }
+      <nz-table [nzData]="currentBands()" [nzShowPagination]="false" nzSize="small">
+        <thead><tr><th>Tên Ca</th><th style="width:130px">Bắt đầu</th><th style="width:130px">Kết thúc</th><th style="width:70px"></th></tr></thead>
+        <tbody>
+          @for (row of currentBands(); track $index) {
+            <tr>
+              <td><input nz-input [(ngModel)]="row.name" [name]="'sn' + $index" placeholder="VD: Ca 1 sáng" /></td>
+              <td><input nz-input [(ngModel)]="row.from" [name]="'sf' + $index" placeholder="07:00" /></td>
+              <td><input nz-input [(ngModel)]="row.to" [name]="'st' + $index" placeholder="09:00" /></td>
+              <td>
+                <button nz-button nzType="link" nzDanger nzSize="small" aria-label="Xóa Ca"
+                  (click)="removeBand($index)"><nz-icon nzType="delete" /></button>
+              </td>
+            </tr>
+          }
+          @if (currentBands().length === 0) {
+            <tr><td colspan="4" class="empty">Chưa có Ca nào.</td></tr>
+          }
+        </tbody>
+      </nz-table>
+      <div style="margin-top:12px; display:flex; gap:8px">
+        <button nz-button (click)="addBand()"><nz-icon nzType="plus" /> Thêm Ca</button>
+        <button nz-button nzType="primary" [nzLoading]="savingShifts()" (click)="saveShifts()">
+          <nz-icon nzType="save" /> Lưu khung Ca
+        </button>
+      </div>
     </nz-card>
 
     <!-- Lý do cộng điểm -->
@@ -221,6 +270,16 @@ export class SettingsPage implements OnInit {
   protected readonly branches = signal<Branch[]>([]);
   protected readonly savingBranchId = signal<string | null>(null);
 
+  // Khung Ca học: khung mặc định + override theo cơ sở.
+  protected readonly savingShifts = signal(false);
+  protected readonly shiftScope = signal<string>('default');
+  protected readonly shiftDefault = signal<BandRow[]>([]);
+  protected readonly shiftByBranch = signal<Record<string, BandRow[]>>({});
+  protected readonly currentBands = computed<BandRow[]>(() => {
+    const scope = this.shiftScope();
+    return scope === 'default' ? this.shiftDefault() : (this.shiftByBranch()[scope] ?? []);
+  });
+
   protected fileMode: FileStorageMode = FileStorageMode.ExternalUrl;
   protected dueSoonDays = 7;
   protected scoreDrop = 1.5;
@@ -250,9 +309,86 @@ export class SettingsPage implements OnInit {
       if (v[KEY_SCORE_DROP]) this.scoreDrop = Number(v[KEY_SCORE_DROP]);
       if (v[KEY_ACC_PWD]) this.accDefaultPassword = v[KEY_ACC_PWD];
       if (v[KEY_ACC_DOMAIN]) this.accEmailDomain = v[KEY_ACC_DOMAIN];
+      this.loadShifts(v[KEY_SHIFTS]);
     });
     this.loadReasons();
     this.branchesService.getAll(true).subscribe(x => this.branches.set(x));
+  }
+
+  // ---- Khung Ca học ----
+
+  private loadShifts(raw: string | undefined): void {
+    if (!raw) return;
+    try {
+      const cfg = JSON.parse(raw) as { default?: BandRow[]; byBranch?: Record<string, BandRow[]> };
+      const toRows = (arr?: BandRow[]) => (arr ?? []).map(d => ({ name: d.name ?? '', from: d.from ?? '', to: d.to ?? '' }));
+      this.shiftDefault.set(toRows(cfg.default));
+      const byBranch: Record<string, BandRow[]> = {};
+      for (const [bid, arr] of Object.entries(cfg.byBranch ?? {})) byBranch[bid] = toRows(arr);
+      this.shiftByBranch.set(byBranch);
+    } catch {
+      // JSON hỏng → bỏ qua, giữ trống (server vẫn fallback về mặc định).
+    }
+  }
+
+  private setBands(rows: BandRow[]): void {
+    const scope = this.shiftScope();
+    if (scope === 'default') this.shiftDefault.set(rows);
+    else this.shiftByBranch.update(m => ({ ...m, [scope]: rows }));
+  }
+
+  protected addBand(): void {
+    this.setBands([...this.currentBands(), { name: '', from: '', to: '' }]);
+  }
+
+  protected removeBand(index: number): void {
+    this.setBands(this.currentBands().filter((_, i) => i !== index));
+  }
+
+  protected saveShifts(): void {
+    const norm = this.buildShiftsConfig();
+    if (norm === null) return; // có lỗi định dạng, đã báo
+
+    const req: UpsertSettingRequest = {
+      key: KEY_SHIFTS, value: JSON.stringify(norm), scope: SettingScope.System, scopeId: null, dataType: 'Json', description: null
+    };
+    this.savingShifts.set(true);
+    this.settingsService.upsert(req).subscribe({
+      next: () => { this.savingShifts.set(false); this.message.success('Đã lưu khung Ca.'); },
+      error: (err: HttpErrorResponse) => { this.savingShifts.set(false); this.message.error(err.error?.message ?? err.message); }
+    });
+  }
+
+  /** Chuẩn hóa + kiểm tra các Ca; trả null nếu có lỗi (đã hiện message). Bỏ dòng trống. */
+  private buildShiftsConfig(): { default: BandRow[]; byBranch: Record<string, BandRow[]> } | null {
+    const timeRe = /^([01]?\d|2[0-3]):[0-5]\d$/;
+    const toBands = (rows: BandRow[], scopeLabel: string): BandRow[] | null => {
+      const out: BandRow[] = [];
+      for (const r of rows) {
+        const name = (r.name ?? '').trim();
+        const from = (r.from ?? '').trim();
+        const to = (r.to ?? '').trim();
+        if (!name && !from && !to) continue; // dòng trống → bỏ
+        if (!name) { this.message.error(`[${scopeLabel}] Ca thiếu tên.`); return null; }
+        if (!timeRe.test(from) || !timeRe.test(to)) { this.message.error(`[${scopeLabel}] Giờ Ca "${name}" phải dạng HH:mm.`); return null; }
+        const nf = normTime(from), nt = normTime(to);
+        if (nt <= nf) { this.message.error(`[${scopeLabel}] Ca "${name}": giờ kết thúc phải sau giờ bắt đầu.`); return null; }
+        out.push({ name, from: nf, to: nt });
+      }
+      return out;
+    };
+
+    const def = toBands(this.shiftDefault(), 'Mặc định');
+    if (def === null) return null;
+
+    const byBranch: Record<string, BandRow[]> = {};
+    const branchName = (id: string) => this.branches().find(b => b.id === id)?.name ?? 'Cơ sở';
+    for (const [bid, rows] of Object.entries(this.shiftByBranch())) {
+      const bands = toBands(rows, branchName(bid));
+      if (bands === null) return null;
+      if (bands.length) byBranch[bid] = bands;
+    }
+    return { default: def, byBranch };
   }
 
   // Prefix mặc định theo tên cơ sở (PascalCase liền + "@") — đồng bộ NameCodeGenerator.PascalCompact ở BE.
@@ -377,4 +513,10 @@ export class SettingsPage implements OnInit {
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message)
     });
   }
+}
+
+/** Chuẩn hóa "H:mm"/"HH:mm" → "HH:mm" (giờ 2 chữ số) để so sánh & lưu nhất quán. */
+function normTime(value: string): string {
+  const [h, m] = value.split(':');
+  return `${h.padStart(2, '0')}:${m}`;
 }

@@ -4,8 +4,19 @@ namespace HungSilver.Application.Schedule;
 
 public interface IScheduleService
 {
-    /// <summary>Buổi học trong khoảng ngày (dùng cho lịch tháng/tuần). Tự lọc theo lớp của giáo viên.</summary>
-    Task<Result<List<CalendarSessionDto>>> GetRangeAsync(DateOnly from, DateOnly to, Guid? classId, CancellationToken ct = default);
+    /// <summary>
+    /// Buổi học trong khoảng ngày (lịch ngày/tuần/tháng), kèm bộ lọc theo cơ sở · môn · khối · giáo viên.
+    /// Tự scope theo lớp của giáo viên (Admin thấy tất cả). Mỗi buổi được xếp Ca theo cấu hình Schedule.Shifts.
+    /// </summary>
+    Task<Result<List<CalendarSessionDto>>> GetRangeAsync(
+        DateOnly from,
+        DateOnly to,
+        Guid? classId,
+        Guid? branchId = null,
+        Guid? subjectId = null,
+        Guid? gradeId = null,
+        Guid? teacherProfileId = null,
+        CancellationToken ct = default);
 
     Task<Result<List<ScheduleSlotDto>>> GetSlotsAsync(Guid classId, CancellationToken ct = default);
     Task<Result<ScheduleSlotDto>> AddSlotAsync(CreateSlotRequest request, CancellationToken ct = default);

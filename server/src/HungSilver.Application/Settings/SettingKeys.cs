@@ -25,6 +25,18 @@ public static class SettingKeys
     /// <summary>Tên miền email "ảo" cho tài khoản không có email thật (Identity bắt buộc email duy nhất).</summary>
     public const string AccountLocalEmailDomain = "Account.LocalEmailDomain";
 
+    /// <summary>
+    /// Khung "Ca" học (để nhóm lịch theo Ca). JSON: <c>{ "default": [{name,from,to}], "byBranch": { "&lt;branchId&gt;": [...] } }</c>.
+    /// Mỗi buổi xếp vào Ca theo giờ bắt đầu; cơ sở có override riêng dùng <c>byBranch</c>, còn lại dùng <c>default</c>.
+    /// Giờ dạng "HH:mm". Cấu hình ở màn Cấu hình hệ thống (Admin).
+    /// </summary>
+    public const string ScheduleShifts = "Schedule.Shifts";
+
+    /// <summary>JSON Ca mặc định (5 ca: 2 sáng, 2 chiều, 1 tối) — fallback khi chưa cấu hình.</summary>
+    public const string DefaultShiftsJson = """
+        {"default":[{"name":"Ca 1 sáng","from":"07:00","to":"09:00"},{"name":"Ca 2 sáng","from":"09:00","to":"11:30"},{"name":"Ca 1 chiều","from":"13:30","to":"15:30"},{"name":"Ca 2 chiều","from":"15:30","to":"17:30"},{"name":"Ca tối","from":"18:00","to":"21:00"}],"byBranch":{}}
+        """;
+
     /// <summary>Giá trị mặc định khi chưa có cấu hình ở scope nào.</summary>
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
@@ -33,6 +45,7 @@ public static class SettingKeys
         [WarningScoreDropThreshold] = "1.5",
         [CenterCodePrefix] = "HV",
         [AccountDefaultPassword] = "Hocvien@123",
-        [AccountLocalEmailDomain] = "hs.local"
+        [AccountLocalEmailDomain] = "hs.local",
+        [ScheduleShifts] = DefaultShiftsJson
     };
 }

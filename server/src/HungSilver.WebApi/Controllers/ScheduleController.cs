@@ -10,14 +10,21 @@ namespace HungSilver.WebApi.Controllers;
 [Authorize(Policy = "TeacherOrAdmin")]
 public class ScheduleController(IScheduleService scheduleService) : ControllerBase
 {
-    /// <summary>Buổi học trong khoảng ngày (lịch tháng/tuần). Admin/Teacher xem toàn bộ nghiệp vụ.</summary>
+    /// <summary>
+    /// Buổi học trong khoảng ngày (lịch ngày/tuần/tháng) kèm bộ lọc cơ sở · môn · khối · giáo viên.
+    /// Admin xem tất cả; Giáo viên tự giới hạn theo lớp mình (filter giáo viên bị bỏ qua).
+    /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<CalendarSessionDto>>> GetRange(
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         [FromQuery] Guid? classId,
+        [FromQuery] Guid? branchId,
+        [FromQuery] Guid? subjectId,
+        [FromQuery] Guid? gradeId,
+        [FromQuery] Guid? teacherProfileId,
         CancellationToken ct) =>
-        (await scheduleService.GetRangeAsync(from, to, classId, ct)).ToActionResult();
+        (await scheduleService.GetRangeAsync(from, to, classId, branchId, subjectId, gradeId, teacherProfileId, ct)).ToActionResult();
 
     [HttpGet("classes/{classId:guid}/slots")]
     public async Task<ActionResult<List<ScheduleSlotDto>>> GetSlots(Guid classId, CancellationToken ct) =>
