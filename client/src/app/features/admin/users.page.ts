@@ -22,11 +22,13 @@ import { ScreenService } from '../../core/screen.service';
 import { UsersService } from '../../core/users.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
+import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
+import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
 @Component({
   selector: 'app-users-page',
   imports: [
-    FormsModule, DatePipe, ColumnSettings,
+    FormsModule, DatePipe, ColumnSettings, TableDragScroll,
     NzTableModule, NzButtonModule, NzIconModule, NzInputModule,
     NzTagModule, NzSelectModule, NzPopconfirmModule, NzModalModule, NzFormModule, NzAlertModule, NzCardModule, NzPaginationModule,
     NzTooltipModule, PageHeader
@@ -89,14 +91,18 @@ import { PageHeader } from '../../shared/page-header';
       </div>
       <nz-table
         #table
+        appTableDragScroll
         [nzData]="users()"
         [nzLoading]="loading()"
         [nzFrontPagination]="false"
         [nzTotal]="total()"
         [nzPageIndex]="page()"
         [nzPageSize]="pageSize()"
+        nzShowSizeChanger
+        [nzPageSizeOptions]="PAGE_SIZE_OPTIONS"
         (nzPageIndexChange)="onPageChange($event)"
-        [nzScroll]="{ x: '760px' }">
+        (nzPageSizeChange)="pageSize.set($event); onPageChange(1)"
+        [nzScroll]="{ x: '760px', y: scrollY }">
         <thead>
           <tr>
             <th nzWidth="64px" style="white-space: nowrap">STT</th>
@@ -230,6 +236,8 @@ export class UsersPage {
   protected readonly total = signal(0);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
+  protected readonly PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
+  protected readonly scrollY = TABLE_SCROLL_Y;
   protected readonly search = signal('');
   protected readonly loading = signal(false);
 

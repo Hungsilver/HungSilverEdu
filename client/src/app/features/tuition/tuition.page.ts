@@ -25,11 +25,13 @@ import { TeachersService } from '../../core/teachers.service';
 import { TuitionService } from '../../core/tuition.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
+import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
+import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
 @Component({
   selector: 'app-tuition-page',
   imports: [
-    CurrencyPipe, DatePipe, FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings,
+    CurrencyPipe, DatePipe, FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings, TableDragScroll,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzInputNumberModule, NzModalModule, NzSelectModule, NzTableModule, NzTagModule
   ],
@@ -60,9 +62,12 @@ import { PageHeader } from '../../shared/page-header';
       <app-column-settings #cols storageKey="hs-cols-tuition" [columns]="COLUMNS" />
     </div>
 
-    <nz-table #table [nzData]="items()" [nzLoading]="loading()" [nzFrontPagination]="false"
+    <nz-table #table appTableDragScroll [nzData]="items()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
-      (nzPageIndexChange)="page.set($event); load()" [nzScroll]="{ x: '900px' }">
+      nzShowSizeChanger [nzPageSizeOptions]="PAGE_SIZE_OPTIONS"
+      (nzPageIndexChange)="page.set($event); load()"
+      (nzPageSizeChange)="pageSize.set($event); page.set(1); load()"
+      [nzScroll]="{ x: '900px', y: scrollY }">
       <thead><tr>
         <th nzWidth="64px" style="white-space: nowrap">STT</th>
         @for (col of cols.visibleColumns(); track col.key) { <th>{{ col.label }}</th> }
@@ -154,6 +159,8 @@ export class TuitionPage {
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
   protected readonly total = signal(0);
+  protected readonly PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
+  protected readonly scrollY = TABLE_SCROLL_Y;
   protected search = '';
   protected branchId: string | null = null;
   protected subjectId: string | null = null;

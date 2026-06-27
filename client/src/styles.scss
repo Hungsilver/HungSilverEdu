@@ -134,6 +134,21 @@ a {
   background: var(--hs-primary-weak);
 }
 
+/* Kéo (grab) để cuộn ngang bảng — directive appTableDragScroll */
+.hs-drag-scroll .ant-table-header,
+.hs-drag-scroll .ant-table-body,
+.hs-drag-scroll .ant-table-content {
+  cursor: grab;
+}
+.hs-drag-scroll.hs-dragging {
+  user-select: none;
+}
+.hs-drag-scroll.hs-dragging .ant-table-header,
+.hs-drag-scroll.hs-dragging .ant-table-body,
+.hs-drag-scroll.hs-dragging .ant-table-content {
+  cursor: grabbing;
+}
+
 /* Tag bo tròn (pill) */
 .ant-tag {
   border-radius: 999px;
@@ -229,7 +244,8 @@ a {
    Layout & Navigation
    ========================================================================== */
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--hs-bg);
 }
 .ant-layout {

@@ -21,11 +21,13 @@ import { Branch, ClassListItem, CreateTeacherAccountRequest, TeacherProfile, Tea
 import { TeachersService } from '../../core/teachers.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
+import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
+import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
 @Component({
   selector: 'app-teachers-page',
   imports: [
-    FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings,
+    FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings, TableDragScroll,
     NzAlertModule, NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule, NzTagModule, NzTooltipModule
   ],
@@ -45,9 +47,12 @@ import { PageHeader } from '../../shared/page-header';
       <app-column-settings #cols storageKey="hs-cols-teachers" [columns]="COLUMNS" />
     </div>
 
-    <nz-table #table [nzData]="teachers()" [nzLoading]="loading()" [nzFrontPagination]="false"
+    <nz-table #table appTableDragScroll [nzData]="teachers()" [nzLoading]="loading()" [nzFrontPagination]="false"
       [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
-      (nzPageIndexChange)="page.set($event); load()">
+      nzShowSizeChanger [nzPageSizeOptions]="PAGE_SIZE_OPTIONS"
+      (nzPageIndexChange)="page.set($event); load()"
+      (nzPageSizeChange)="pageSize.set($event); page.set(1); load()"
+      [nzScroll]="{ x: '1080px', y: scrollY }">
       <thead><tr>
         <th nzWidth="44px" nzShowCheckbox [nzChecked]="allChecked()" [nzIndeterminate]="someChecked()"
             (nzCheckedChange)="checkAll($event)" nz-tooltip nzTooltipTitle="Chọn GV chưa có tài khoản"></th>
@@ -236,6 +241,8 @@ export class TeachersPage {
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
   protected readonly total = signal(0);
+  protected readonly PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
+  protected readonly scrollY = TABLE_SCROLL_Y;
   protected search = '';
 
   // Cột cấu hình được (ngoài STT & Thao tác cố định).

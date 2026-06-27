@@ -37,11 +37,13 @@ import { TeachersService } from '../../core/teachers.service';
 import { ClassFormModal } from './class-form-modal';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
+import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
+import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
 @Component({
   selector: 'app-classes-page',
   imports: [
-    DecimalPipe, FormsModule, RouterLink, PageHeader, ClassFormModal, ColumnSettings,
+    DecimalPipe, FormsModule, RouterLink, PageHeader, ClassFormModal, ColumnSettings, TableDragScroll,
     NzButtonModule, NzCardModule, NzEmptyModule, NzFormModule, NzIconModule,
     NzInputModule, NzInputNumberModule, NzModalModule, NzPaginationModule, NzPopconfirmModule, NzSelectModule,
     NzTableModule, NzTabsModule, NzTagModule, NzTooltipModule, NzUploadModule
@@ -107,9 +109,12 @@ import { PageHeader } from '../../shared/page-header';
               (nzPageIndexChange)="page.set($event); loadClasses()" />
           </div>
         } @else {
-          <nz-table #classTable [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
+          <nz-table #classTable appTableDragScroll [nzData]="classes()" [nzLoading]="loading()" [nzFrontPagination]="false"
             [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
-            (nzPageIndexChange)="page.set($event); loadClasses()" [nzScroll]="{ x: '1180px' }">
+            nzShowSizeChanger [nzPageSizeOptions]="PAGE_SIZE_OPTIONS"
+            (nzPageIndexChange)="page.set($event); loadClasses()"
+            (nzPageSizeChange)="pageSize.set($event); page.set(1); loadClasses()"
+            [nzScroll]="{ x: '1180px', y: scrollY }">
             <thead>
               <tr>
                 <th nzWidth="64px" style="white-space: nowrap">STT</th>
@@ -377,6 +382,8 @@ export class ClassesPage {
   protected readonly total = signal(0);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
+  protected readonly PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
+  protected readonly scrollY = TABLE_SCROLL_Y;
 
   protected search = '';
   protected branchId: string | null = null;

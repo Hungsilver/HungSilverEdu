@@ -169,10 +169,11 @@ import { ThemeService } from '../core/theme.service';
     </nz-drawer>
   `,
   styles: `
-    .app-layout { min-height: 100vh; }
+    /* Khung full-height: trang KHÔNG cuộn ⇒ sider & header đứng yên, chỉ vùng nội dung cuộn */
+    .app-layout { height: 100vh; overflow: hidden; }
 
     .brand {
-      height: 64px; display: flex; align-items: center; gap: 10px;
+      height: 52px; display: flex; align-items: center; gap: 10px;
       padding: 0 20px; color: var(--hs-heading); font-weight: 700;
       font-size: 18px; letter-spacing: 0.3px;
     }
@@ -185,7 +186,12 @@ import { ThemeService } from '../core/theme.service';
     :host ::ng-deep .ant-layout-sider-collapsed .brand { padding: 0; justify-content: center; }
     :host ::ng-deep .ant-layout-sider-collapsed .brand-name { display: none; }
 
+    /* Sider full-height: brand cố định trên, menu tự cuộn khi dài (chừa chỗ nút thu gọn) */
+    :host ::ng-deep .app-sider .ant-layout-sider-children { display: flex; flex-direction: column; padding-bottom: 48px; }
+    .app-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
     .header {
+      height: 52px; line-height: 52px; flex: 0 0 auto;
       padding: 0 16px; display: flex; align-items: center; justify-content: space-between;
     }
     .header-right { display: flex; align-items: center; gap: 8px; }
@@ -194,7 +200,8 @@ import { ThemeService } from '../core/theme.service';
     .theme-toggle.active { color: #f59e0b; }
     .user { cursor: pointer; display: inline-flex; align-items: center; gap: 8px; color: var(--hs-text); }
 
-    .content { margin: 16px; padding: 20px; }
+    /* Vùng nội dung là phần cuộn duy nhất (min-height:0 để flex item cuộn được) */
+    .content { margin: 12px; padding: 16px; flex: 1; min-height: 0; overflow: auto; }
 
     @media (max-width: 575px) {
       .user-name { display: none; }
