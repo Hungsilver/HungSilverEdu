@@ -134,18 +134,17 @@ a {
   background: var(--hs-primary-weak);
 }
 
-/* Kéo (grab) để cuộn ngang bảng — directive appTableDragScroll */
-.hs-drag-scroll .ant-table-header,
-.hs-drag-scroll .ant-table-body,
-.hs-drag-scroll .ant-table-content {
+/* Kéo (grab) để cuộn ngang bảng — directive appTableDragScroll.
+   Chỉ gợi ý con trỏ "bàn tay" ở HEADER (kéo header để cuộn ngang); các DÒNG giữ
+   con trỏ bình thường (pointer nếu hàng bấm được). Khi đang kéo, cả bảng dùng "grabbing". */
+.hs-drag-scroll .ant-table-header {
   cursor: grab;
 }
 .hs-drag-scroll.hs-dragging {
+  cursor: grabbing;
   user-select: none;
 }
-.hs-drag-scroll.hs-dragging .ant-table-header,
-.hs-drag-scroll.hs-dragging .ant-table-body,
-.hs-drag-scroll.hs-dragging .ant-table-content {
+.hs-drag-scroll.hs-dragging .ant-table-header {
   cursor: grabbing;
 }
 

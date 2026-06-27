@@ -102,7 +102,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
         [nzPageSizeOptions]="PAGE_SIZE_OPTIONS"
         (nzPageIndexChange)="onPageChange($event)"
         (nzPageSizeChange)="pageSize.set($event); onPageChange(1)"
-        [nzScroll]="{ x: '760px', y: scrollY }">
+        [nzScroll]="{ x: '1080px', y: scrollY }">
         <thead>
           <tr>
             <th nzWidth="64px" style="white-space: nowrap">STT</th>
