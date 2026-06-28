@@ -22,18 +22,26 @@ import {
   CalendarOutline,
   CameraOutline,
   CheckOutline,
+  CloseCircleOutline,
   CloseOutline,
   CopyOutline,
   DashboardOutline,
   DeleteOutline,
+  DisconnectOutline,
   DollarOutline,
+  DownloadOutline,
   DownOutline,
   EditOutline,
   EyeOutline,
+  FallOutline,
   FileExcelOutline,
   FileTextOutline,
   GiftOutline,
+  HolderOutline,
   IdcardOutline,
+  InsertRowRightOutline,
+  KeyOutline,
+  LeftOutline,
   LineChartOutline,
   LinkOutline,
   LoadingOutline,
@@ -45,17 +53,25 @@ import {
   PlusOutline,
   ReadOutline,
   ReloadOutline,
+  RightOutline,
+  SafetyOutline,
   SaveOutline,
   ScheduleOutline,
+  SearchOutline,
   SettingOutline,
   ShoppingOutline,
   SolutionOutline,
   TeamOutline,
   TrophyOutline,
   UndoOutline,
+  UnlockOutline,
   UploadOutline,
+  UserAddOutline,
+  UserDeleteOutline,
   UserOutline,
-  WarningOutline
+  WarningOutline,
+  ZoomInOutline,
+  ZoomOutOutline
 } from '@ant-design/icons-angular/icons';
 import { provideNzConfig } from 'ng-zorro-antd/core/config';
 import { provideNzI18n, vi_VN } from 'ng-zorro-antd/i18n';
@@ -84,7 +100,12 @@ export const appConfig: ApplicationConfig = {
       MailOutline, CopyOutline, SaveOutline, CheckOutline, CloseOutline, MinusOutline,
       EyeOutline, AppstoreOutline, SettingOutline, MenuOutline, ArrowLeftOutline,
       ReloadOutline, GiftOutline, TrophyOutline, BulbOutline, CameraOutline, LoadingOutline,
-      BankOutline, ApartmentOutline, FileExcelOutline, UploadOutline
+      BankOutline, ApartmentOutline, FileExcelOutline, UploadOutline,
+      // Bổ sung icon đang dùng trong template nhưng chưa đăng ký (gây lỗi "<svg> tag not found"):
+      SearchOutline, UserAddOutline, DownloadOutline, KeyOutline, UnlockOutline,
+      DisconnectOutline, LeftOutline, RightOutline, SafetyOutline, HolderOutline,
+      InsertRowRightOutline, ZoomInOutline, ZoomOutOutline, UserDeleteOutline,
+      CloseCircleOutline, FallOutline
     ]),
     // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
     provideNzConfig({

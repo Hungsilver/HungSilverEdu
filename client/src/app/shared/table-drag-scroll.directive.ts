@@ -53,7 +53,10 @@ export class TableDragScroll {
     this.dragging = true;
     this.moved = false;
     this.pointerId = e.pointerId;
-    this.host.setPointerCapture?.(e.pointerId);
+    // KHÔNG setPointerCapture ở đây: khi một phần tử đang giữ pointer capture, trình duyệt
+    // đổi target của sự kiện 'click' kế tiếp sang chính phần tử đó (bảng) thay vì <tr>,
+    // khiến (click)="openDetail(...)" trên dòng KHÔNG bao giờ chạy. Chỉ chiếm con trỏ khi
+    // người dùng đã thực sự kéo (vượt ngưỡng) — xem onPointerMove.
   }
 
   @HostListener('pointermove', ['$event'])
@@ -61,8 +64,13 @@ export class TableDragScroll {
     if (!this.dragging || !this.scroller) return;
     const dx = e.clientX - this.startX;
     if (!this.moved && Math.abs(dx) <= 4) return; // ngưỡng để click vẫn là click
-    this.moved = true;
-    this.host.classList.add('hs-dragging');
+    if (!this.moved) {
+      // Bắt đầu kéo thật ⇒ giờ mới chiếm con trỏ để tiếp tục nhận pointermove kể cả khi
+      // rê ra ngoài bảng; cú click sinh ra sau đó sẽ bị nuốt trong endDrag().
+      this.moved = true;
+      this.host.classList.add('hs-dragging');
+      if (this.pointerId >= 0) this.host.setPointerCapture?.(this.pointerId);
+    }
     this.scroller.scrollLeft = this.startScrollLeft - dx;
     e.preventDefault();
   }
@@ -85,7 +93,9 @@ export class TableDragScroll {
     this.scroller = null;
     this.host.classList.remove('hs-dragging');
     if (this.pointerId >= 0) {
-      this.host.releasePointerCapture?.(this.pointerId);
+      // Chỉ nhả khi đang thực sự giữ capture (chỉ xảy ra khi đã kéo) — gọi release lúc
+      // không giữ sẽ ném InvalidPointerId trên cú click thường.
+      if (this.host.hasPointerCapture?.(this.pointerId)) this.host.releasePointerCapture(this.pointerId);
       this.pointerId = -1;
     }
     // Đã kéo ⇒ nuốt cú click kế tiếp để không mở modal chi tiết ngoài ý muốn.
