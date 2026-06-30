@@ -109,7 +109,7 @@ public sealed class ScheduleService(
         var slots = await context.ClassScheduleSlots.AsNoTracking()
             .Where(s => s.ClassId == classId)
             .OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime)
-            .Select(s => new ScheduleSlotDto(s.Id, s.ClassId, s.DayOfWeek, s.StartTime, s.EndTime))
+            .Select(s => new ScheduleSlotDto(s.Id, s.ClassId, (int)s.DayOfWeek, s.StartTime, s.EndTime))
             .ToListAsync(ct);
 
         return slots;
@@ -127,14 +127,14 @@ public sealed class ScheduleService(
         var slot = new ClassScheduleSlot
         {
             ClassId = request.ClassId,
-            DayOfWeek = request.DayOfWeek,
+            DayOfWeek = (DayOfWeek)request.DayOfWeek,
             StartTime = request.StartTime,
             EndTime = request.EndTime
         };
         context.ClassScheduleSlots.Add(slot);
         await context.SaveChangesAsync(ct);
 
-        return new ScheduleSlotDto(slot.Id, slot.ClassId, slot.DayOfWeek, slot.StartTime, slot.EndTime);
+        return new ScheduleSlotDto(slot.Id, slot.ClassId, (int)slot.DayOfWeek, slot.StartTime, slot.EndTime);
     }
 
     public async Task<Result> RemoveSlotAsync(Guid slotId, CancellationToken ct = default)

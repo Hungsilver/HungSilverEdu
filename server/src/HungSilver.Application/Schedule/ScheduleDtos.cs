@@ -27,13 +27,16 @@ public sealed record CalendarSessionDto(
 public sealed record ScheduleSlotDto(
     Guid Id,
     Guid ClassId,
-    DayOfWeek DayOfWeek,
+    // Thứ trong tuần dạng SỐ 0–6 (Chủ nhật=0 … Thứ 7=6), khớp Date.getDay() của JS và
+    // WEEKDAY_LABELS phía FE. KHÔNG để kiểu enum DayOfWeek vì JsonStringEnumConverter toàn cục
+    // sẽ serialize thành chuỗi ("Monday") làm FE tra WEEKDAY_LABELS[..] ra undefined (mất chữ Thứ).
+    int DayOfWeek,
     TimeOnly StartTime,
     TimeOnly EndTime);
 
 public sealed record CreateSlotRequest(
     Guid ClassId,
-    DayOfWeek DayOfWeek,
+    int DayOfWeek,
     TimeOnly StartTime,
     TimeOnly EndTime);
 
