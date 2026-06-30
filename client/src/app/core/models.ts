@@ -820,6 +820,28 @@ export interface StoredFile {
   url: string;
 }
 
+// ----------------- Tích hợp AI (Google Gemini) -----------------
+
+/** Trạng thái cấu hình API Key AI của tài khoản hiện tại — KHÔNG bao giờ chứa key thô. */
+export interface AiCredential {
+  hasKey: boolean;
+  maskedKey: string | null;
+  provider: string;
+  model: string | null;
+  lastValidatedAt: string | null;
+  isValid: boolean | null;
+}
+
+export interface SaveAiCredentialRequest {
+  apiKey: string;
+  model: string | null;
+}
+
+export interface ValidateAiKeyResult {
+  isValid: boolean;
+  message: string | null;
+}
+
 // ----------------- Học phí -----------------
 
 export interface TuitionInvoice {

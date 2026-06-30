@@ -115,6 +115,12 @@ public sealed class CurrentRelationCleanupService(AppDbContext context) : ICurre
             .ToListAsync(ct);
         foreach (var teacher in teachers)
             teacher.UserId = null;
+
+        // Cấu hình API Key AI là 1-1 theo tài khoản ⇒ xóa user thì dọn luôn (xóa mềm qua interceptor).
+        var aiCreds = await context.AiCredentials
+            .Where(c => c.UserId == userId)
+            .ToListAsync(ct);
+        context.AiCredentials.RemoveRange(aiCreds);
     }
 
     private void SoftDeleteEnrollments(IEnumerable<Domain.Entities.Enrollment> enrollments)

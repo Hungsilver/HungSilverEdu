@@ -1,6 +1,7 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Account;
 using HungSilver.Application.Accounts;
+using HungSilver.Application.AiCredentials;
 using HungSilver.Application.Assignments;
 using HungSilver.Application.Auth;
 using HungSilver.Application.Files;
@@ -20,6 +21,8 @@ using HungSilver.Application.Teachers;
 using HungSilver.Application.Tuition;
 using HungSilver.Application.Warnings;
 using HungSilver.Infrastructure.Accounts;
+using HungSilver.Infrastructure.Ai;
+using HungSilver.Infrastructure.AiCredentials;
 using HungSilver.Infrastructure.Assignments;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Classes;
@@ -38,16 +41,19 @@ using HungSilver.Infrastructure.Warnings;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.Infrastructure.Persistence.Interceptors;
 using HungSilver.Infrastructure.Persistence.Repositories;
+using HungSilver.Infrastructure.Security;
 using HungSilver.Infrastructure.Services;
 using HungSilver.Infrastructure.Settings;
 using HungSilver.Infrastructure.Storage;
 using HungSilver.Infrastructure.Students;
 using HungSilver.Infrastructure.Teachers;
 using HungSilver.Infrastructure.Users;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace HungSilver.Infrastructure;
 
@@ -60,6 +66,7 @@ public static class DependencyInjection
         services.Configure<AuthFeatureOptions>(configuration.GetSection(AuthFeatureOptions.SectionName));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
 
         services.AddSingleton<AuditSaveChangesInterceptor>();
 
@@ -102,6 +109,32 @@ public static class DependencyInjection
         services.AddScoped<SettingsService>();
         services.AddScoped<ISettingsService>(sp => sp.GetRequiredService<SettingsService>());
         services.AddScoped<ISettingsResolver>(sp => sp.GetRequiredService<SettingsService>());
+
+        // Tích hợp AI (Gemini) — cấu hình API Key theo tài khoản.
+        // Mã hóa key bằng Data Protection; persist khóa ra đĩa để giải mã được sau khi restart/redeploy.
+        // ⚠️ Mất thư mục khóa ⇒ mọi key đã lưu không giải mã được (user phải nhập lại). Mặc định để dưới
+        // FileStorage:RootPath (đi cùng volume uploads bền vững ở prod) — đổi qua config "DataProtection:KeysPath".
+        var dpKeysPath = configuration["DataProtection:KeysPath"];
+        if (string.IsNullOrWhiteSpace(dpKeysPath))
+        {
+            var storageRoot = configuration["FileStorage:RootPath"];
+            dpKeysPath = string.IsNullOrWhiteSpace(storageRoot) ? "dpkeys" : Path.Combine(storageRoot, "dpkeys");
+        }
+        Directory.CreateDirectory(dpKeysPath);
+        services.AddDataProtection()
+            .SetApplicationName("HungSilver")
+            .PersistKeysToFileSystem(new DirectoryInfo(dpKeysPath));
+
+        services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
+        services.AddHttpClient<IGeminiClient, GeminiClient>((sp, client) =>
+        {
+            var opt = sp.GetRequiredService<IOptions<GeminiOptions>>().Value;
+            client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<AiCredentialService>();
+        services.AddScoped<IAiCredentialService>(sp => sp.GetRequiredService<AiCredentialService>());
+        services.AddScoped<IAiCredentialResolver>(sp => sp.GetRequiredService<AiCredentialService>());
 
         // Service nghiệp vụ (Infrastructure)
         services.AddScoped<IClassService, ClassService>();

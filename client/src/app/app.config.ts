@@ -21,6 +21,7 @@ import {
   BulbOutline,
   CalendarOutline,
   CameraOutline,
+  CheckCircleOutline,
   CheckOutline,
   CloseCircleOutline,
   CloseOutline,
@@ -54,6 +55,7 @@ import {
   ReadOutline,
   ReloadOutline,
   RightOutline,
+  RobotOutline,
   SafetyOutline,
   SaveOutline,
   ScheduleOutline,
@@ -105,7 +107,7 @@ export const appConfig: ApplicationConfig = {
       SearchOutline, UserAddOutline, DownloadOutline, KeyOutline, UnlockOutline,
       DisconnectOutline, LeftOutline, RightOutline, SafetyOutline, HolderOutline,
       InsertRowRightOutline, ZoomInOutline, ZoomOutOutline, UserDeleteOutline,
-      CloseCircleOutline, FallOutline
+      CloseCircleOutline, FallOutline, RobotOutline, CheckCircleOutline
     ]),
     // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
     provideNzConfig({
