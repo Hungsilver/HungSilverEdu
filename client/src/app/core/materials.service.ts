@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialType, UpdateMaterialRequest
+  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialType, PagedResult, UpdateMaterialRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -24,6 +24,14 @@ export class MaterialsService {
     if (type) params = params.set('type', type);
     if (gradeBand) params = params.set('gradeBand', gradeBand);
     return this.http.get<Material[]>(`${this.apiUrl}/library`, { params });
+  }
+
+  /** Tài liệu theo Môn (lưới phân trang) — trục quản lý mới. */
+  getBySubject(subjectId: string, type: MaterialType | null, gradeBand: string | null, page: number, pageSize: number): Observable<PagedResult<Material>> {
+    let params = new HttpParams().set('subjectId', subjectId).set('page', page).set('pageSize', pageSize);
+    if (type) params = params.set('type', type);
+    if (gradeBand) params = params.set('gradeBand', gradeBand);
+    return this.http.get<PagedResult<Material>>(`${this.apiUrl}/by-subject`, { params });
   }
 
   create(request: CreateMaterialRequest): Observable<Material> {

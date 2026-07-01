@@ -7,6 +7,8 @@ public sealed record MaterialDto(
     Guid? ClassId,
     Guid? CategoryId,
     string? CategoryName,
+    Guid? SubjectId,
+    string? SubjectName,
     string? GradeBand,
     string Title,
     MaterialType Type,
@@ -20,6 +22,7 @@ public sealed record MaterialDto(
 public sealed record CreateMaterialRequest(
     Guid? ClassId,
     Guid? CategoryId,
+    Guid? SubjectId,
     string? GradeBand,
     string Title,
     MaterialType Type,
@@ -30,6 +33,7 @@ public sealed record CreateMaterialRequest(
 
 public sealed record UpdateMaterialRequest(
     Guid? CategoryId,
+    Guid? SubjectId,
     string? GradeBand,
     string Title,
     MaterialType Type,

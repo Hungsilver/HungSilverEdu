@@ -43,6 +43,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<PointReason> PointReasons => Set<PointReason>();
     public DbSet<UserAiCredential> AiCredentials => Set<UserAiCredential>();
 
+    // Đề trắc nghiệm AI (sinh từ tài liệu) — Pha 1.
+    public DbSet<Exam> Exams => Set<Exam>();
+    public DbSet<ExamQuestionGroup> ExamQuestionGroups => Set<ExamQuestionGroup>();
+    public DbSet<ExamQuestion> ExamQuestions => Set<ExamQuestion>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

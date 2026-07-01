@@ -2,6 +2,7 @@ using HungSilver.Application.Abstractions;
 using HungSilver.Application.AiCredentials;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
+using HungSilver.Infrastructure.Ai;
 using HungSilver.Infrastructure.AiCredentials;
 using HungSilver.Infrastructure.Persistence;
 using HungSilver.Infrastructure.Persistence.Interceptors;
@@ -43,7 +44,8 @@ public sealed class AiCredentialServiceTests : IDisposable
             new UnitOfWork(_context),
             new ReversibleProtector(),
             _gemini,
-            new SaveAiCredentialRequestValidator());
+            new SaveAiCredentialRequestValidator(),
+            Microsoft.Extensions.Options.Options.Create(new GeminiOptions()));
     }
 
     public void Dispose()
@@ -150,5 +152,7 @@ public sealed class AiCredentialServiceTests : IDisposable
     {
         public Result NextResult { get; set; } = Result.Success();
         public Task<Result> ValidateKeyAsync(string apiKey, CancellationToken ct = default) => Task.FromResult(NextResult);
+        public Task<Result<string>> GenerateContentAsync(GeminiContentRequest request, CancellationToken ct = default)
+            => Task.FromResult(Result.Failure<string>(Error.Failure("Ai.NotUsed", "Không dùng trong test này.")));
     }
 }

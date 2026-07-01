@@ -1,6 +1,7 @@
 using FluentValidation;
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
+using HungSilver.Application.Common.Models;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
 using HungSilver.Domain.Enums;
@@ -11,6 +12,7 @@ public interface IMaterialService
 {
     Task<Result<List<MaterialDto>>> GetByClassAsync(Guid classId, CancellationToken ct = default);
     Task<Result<List<MaterialDto>>> GetLibraryAsync(Guid? categoryId, MaterialType? type, string? gradeBand, CancellationToken ct = default);
+    Task<Result<PagedResult<MaterialDto>>> GetPagedBySubjectAsync(Guid subjectId, MaterialType? type, string? gradeBand, PagedRequest paging, CancellationToken ct = default);
     Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default);
     Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
@@ -19,6 +21,7 @@ public interface IMaterialService
 public sealed class MaterialService(
     IRepository<LearningMaterial> materials,
     IRepository<MaterialCategory> categories,
+    IRepository<Subject> subjects,
     IClassAccessGuard accessGuard,
     ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork,
@@ -52,6 +55,19 @@ public sealed class MaterialService(
         return items.OrderByDescending(m => m.CreatedAt).Select(m => ToDto(m, Lookup(names, m.CategoryId))).ToList();
     }
 
+    /// <summary>Tài liệu theo Môn (trục quản lý mới) — lưới phân trang server-side, lọc theo loại/khối.</summary>
+    public async Task<Result<PagedResult<MaterialDto>>> GetPagedBySubjectAsync(
+        Guid subjectId, MaterialType? type, string? gradeBand, PagedRequest paging, CancellationToken ct = default)
+    {
+        var band = string.IsNullOrWhiteSpace(gradeBand) ? null : gradeBand.Trim();
+        var paged = await materials.GetPagedAsync(paging.Page, paging.PageSize,
+            m => m.SubjectId == subjectId
+                 && (type == null || m.Type == type)
+                 && (band == null || m.GradeBand == band), ct: ct);
+        var names = await LoadCategoryNamesAsync(paged.Items, ct);
+        return paged.Map(m => ToDto(m, Lookup(names, m.CategoryId)));
+    }
+
     public async Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default)
     {
         var validation = await createValidator.ValidateAsync(request, ct);
@@ -66,10 +82,15 @@ public sealed class MaterialService(
                 return Result.Failure<MaterialDto>(access.Error);
         }
 
+        var subjectId = Normalize(request.SubjectId);
+        var subjectName = await SubjectNameAsync(subjectId, ct);
+
         var material = new LearningMaterial
         {
             ClassId = classId,
             CategoryId = Normalize(request.CategoryId),
+            SubjectId = subjectId,
+            SubjectName = subjectName,
             GradeBand = CleanBand(request.GradeBand),
             Title = request.Title.Trim(),
             Type = request.Type,
@@ -109,6 +130,8 @@ public sealed class MaterialService(
         }
 
         material.CategoryId = Normalize(request.CategoryId);
+        material.SubjectId = Normalize(request.SubjectId);
+        material.SubjectName = await SubjectNameAsync(material.SubjectId, ct);
         material.GradeBand = CleanBand(request.GradeBand);
         material.Title = request.Title.Trim();
         material.Type = request.Type;
@@ -156,6 +179,9 @@ public sealed class MaterialService(
     private async Task<string?> CategoryNameAsync(Guid? categoryId, CancellationToken ct) =>
         categoryId is null ? null : (await categories.GetByIdAsync(categoryId.Value, ct: ct))?.Name;
 
+    private async Task<string?> SubjectNameAsync(Guid? subjectId, CancellationToken ct) =>
+        subjectId is null ? null : (await subjects.GetByIdAsync(subjectId.Value, ct: ct))?.Name;
+
     private static string? Lookup(Dictionary<Guid, string> map, Guid? id) =>
         id.HasValue && map.TryGetValue(id.Value, out var name) ? name : null;
 
@@ -164,7 +190,7 @@ public sealed class MaterialService(
         var downloadUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
-        return new MaterialDto(m.Id, m.ClassId, m.CategoryId, categoryName, m.GradeBand, m.Title, m.Type, m.Source,
-            m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAt);
+        return new MaterialDto(m.Id, m.ClassId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
+            m.Title, m.Type, m.Source, m.Url, m.StoredFileId, m.Description, downloadUrl, m.CreatedAt);
     }
 }

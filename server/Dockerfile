@@ -7,8 +7,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 # tzdata để DateTime.Now lấy đúng giờ local (app chạy theo giờ VPS, không dùng UTC).
 # Múi giờ thực tế đặt qua biến môi trường TZ (xem docker-compose*.yml), mặc định VN.
+# libreoffice-writer: chuyển Word (.docx) → PDF cho tính năng "Tạo đề bằng AI" (Gemini đọc PDF bằng vision).
+# fonts-liberation + fonts-noto-core: thay Times/Arial + phủ tiếng Việt khi render PDF (giữ đúng chữ có dấu).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tzdata \
+    && apt-get install -y --no-install-recommends tzdata libreoffice-writer fonts-liberation fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 ENV TZ=Asia/Ho_Chi_Minh
 COPY --from=build /app/publish .

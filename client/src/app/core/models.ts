@@ -956,6 +956,8 @@ export interface Material {
   classId: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
   gradeBand: string | null;
   title: string;
   type: MaterialType;
@@ -970,6 +972,7 @@ export interface Material {
 export interface CreateMaterialRequest {
   classId: string | null;
   categoryId: string | null;
+  subjectId: string | null;
   gradeBand: string | null;
   title: string;
   type: MaterialType;
@@ -981,6 +984,7 @@ export interface CreateMaterialRequest {
 
 export interface UpdateMaterialRequest {
   categoryId: string | null;
+  subjectId: string | null;
   gradeBand: string | null;
   title: string;
   type: MaterialType;
@@ -1173,6 +1177,121 @@ export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
   [MaterialType.Test]: 'Đề kiểm tra',
   [MaterialType.Homework]: 'Bài tập'
 };
+
+// ----------------- Đề trắc nghiệm AI -----------------
+
+export type ExamQuestionType = 'SingleChoice' | 'TrueFalse' | 'FillBlank' | 'Matching';
+export type ExamStatus = 'Draft' | 'Published';
+export type ExamGenSource = 'Extracted' | 'Generated' | 'Manual';
+export type ExamGenerationMode = 'Extract' | 'Generate';
+
+export const EXAM_TYPE_LABELS: Record<ExamQuestionType, string> = {
+  SingleChoice: 'Trắc nghiệm',
+  TrueFalse: 'Đúng/Sai',
+  FillBlank: 'Điền từ',
+  Matching: 'Nối cột'
+};
+
+export const EXAM_STATUS_LABELS: Record<ExamStatus, string> = {
+  Draft: 'Nháp',
+  Published: 'Đã phát hành'
+};
+
+export interface ExamListItem {
+  id: string;
+  materialId: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  title: string;
+  gradeBand: string | null;
+  durationMinutes: number;
+  totalPoints: number;
+  status: ExamStatus;
+  source: ExamGenSource;
+  questionCount: number;
+  createdAt: string;
+}
+
+export interface ExamGroup {
+  id: string;
+  orderNo: number;
+  section: string | null;
+  exerciseLabel: string | null;
+  instruction: string | null;
+  passage: string | null;
+}
+
+export interface ExamQuestion {
+  id: string;
+  groupId: string | null;
+  orderNo: number;
+  sourceNumber: number | null;
+  type: ExamQuestionType;
+  stem: string;
+  optionsJson: string | null;
+  answerJson: string;
+  explanation: string | null;
+  points: number;
+}
+
+export interface ExamDetail {
+  id: string;
+  materialId: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  title: string;
+  description: string | null;
+  gradeBand: string | null;
+  durationMinutes: number;
+  totalPoints: number;
+  status: ExamStatus;
+  source: ExamGenSource;
+  sourceFileUrl: string | null;
+  groups: ExamGroup[];
+  questions: ExamQuestion[];
+  createdAt: string;
+}
+
+export interface GenerateExamRequest {
+  mode: ExamGenerationMode;
+  title: string | null;
+  durationMinutes: number | null;
+  maxQuestions: number | null;
+  difficulty: string | null;
+  instructions: string | null;
+  verify: boolean;
+}
+
+export interface ExamGenerationResult {
+  examId: string;
+  questionCount: number;
+  droppedCount: number;
+  warnings: string[];
+}
+
+export interface UpdateExamRequest {
+  title: string;
+  description: string | null;
+  gradeBand: string | null;
+  durationMinutes: number;
+}
+
+export interface ExamOption { key: string; text: string; }
+export interface ExamPair { left: string; right: string; }
+
+export interface UpsertQuestionRequest {
+  groupId: string | null;
+  type: ExamQuestionType;
+  stem: string;
+  options: ExamOption[] | null;
+  optionsRight: ExamOption[] | null;
+  answerKey: string | null;
+  answerBlanks: string[] | null;
+  wordBox: string[] | null;
+  answerPairs: ExamPair[] | null;
+  explanation: string | null;
+  points: number | null;
+}
 
 // ----------------- Đánh giá tháng + Bảng vàng -----------------
 

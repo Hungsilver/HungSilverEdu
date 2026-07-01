@@ -4,6 +4,7 @@ using HungSilver.Application.Accounts;
 using HungSilver.Application.AiCredentials;
 using HungSilver.Application.Assignments;
 using HungSilver.Application.Auth;
+using HungSilver.Application.Exams;
 using HungSilver.Application.Files;
 using HungSilver.Application.Common;
 using HungSilver.Application.Settings;
@@ -23,6 +24,8 @@ using HungSilver.Application.Warnings;
 using HungSilver.Infrastructure.Accounts;
 using HungSilver.Infrastructure.Ai;
 using HungSilver.Infrastructure.AiCredentials;
+using HungSilver.Infrastructure.Documents;
+using HungSilver.Infrastructure.Exams;
 using HungSilver.Infrastructure.Assignments;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Classes;
@@ -67,6 +70,7 @@ public static class DependencyInjection
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
         services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.Configure<DocumentConversionOptions>(configuration.GetSection(DocumentConversionOptions.SectionName));
 
         services.AddSingleton<AuditSaveChangesInterceptor>();
 
@@ -130,11 +134,17 @@ public static class DependencyInjection
         {
             var opt = sp.GetRequiredService<IOptions<GeminiOptions>>().Value;
             client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
-            client.Timeout = TimeSpan.FromSeconds(15);
+            // Timeout điều khiển theo từng lệnh (CTS) trong GeminiClient: validate ~20s, generate ~120s.
+            client.Timeout = Timeout.InfiniteTimeSpan;
         });
         services.AddScoped<AiCredentialService>();
         services.AddScoped<IAiCredentialService>(sp => sp.GetRequiredService<AiCredentialService>());
         services.AddScoped<IAiCredentialResolver>(sp => sp.GetRequiredService<AiCredentialService>());
+
+        // Sinh đề bằng AI: chuẩn hóa tài liệu → PDF (LibreOffice) → Gemini vision → kiểm chứng 3 lớp.
+        services.AddScoped<IDocumentToPdfConverter, LibreOfficeDocumentConverter>();
+        services.AddScoped<IExamSourceProvider, ExamSourceProvider>();
+        services.AddScoped<IExamGenerationService, ExamGenerationService>();
 
         // Service nghiệp vụ (Infrastructure)
         services.AddScoped<IClassService, ClassService>();

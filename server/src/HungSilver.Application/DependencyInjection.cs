@@ -1,6 +1,7 @@
 using FluentValidation;
 using HungSilver.Application.Branches;
 using HungSilver.Application.Common;
+using HungSilver.Application.Exams;
 using HungSilver.Application.Grades;
 using HungSilver.Application.Journals;
 using HungSilver.Application.Materials;
@@ -23,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<ITeacherJournalService, TeacherJournalService>();
         services.AddScoped<IMaterialService, MaterialService>();
         services.AddScoped<IMaterialCategoryService, MaterialCategoryService>();
+        services.AddScoped<IExamService, ExamService>();
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<IBranchService, BranchService>();
         services.AddScoped<IGradeService, GradeService>();

@@ -203,6 +203,7 @@ public sealed class CurrentRelationCleanupTests : IDisposable
         new(
             new Repository<LearningMaterial>(_context),
             new Repository<MaterialCategory>(_context),
+            new Repository<Subject>(_context),
             new AdminGuard(),
             _cleanup,
             new UnitOfWork(_context),

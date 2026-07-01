@@ -1,3 +1,4 @@
+using HungSilver.Application.Common.Models;
 using HungSilver.Application.Materials;
 using HungSilver.Domain.Enums;
 using HungSilver.WebApi.Common;
@@ -20,6 +21,13 @@ public class MaterialsController(IMaterialService materialService) : ControllerB
     public async Task<ActionResult<List<MaterialDto>>> GetLibrary(
         [FromQuery] Guid? categoryId, [FromQuery] MaterialType? type, [FromQuery] string? gradeBand, CancellationToken ct) =>
         (await materialService.GetLibraryAsync(categoryId, type, gradeBand, ct)).ToActionResult();
+
+    /// <summary>Tài liệu theo Môn học (lưới phân trang) — trục quản lý mới của Kho tài liệu.</summary>
+    [HttpGet("by-subject")]
+    public async Task<ActionResult<PagedResult<MaterialDto>>> GetBySubject(
+        [FromQuery] Guid subjectId, [FromQuery] MaterialType? type, [FromQuery] string? gradeBand,
+        [FromQuery] PagedRequest paging, CancellationToken ct) =>
+        (await materialService.GetPagedBySubjectAsync(subjectId, type, gradeBand, paging, ct)).ToActionResult();
 
     [HttpPost]
     public async Task<ActionResult<MaterialDto>> Create(CreateMaterialRequest request, CancellationToken ct) =>

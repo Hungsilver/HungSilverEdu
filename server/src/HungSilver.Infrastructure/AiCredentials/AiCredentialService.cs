@@ -4,6 +4,8 @@ using HungSilver.Application.AiCredentials;
 using HungSilver.Application.Common;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
+using HungSilver.Infrastructure.Ai;
+using Microsoft.Extensions.Options;
 
 namespace HungSilver.Infrastructure.AiCredentials;
 
@@ -16,7 +18,8 @@ public sealed class AiCredentialService(
     IUnitOfWork unitOfWork,
     ISecretProtector protector,
     IGeminiClient gemini,
-    IValidator<SaveAiCredentialRequest> saveValidator) : IAiCredentialService, IAiCredentialResolver
+    IValidator<SaveAiCredentialRequest> saveValidator,
+    IOptions<GeminiOptions> geminiOptions) : IAiCredentialService, IAiCredentialResolver
 {
     private const string GeminiProvider = "Gemini";
     private static readonly Error NotConfigured =
@@ -82,6 +85,16 @@ public sealed class AiCredentialService(
         var cred = await FindAsync(userId, ct);
         if (cred is null) return Result.Failure<string>(NotConfigured);
         return protector.Unprotect(cred.ApiKeyEncrypted);
+    }
+
+    public async Task<Result<ResolvedAiCredential>> ResolveForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var cred = await FindAsync(userId, ct);
+        if (cred is null) return Result.Failure<ResolvedAiCredential>(NotConfigured);
+
+        var apiKey = protector.Unprotect(cred.ApiKeyEncrypted);
+        var model = string.IsNullOrWhiteSpace(cred.Model) ? geminiOptions.Value.DefaultModel : cred.Model!.Trim();
+        return new ResolvedAiCredential(apiKey, model);
     }
 
     private async Task<UserAiCredential?> FindAsync(Guid userId, CancellationToken ct)

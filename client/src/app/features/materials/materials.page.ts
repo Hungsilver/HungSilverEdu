@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
@@ -10,6 +11,7 @@ import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule } from 'ng-zorro-antd/modal';
+import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzSelectModule } from 'ng-zorro-antd/select';
@@ -23,10 +25,11 @@ import { FilesService } from '../../core/files.service';
 import { MaterialsService } from '../../core/materials.service';
 import {
   ClassListItem, CreateMaterialRequest, FileStorageMode, Material, MaterialCategory, MaterialSource,
-  MaterialType, MATERIAL_TYPE_LABELS
+  MaterialType, MATERIAL_TYPE_LABELS, Subject
 } from '../../core/models';
 import { ScreenService } from '../../core/screen.service';
 import { SettingsService } from '../../core/settings.service';
+import { SubjectsService } from '../../core/subjects.service';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
@@ -34,12 +37,13 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, ReactiveFormsModule,
     NzTableModule, NzButtonModule, NzCardModule, NzIconModule, NzTagModule, NzSelectModule, NzRadioModule, NzInputNumberModule,
-    NzModalModule, NzFormModule, NzInputModule, NzPopconfirmModule, NzTooltipModule, NzUploadModule, PageHeader
+    NzModalModule, NzPaginationModule, NzFormModule, NzInputModule, NzPopconfirmModule, NzTooltipModule, NzUploadModule, PageHeader
   ],
   template: `
     <app-page-header title="Kho tài liệu" subtitle="Học liệu theo lớp hoặc thư viện chung theo danh mục" icon="link">
       <div class="actions">
         <nz-radio-group [(ngModel)]="mode" (ngModelChange)="onModeChange()" nzButtonStyle="solid">
+          <label nz-radio-button nzValue="subject">Theo môn</label>
           <label nz-radio-button nzValue="class">Theo lớp</label>
           <label nz-radio-button nzValue="library">Thư viện</label>
         </nz-radio-group>
@@ -50,7 +54,17 @@ import { PageHeader } from '../../shared/page-header';
     </app-page-header>
 
     <div class="filters">
-      @if (mode === 'class') {
+      @if (mode === 'subject') {
+        <nz-select class="cls" nzShowSearch nzPlaceHolder="Chọn môn học" [(ngModel)]="subjectId" (ngModelChange)="onSubjectChange()">
+          @for (s of subjects(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="s.name" /> }
+        </nz-select>
+        <nz-select class="cls" nzAllowClear nzPlaceHolder="Tất cả loại" [(ngModel)]="libType" (ngModelChange)="loadMaterials()">
+          @for (t of types; track t) { <nz-option [nzValue]="t" [nzLabel]="typeLabels[t]" /> }
+        </nz-select>
+        <nz-select class="cls" nzAllowClear nzShowSearch nzPlaceHolder="Tất cả khối" [(ngModel)]="libGradeBand" (ngModelChange)="loadMaterials()">
+          @for (b of gradeBands(); track b) { <nz-option [nzValue]="b" [nzLabel]="b" /> }
+        </nz-select>
+      } @else if (mode === 'class') {
         <nz-select class="cls" nzShowSearch nzPlaceHolder="Chọn lớp" [(ngModel)]="classId" (ngModelChange)="loadMaterials()">
           @for (c of classes(); track c.id) { <nz-option [nzValue]="c.id" [nzLabel]="c.name" /> }
         </nz-select>
@@ -65,12 +79,12 @@ import { PageHeader } from '../../shared/page-header';
           @for (b of gradeBands(); track b) { <nz-option [nzValue]="b" [nzLabel]="b" /> }
         </nz-select>
       }
-      <button nz-button nzType="primary" [disabled]="mode === 'class' && !classId" (click)="openCreate()">
+      <button nz-button nzType="primary" [disabled]="(mode === 'class' && !classId) || (mode === 'subject' && !subjectId)" (click)="openCreate()">
         <nz-icon nzType="plus" /> Thêm tài liệu
       </button>
     </div>
 
-    @if (mode === 'library' || classId) {
+    @if (mode === 'library' || (mode === 'class' && classId) || (mode === 'subject' && subjectId)) {
       @if (screen.isMobile()) {
         <div class="mobile-card-list">
           @for (m of materials(); track m.id) {
@@ -84,6 +98,7 @@ import { PageHeader } from '../../shared/page-header';
               <div class="card-field"><span class="label">Mô tả</span><span>{{ m.description || '—' }}</span></div>
               <div class="card-actions">
                 <button nz-button nzSize="small" (click)="openMaterial(m)"><nz-icon nzType="eye" /> Mở</button>
+                <button nz-button nzSize="small" nzType="primary" (click)="openExams(m)"><nz-icon nzType="file-text" /> Đề</button>
                 <button nz-button nzSize="small" nz-tooltip nzTooltipTitle="Sửa tài liệu" aria-label="Sửa tài liệu" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
                 <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa tài liệu" aria-label="Xóa tài liệu" nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
               </div>
@@ -103,6 +118,7 @@ import { PageHeader } from '../../shared/page-header';
                 <td>{{ m.description || '—' }}</td>
                 <td nzRight>
                   <button nz-button nzType="link" nzSize="small" (click)="openMaterial(m)"><nz-icon nzType="eye" /> Mở</button>
+                  <button nz-button nzType="link" nzSize="small" (click)="openExams(m)"><nz-icon nzType="file-text" /> Đề</button>
                   <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa tài liệu" aria-label="Sửa tài liệu" (click)="openEdit(m)"><nz-icon nzType="edit" /></button>
                   <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa tài liệu" aria-label="Xóa tài liệu"
                           nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="remove(m)"><nz-icon nzType="delete" /></button>
@@ -112,8 +128,12 @@ import { PageHeader } from '../../shared/page-header';
           </tbody>
         </nz-table>
       }
+      @if (mode === 'subject' && subjectTotal() > subjectPageSize) {
+        <nz-pagination class="pager" [nzPageIndex]="subjectPage()" [nzPageSize]="subjectPageSize"
+          [nzTotal]="subjectTotal()" (nzPageIndexChange)="onSubjectPage($event)" />
+      }
     } @else {
-      <p class="muted">Chọn một lớp để xem kho tài liệu.</p>
+      <p class="muted">Chọn môn học hoặc lớp để xem tài liệu.</p>
     }
 
     <!-- Modal thêm/sửa học liệu -->
@@ -212,8 +232,10 @@ export class MaterialsPage {
   protected readonly screen = inject(ScreenService);
   private readonly materialsService = inject(MaterialsService);
   private readonly classesService = inject(ClassesService);
+  private readonly subjectsService = inject(SubjectsService);
   private readonly filesService = inject(FilesService);
   private readonly settingsService = inject(SettingsService);
+  private readonly router = inject(Router);
   private readonly message = inject(NzMessageService);
   protected readonly canManage = computed(() => this.auth.isAdmin() || this.auth.isTeacher());
 
@@ -223,16 +245,22 @@ export class MaterialsPage {
 
   protected readonly classes = signal<ClassListItem[]>([]);
   protected readonly categories = signal<MaterialCategory[]>([]);
+  protected readonly subjects = signal<Subject[]>([]);
   protected readonly materials = signal<Material[]>([]);
   protected readonly gradeBands = signal<string[]>([]);
   protected readonly loading = signal(false);
   protected readonly serverUploadAllowed = signal(false);
 
-  protected mode: 'class' | 'library' = 'class';
+  protected mode: 'subject' | 'class' | 'library' = 'subject';
   protected classId: string | null = null;
+  protected subjectId: string | null = null;
   protected libCategoryId: string | null = null;
   protected libType: MaterialType | null = null;
   protected libGradeBand: string | null = null;
+
+  protected readonly subjectPageSize = 20;
+  protected readonly subjectPage = signal(1);
+  protected readonly subjectTotal = signal(0);
 
   protected readonly modalOpen = signal(false);
   protected readonly saving = signal(false);
@@ -258,6 +286,7 @@ export class MaterialsPage {
 
   constructor() {
     this.classesService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.classes.set(r.items));
+    this.subjectsService.getAll().subscribe(s => this.subjects.set(s));
     this.materialsService.getCategories().subscribe(c => this.categories.set(c));
     this.settingsService.getEffective().subscribe(s => {
       this.serverUploadAllowed.set(s.values['FileStorage.Mode'] === FileStorageMode.Server);
@@ -268,10 +297,35 @@ export class MaterialsPage {
 
   protected onModeChange(): void {
     this.materials.set([]);
+    this.subjectPage.set(1);
     this.loadMaterials();
   }
 
+  protected onSubjectChange(): void {
+    this.subjectPage.set(1);
+    this.loadMaterials();
+  }
+
+  protected onSubjectPage(page: number): void {
+    this.subjectPage.set(page);
+    this.loadMaterials();
+  }
+
+  /** Mở danh sách đề của tài liệu này (sinh đề bằng AI). */
+  protected openExams(m: Material): void {
+    this.router.navigate(['/materials', m.id, 'exams'], { queryParams: { title: m.title } });
+  }
+
   protected loadMaterials(): void {
+    if (this.mode === 'subject') {
+      if (!this.subjectId) { this.materials.set([]); return; }
+      this.loading.set(true);
+      this.materialsService.getBySubject(this.subjectId, this.libType, this.libGradeBand, this.subjectPage(), this.subjectPageSize).subscribe({
+        next: r => { this.materials.set(r.items); this.subjectTotal.set(r.totalCount); this.loading.set(false); },
+        error: () => this.loading.set(false)
+      });
+      return;
+    }
     if (this.mode === 'class') {
       if (!this.classId) return;
       this.loading.set(true);
@@ -341,6 +395,7 @@ export class MaterialsPage {
 
     const body = {
       categoryId: v.categoryId,
+      subjectId: this.editing() ? this.editing()!.subjectId : (this.mode === 'subject' ? this.subjectId : null),
       gradeBand: v.gradeBand,
       title: v.title, type: v.type, source: v.source,
       url: v.source === MaterialSource.ExternalUrl ? v.url : null,

@@ -117,6 +117,18 @@ export const routes: Routes = [
         loadComponent: () => import('./features/materials/materials.page').then(m => m.MaterialsPage)
       },
       {
+        path: 'materials/:materialId/exams',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/exams/exam-list.page').then(m => m.ExamListPage)
+      },
+      {
+        path: 'exams/:id',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/exams/exam-detail.page').then(m => m.ExamDetailPage)
+      },
+      {
         path: 'notifications',
         canActivate: [roleGuard],
         data: teacherOrAdmin,
