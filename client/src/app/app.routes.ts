@@ -129,6 +129,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/exams/exam-detail.page').then(m => m.ExamDetailPage)
       },
       {
+        path: 'exams/assignments/:assignmentId/report',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/exams/exam-report.page').then(m => m.ExamReportPage)
+      },
+      {
         path: 'notifications',
         canActivate: [roleGuard],
         data: teacherOrAdmin,
@@ -151,6 +157,18 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { roles: [ROLE_USER] },
         loadComponent: () => import('./features/portal/portal.page').then(m => m.PortalPage)
+      },
+      {
+        path: 'portal/exams/:assignmentId',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_USER] },
+        loadComponent: () => import('./features/portal/exam-take.page').then(m => m.ExamTakePage)
+      },
+      {
+        path: 'portal/attempts/:attemptId/review',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_USER] },
+        loadComponent: () => import('./features/portal/exam-review.page').then(m => m.ExamReviewPage)
       }
     ]
   },

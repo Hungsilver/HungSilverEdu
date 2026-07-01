@@ -48,6 +48,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ExamQuestionGroup> ExamQuestionGroups => Set<ExamQuestionGroup>();
     public DbSet<ExamQuestion> ExamQuestions => Set<ExamQuestion>();
 
+    // Giao đề + làm bài + tự chấm — Pha 2.
+    public DbSet<ExamAssignment> ExamAssignments => Set<ExamAssignment>();
+    public DbSet<ExamAttempt> ExamAttempts => Set<ExamAttempt>();
+    public DbSet<ExamAttemptAnswer> ExamAttemptAnswers => Set<ExamAttemptAnswer>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

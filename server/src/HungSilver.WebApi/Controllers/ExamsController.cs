@@ -18,6 +18,8 @@ namespace HungSilver.WebApi.Controllers;
 public class ExamsController(
     IExamService service,
     IExamGenerationService generation,
+    IExamAssignmentService assignments,
+    IExamReportService reports,
     ICurrentUser currentUser) : ControllerBase
 {
     /// <summary>Sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả về đề nháp + cảnh báo kiểm chứng.</summary>
@@ -66,6 +68,26 @@ public class ExamsController(
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct) =>
         (await service.DeleteAsync(id, ct)).ToActionResult();
+
+    // ---- Giao đề cho lớp (Pha 2) ----
+
+    /// <summary>Giao đề (đã phát hành) cho một lớp, hẹn giờ (trên lớp / về nhà).</summary>
+    [HttpPost("{examId:guid}/assign")]
+    public async Task<ActionResult<ExamAssignmentDto>> Assign(Guid examId, AssignExamRequest request, CancellationToken ct) =>
+        (await assignments.AssignAsync(examId, request, ct)).ToActionResult();
+
+    [HttpGet("{examId:guid}/assignments")]
+    public async Task<ActionResult<List<ExamAssignmentDto>>> Assignments(Guid examId, CancellationToken ct) =>
+        (await assignments.ListByExamAsync(examId, ct)).ToActionResult();
+
+    [HttpPost("assignments/{assignmentId:guid}/close")]
+    public async Task<ActionResult> CloseAssignment(Guid assignmentId, CancellationToken ct) =>
+        (await assignments.CloseAsync(assignmentId, ct)).ToActionResult();
+
+    /// <summary>Báo cáo trực quan một lượt giao đề (per-student, TB lớp, phân bố điểm, item analysis).</summary>
+    [HttpGet("assignments/{assignmentId:guid}/report")]
+    public async Task<ActionResult<ExamReportDto>> Report(Guid assignmentId, CancellationToken ct) =>
+        (await reports.GetReportAsync(assignmentId, ct)).ToActionResult();
 
     private Guid UserId => currentUser.UserId ?? throw new InvalidOperationException("Thiếu user hiện tại.");
 }

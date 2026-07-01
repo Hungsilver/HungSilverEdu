@@ -1293,6 +1293,170 @@ export interface UpsertQuestionRequest {
   points: number | null;
 }
 
+// ---- Giao đề + làm bài + tự chấm (Pha 2) ----
+
+export type ExamDeliveryMode = 'InClass' | 'Homework';
+export type ExamAssignmentStatus = 'Open' | 'Closed';
+export type ExamAttemptStatus = 'InProgress' | 'Submitted' | 'AutoSubmitted';
+
+export const EXAM_ATTEMPT_STATUS_LABELS: Record<ExamAttemptStatus, string> = {
+  InProgress: 'Đang làm',
+  Submitted: 'Đã nộp',
+  AutoSubmitted: 'Hết giờ - tự nộp'
+};
+
+export interface AssignExamRequest {
+  classId: string;
+  classSessionId: string | null;
+  mode: ExamDeliveryMode;
+  durationMinutes: number | null;
+  openAt: string;
+  closeAt: string | null;
+}
+
+export interface ExamAssignment {
+  id: string;
+  examId: string;
+  examTitle: string | null;
+  classId: string;
+  className: string;
+  classSessionId: string | null;
+  mode: ExamDeliveryMode;
+  durationMinutes: number;
+  openAt: string;
+  closeAt: string | null;
+  status: ExamAssignmentStatus;
+  totalStudents: number;
+  submittedCount: number;
+  createdAt: string;
+}
+
+export interface PortalExam {
+  assignmentId: string;
+  examId: string;
+  examTitle: string;
+  className: string;
+  mode: ExamDeliveryMode;
+  durationMinutes: number;
+  openAt: string;
+  closeAt: string | null;
+  isOpen: boolean;
+  attemptStatus: ExamAttemptStatus | null;
+  attemptId: string | null;
+  score: number | null;
+  totalPoints: number;
+}
+
+export interface PortalGroup {
+  id: string;
+  orderNo: number;
+  section: string | null;
+  exerciseLabel: string | null;
+  instruction: string | null;
+  passage: string | null;
+}
+
+export interface PortalQuestion {
+  id: string;
+  groupId: string | null;
+  orderNo: number;
+  type: ExamQuestionType;
+  stem: string;
+  optionsJson: string | null;
+  points: number;
+}
+
+export interface PortalSavedAnswer {
+  questionId: string;
+  responseJson: string | null;
+}
+
+export interface PortalAttempt {
+  attemptId: string;
+  assignmentId: string;
+  examTitle: string;
+  durationMinutes: number;
+  expiresAt: string;
+  totalPoints: number;
+  groups: PortalGroup[];
+  questions: PortalQuestion[];
+  savedAnswers: PortalSavedAnswer[];
+}
+
+export interface SaveExamAnswerRequest {
+  questionId: string;
+  responseJson: string | null;
+}
+
+export interface ExamAttemptResult {
+  score: number;
+  totalPoints: number;
+  correctCount: number;
+  totalCount: number;
+  status: ExamAttemptStatus;
+}
+
+export interface PortalReviewQuestion {
+  id: string;
+  groupId: string | null;
+  orderNo: number;
+  type: ExamQuestionType;
+  stem: string;
+  optionsJson: string | null;
+  answerJson: string;
+  explanation: string | null;
+  responseJson: string | null;
+  isCorrect: boolean | null;
+  awardedPoints: number;
+  points: number;
+}
+
+export interface PortalReview {
+  examTitle: string;
+  score: number;
+  totalPoints: number;
+  correctCount: number;
+  totalCount: number;
+  status: ExamAttemptStatus;
+  groups: PortalGroup[];
+  questions: PortalReviewQuestion[];
+}
+
+// ---- Báo cáo (Pha 3) ----
+
+export interface ExamScoreBucket { label: string; count: number; }
+
+export interface ExamItemStat {
+  questionId: string;
+  orderNo: number;
+  sourceNumber: number | null;
+  type: ExamQuestionType;
+  correctCount: number;
+  answeredCount: number;
+  correctPercent: number;
+}
+
+export interface ExamStudentResult {
+  studentId: string;
+  fullName: string;
+  status: ExamAttemptStatus | null;
+  score: number | null;
+  submittedAt: string | null;
+}
+
+export interface ExamReport {
+  assignmentId: string;
+  examTitle: string;
+  className: string;
+  totalPoints: number;
+  totalStudents: number;
+  submittedCount: number;
+  averageScore: number | null;
+  distribution: ExamScoreBucket[];
+  itemStats: ExamItemStat[];
+  students: ExamStudentResult[];
+}
+
 // ----------------- Đánh giá tháng + Bảng vàng -----------------
 
 export interface MonthlyEvaluation {

@@ -23,3 +23,25 @@ public enum ExamQuestionType
     FillBlank = 2,     // Điền từ (có hộp từ + danh sách đáp án chấp nhận)
     Matching = 3       // Nối cột A–B
 }
+
+/// <summary>Cách giao đề cho học viên: làm trên lớp hay bài tập về nhà.</summary>
+public enum ExamDeliveryMode
+{
+    InClass = 0,
+    Homework = 1
+}
+
+/// <summary>Trạng thái lượt giao đề cho lớp.</summary>
+public enum ExamAssignmentStatus
+{
+    Open = 0,
+    Closed = 1
+}
+
+/// <summary>Trạng thái lượt làm bài của học viên.</summary>
+public enum ExamAttemptStatus
+{
+    InProgress = 0,
+    Submitted = 1,      // học viên tự nộp
+    AutoSubmitted = 2   // hết giờ, hệ thống tự nộp
+}

@@ -145,6 +145,9 @@ public static class DependencyInjection
         services.AddScoped<IDocumentToPdfConverter, LibreOfficeDocumentConverter>();
         services.AddScoped<IExamSourceProvider, ExamSourceProvider>();
         services.AddScoped<IExamGenerationService, ExamGenerationService>();
+        services.AddScoped<IExamAssignmentService, ExamAssignmentService>();
+        services.AddScoped<IExamTakingService, ExamTakingService>();
+        services.AddScoped<IExamReportService, ExamReportService>();
 
         // Service nghiệp vụ (Infrastructure)
         services.AddScoped<IClassService, ClassService>();

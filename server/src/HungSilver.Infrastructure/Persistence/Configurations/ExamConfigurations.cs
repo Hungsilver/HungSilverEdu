@@ -40,3 +40,36 @@ public sealed class ExamQuestionConfiguration : IEntityTypeConfiguration<ExamQue
         e.HasIndex(x => x.GroupId);
     }
 }
+
+public sealed class ExamAssignmentConfiguration : IEntityTypeConfiguration<ExamAssignment>
+{
+    public void Configure(EntityTypeBuilder<ExamAssignment> e)
+    {
+        e.Property(x => x.ExamTitle).HasMaxLength(300);
+        e.Property(x => x.TotalPoints).HasPrecision(6, 2);
+        e.HasIndex(x => x.ExamId);
+        e.HasIndex(x => x.ClassId);
+        e.HasIndex(x => x.ClassSessionId);
+    }
+}
+
+public sealed class ExamAttemptConfiguration : IEntityTypeConfiguration<ExamAttempt>
+{
+    public void Configure(EntityTypeBuilder<ExamAttempt> e)
+    {
+        e.Property(x => x.Score).HasPrecision(6, 2);
+        e.HasIndex(x => x.StudentId);
+        // 1 học viên chỉ 1 lượt làm cho 1 lượt giao đề (chống trùng do đua).
+        e.HasIndex(x => new { x.ExamAssignmentId, x.StudentId }).IsUnique();
+    }
+}
+
+public sealed class ExamAttemptAnswerConfiguration : IEntityTypeConfiguration<ExamAttemptAnswer>
+{
+    public void Configure(EntityTypeBuilder<ExamAttemptAnswer> e)
+    {
+        e.Property(x => x.AwardedPoints).HasPrecision(6, 2);
+        e.HasIndex(x => x.AttemptId);
+        e.HasIndex(x => new { x.AttemptId, x.QuestionId }).IsUnique();
+    }
+}

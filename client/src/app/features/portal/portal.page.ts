@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { EMPTY, catchError, switchMap, tap } from 'rxjs';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -18,7 +19,7 @@ import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import {
-  CalendarSession, PortalAssignment, PortalProfile, SUBMISSION_STATUS_COLORS, SUBMISSION_STATUS_LABELS, WEEKDAY_LABELS
+  CalendarSession, PortalAssignment, PortalExam, PortalProfile, SUBMISSION_STATUS_COLORS, SUBMISSION_STATUS_LABELS, WEEKDAY_LABELS
 } from '../../core/models';
 import { PortalService } from '../../core/portal.service';
 import { toDateOnly } from '../../core/date-util';
@@ -32,7 +33,7 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
   imports: [
     DatePipe, FormsModule,
     NzCardModule, NzGridModule, NzStatisticModule, NzTagModule, NzAlertModule, NzEmptyModule,
-    NzButtonModule, NzModalModule, NzInputModule, NzFormModule, NzIconModule, NzRadioModule, NzDatePickerModule, PageHeader
+    NzButtonModule, NzModalModule, NzInputModule, NzFormModule, NzIconModule, NzRadioModule, NzDatePickerModule, RouterLink, PageHeader
   ],
   template: `
     <app-page-header title="Trang của tôi" subtitle="Tiến độ & lịch học của bạn" icon="solution" />
@@ -64,6 +65,28 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
             <button nz-button nzSize="small" (click)="openSubmit(a)"><nz-icon nzType="check" /> Nộp</button>
           </div>
         } @empty { <nz-empty nzNotFoundContent="Chưa có bài tập" /> }
+      </nz-card>
+
+      <nz-card nzTitle="Đề của tôi" class="mt">
+        @for (e of exams(); track e.assignmentId) {
+          <div class="asg">
+            <div class="asg-main">
+              <strong>{{ e.examTitle }}</strong>
+              <span class="muted">{{ e.className }} · {{ e.mode === 'InClass' ? 'Trên lớp' : 'Về nhà' }} · {{ e.durationMinutes }}'
+                @if (e.closeAt) { · Hạn: {{ e.closeAt | date: 'dd/MM HH:mm' }} }
+              </span>
+            </div>
+            @if (e.attemptStatus === 'Submitted' || e.attemptStatus === 'AutoSubmitted') {
+              <nz-tag nzColor="success">{{ e.score }}/{{ e.totalPoints }}đ</nz-tag>
+              <a nz-button nzSize="small" [routerLink]="['/portal/attempts', e.attemptId, 'review']"><nz-icon nzType="file-search" /> Xem lại</a>
+            } @else if (e.isOpen) {
+              <nz-tag nzColor="processing">{{ e.attemptStatus === 'InProgress' ? 'Đang làm' : 'Chưa làm' }}</nz-tag>
+              <a nz-button nzType="primary" nzSize="small" [routerLink]="['/portal/exams', e.assignmentId]"><nz-icon nzType="form" /> Làm bài</a>
+            } @else {
+              <span class="muted">Mở lúc {{ e.openAt | date: 'dd/MM HH:mm' }}</span>
+            }
+          </div>
+        } @empty { <nz-empty nzNotFoundContent="Chưa có đề nào" /> }
       </nz-card>
 
       <nz-card nzTitle="Lịch của tôi" class="mt">
@@ -134,6 +157,7 @@ export class PortalPage {
   protected readonly profile = signal<PortalProfile | null>(null);
   protected readonly notLinked = signal(false);
   protected readonly assignments = signal<PortalAssignment[]>([]);
+  protected readonly exams = signal<PortalExam[]>([]);
 
   protected readonly statusLabels = SUBMISSION_STATUS_LABELS;
   protected readonly statusColors = SUBMISSION_STATUS_COLORS;
@@ -180,6 +204,7 @@ export class PortalPage {
       error: () => this.notLinked.set(true)
     });
     this.portalService.assignments().subscribe({ next: a => this.assignments.set(a) });
+    this.portalService.myExams().subscribe({ next: e => this.exams.set(e), error: () => { /* im lặng */ } });
     this.fetchMySchedule();
   }
 

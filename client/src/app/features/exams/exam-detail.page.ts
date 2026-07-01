@@ -11,14 +11,18 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzInputNumberModule } from 'ng-zorro-antd/input-number';
 import { NzMessageService } from 'ng-zorro-antd/message';
+import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
+import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { ClassesService } from '../../core/classes.service';
 import { ExamService } from '../../core/exam.service';
 import {
-  EXAM_TYPE_LABELS, ExamDetail, ExamOption, ExamPair, ExamQuestion, ExamQuestionType, UpsertQuestionRequest
+  AssignExamRequest, ClassListItem, EXAM_TYPE_LABELS, ExamAssignment, ExamDeliveryMode, ExamDetail, ExamOption,
+  ExamPair, ExamQuestion, ExamQuestionType, UpsertQuestionRequest
 } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
 
@@ -57,7 +61,7 @@ interface Section {
   imports: [
     FormsModule,
     NzCardModule, NzButtonModule, NzIconModule, NzTagModule, NzModalModule, NzFormModule, NzInputModule,
-    NzInputNumberModule, NzRadioModule, NzSpinModule, NzAlertModule, NzPopconfirmModule, PageHeader
+    NzInputNumberModule, NzRadioModule, NzSelectModule, NzDatePickerModule, NzSpinModule, NzAlertModule, NzPopconfirmModule, PageHeader
   ],
   template: `
     <app-page-header [title]="detail()?.title || 'Duyệt đề'" subtitle="Duyệt & chỉnh sửa trước khi phát hành" icon="file-text">
@@ -70,6 +74,7 @@ interface Section {
                   (nzOnConfirm)="publish()"><nz-icon nzType="check-circle" /> Lưu vào bộ đề</button>
         } @else {
           <nz-tag nzColor="success">Đã phát hành</nz-tag>
+          <button nz-button nzType="primary" (click)="openAssign()"><nz-icon nzType="send" /> Giao cho lớp</button>
         }
       }
     </app-page-header>
@@ -82,6 +87,22 @@ interface Section {
         <nz-tag>{{ d.durationMinutes }}'</nz-tag>
         <nz-tag>Thang điểm {{ d.totalPoints }}</nz-tag>
       </div>
+
+      @if (d.status === 'Published' && assignments().length) {
+        <nz-card class="assign-card" nzTitle="Đã giao cho lớp" nzSize="small">
+          @for (a of assignments(); track a.id) {
+            <div class="asg-row">
+              <span>{{ a.className }} · {{ a.mode === 'InClass' ? 'Trên lớp' : 'Về nhà' }} · {{ a.durationMinutes }}'</span>
+              <span class="muted">{{ a.submittedCount }}/{{ a.totalStudents }} đã nộp</span>
+              <nz-tag [nzColor]="a.status === 'Open' ? 'processing' : 'default'">{{ a.status === 'Open' ? 'Đang mở' : 'Đã đóng' }}</nz-tag>
+              <button nz-button nzSize="small" (click)="openReport(a)"><nz-icon nzType="bar-chart" /> Báo cáo</button>
+              @if (a.status === 'Open') {
+                <button nz-button nzSize="small" nz-popconfirm nzPopconfirmTitle="Đóng lượt giao này?" (nzOnConfirm)="closeAssignment(a)">Đóng</button>
+              }
+            </div>
+          }
+        </nz-card>
+      }
 
       <div class="split" [class.no-pdf]="!pdfUrl()">
         @if (pdfUrl(); as url) {
@@ -247,6 +268,31 @@ interface Section {
         </ng-container>
       </nz-modal>
     }
+
+    <!-- Modal giao đề cho lớp -->
+    @if (assignOpen()) {
+      <nz-modal [nzVisible]="true" nzTitle="Giao đề cho lớp" [nzOkLoading]="assigning()" (nzOnOk)="doAssign()" (nzOnCancel)="assignOpen.set(false)">
+        <ng-container *nzModalContent>
+          <form nz-form nzLayout="vertical">
+            <nz-form-item><nz-form-label nzRequired>Lớp</nz-form-label>
+              <nz-form-control><nz-select class="full" nzShowSearch [(ngModel)]="asgClassId" name="cls" nzPlaceHolder="Chọn lớp">
+                @for (c of classes(); track c.id) { <nz-option [nzValue]="c.id" [nzLabel]="c.name" /> }
+              </nz-select></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Hình thức</nz-form-label>
+              <nz-form-control><nz-radio-group [(ngModel)]="asgMode" name="mode">
+                <label nz-radio-button nzValue="InClass">Trên lớp</label>
+                <label nz-radio-button nzValue="Homework">Về nhà</label>
+              </nz-radio-group></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Thời gian làm (phút)</nz-form-label>
+              <nz-form-control><nz-input-number [(ngModel)]="asgDuration" name="dur" [nzMin]="1" [nzMax]="300" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label nzRequired>Mở lúc</nz-form-label>
+              <nz-form-control><nz-date-picker class="full" [(ngModel)]="asgOpenAt" name="open" nzShowTime nzFormat="dd/MM/yyyy HH:mm" /></nz-form-control></nz-form-item>
+            <nz-form-item><nz-form-label>Hạn nộp (tùy chọn)</nz-form-label>
+              <nz-form-control><nz-date-picker class="full" [(ngModel)]="asgCloseAt" name="close" nzShowTime nzFormat="dd/MM/yyyy HH:mm" /></nz-form-control></nz-form-item>
+          </form>
+        </ng-container>
+      </nz-modal>
+    }
   `,
   styles: `
     .center { text-align: center; padding: 48px; }
@@ -275,11 +321,16 @@ interface Section {
     .blank-no { min-width: 48px; }
     .match-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .col-h { font-weight: 600; margin: 8px 0 4px; }
+    .assign-card { margin-bottom: 12px; }
+    .asg-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--hs-border); flex-wrap: wrap; }
+    .asg-row:last-child { border-bottom: none; }
+    .full { width: 100%; }
     @media (max-width: 991px) { .split { grid-template-columns: 1fr; } .pdf { height: 60vh; position: static; } }
   `
 })
 export class ExamDetailPage implements OnInit, OnDestroy {
   private readonly examService = inject(ExamService);
+  private readonly classesService = inject(ClassesService);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly message = inject(NzMessageService);
@@ -309,6 +360,17 @@ export class ExamDetailPage implements OnInit, OnDestroy {
   // Sửa/thêm câu hỏi
   protected readonly edit = signal<EditQuestion | null>(null);
 
+  // Giao đề cho lớp
+  protected readonly classes = signal<ClassListItem[]>([]);
+  protected readonly assignments = signal<ExamAssignment[]>([]);
+  protected readonly assignOpen = signal(false);
+  protected readonly assigning = signal(false);
+  protected asgClassId: string | null = null;
+  protected asgMode: ExamDeliveryMode = 'InClass';
+  protected asgDuration = 60;
+  protected asgOpenAt: Date | null = null;
+  protected asgCloseAt: Date | null = null;
+
   ngOnInit(): void {
     this.load();
   }
@@ -320,6 +382,7 @@ export class ExamDetailPage implements OnInit, OnDestroy {
         this.detailRaw.set(d);
         this.buildSections(d);
         this.loadPdf(d.sourceFileUrl);
+        if (d.status === 'Published') this.loadAssignments();
         this.loading.set(false);
       },
       error: () => this.loading.set(false)
@@ -499,5 +562,51 @@ export class ExamDetailPage implements OnInit, OnDestroy {
       next: () => { this.message.success('Đã phát hành đề.'); this.load(); },
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Phát hành thất bại.')
     });
+  }
+
+  // ---- Giao đề cho lớp ----
+
+  private loadAssignments(): void {
+    this.examService.listAssignments(this.id()).subscribe({ next: a => this.assignments.set(a), error: () => { /* im lặng */ } });
+  }
+
+  protected openAssign(): void {
+    this.asgClassId = null;
+    this.asgMode = 'InClass';
+    this.asgDuration = this.detailRaw()?.durationMinutes ?? 60;
+    this.asgOpenAt = new Date();
+    this.asgCloseAt = null;
+    if (this.classes().length === 0)
+      this.classesService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.classes.set(r.items));
+    this.assignOpen.set(true);
+  }
+
+  protected doAssign(): void {
+    if (!this.asgClassId) { this.message.warning('Chọn lớp.'); return; }
+    if (!this.asgOpenAt) { this.message.warning('Chọn thời gian mở.'); return; }
+    const req: AssignExamRequest = {
+      classId: this.asgClassId,
+      classSessionId: null,
+      mode: this.asgMode,
+      durationMinutes: this.asgDuration,
+      openAt: this.asgOpenAt.toISOString(),
+      closeAt: this.asgCloseAt ? this.asgCloseAt.toISOString() : null
+    };
+    this.assigning.set(true);
+    this.examService.assign(this.id(), req).subscribe({
+      next: () => { this.assigning.set(false); this.assignOpen.set(false); this.message.success('Đã giao đề cho lớp.'); this.loadAssignments(); },
+      error: (err: HttpErrorResponse) => { this.assigning.set(false); this.message.error(err.error?.message ?? err.message ?? 'Giao đề thất bại.'); }
+    });
+  }
+
+  protected closeAssignment(a: ExamAssignment): void {
+    this.examService.closeAssignment(a.id).subscribe({
+      next: () => { this.message.success('Đã đóng lượt giao.'); this.loadAssignments(); },
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message)
+    });
+  }
+
+  protected openReport(a: ExamAssignment): void {
+    this.router.navigate(['/exams/assignments', a.id, 'report']);
   }
 }

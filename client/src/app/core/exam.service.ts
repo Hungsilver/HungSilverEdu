@@ -3,8 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  ExamDetail, ExamGenerationResult, ExamListItem, ExamQuestion, ExamStatus, GenerateExamRequest,
-  PagedResult, UpdateExamRequest, UpsertQuestionRequest
+  AssignExamRequest, ExamAssignment, ExamDetail, ExamGenerationResult, ExamListItem, ExamQuestion, ExamReport,
+  ExamStatus, GenerateExamRequest, PagedResult, UpdateExamRequest, UpsertQuestionRequest
 } from './models';
 
 /** Bộ đề trắc nghiệm: sinh từ tài liệu bằng AI, duyệt/sửa, phát hành. */
@@ -54,5 +54,23 @@ export class ExamService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  // ---- Giao đề cho lớp (Pha 2) ----
+
+  assign(examId: string, request: AssignExamRequest): Observable<ExamAssignment> {
+    return this.http.post<ExamAssignment>(`${this.apiUrl}/${examId}/assign`, request);
+  }
+
+  listAssignments(examId: string): Observable<ExamAssignment[]> {
+    return this.http.get<ExamAssignment[]>(`${this.apiUrl}/${examId}/assignments`);
+  }
+
+  closeAssignment(assignmentId: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/assignments/${assignmentId}/close`, {});
+  }
+
+  report(assignmentId: string): Observable<ExamReport> {
+    return this.http.get<ExamReport>(`${this.apiUrl}/assignments/${assignmentId}/report`);
   }
 }
