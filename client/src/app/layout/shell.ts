@@ -188,7 +188,9 @@ import { ThemeService } from '../core/theme.service';
 
     /* Sider full-height: brand cố định trên, menu tự cuộn khi dài (chừa chỗ nút thu gọn) */
     :host ::ng-deep .app-sider .ant-layout-sider-children { display: flex; flex-direction: column; padding-bottom: 48px; }
-    .app-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    /* Vẫn cuộn được khi menu dài, nhưng ẩn thanh cuộn cho gọn (Firefox + IE/Edge + WebKit) */
+    .app-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+    .app-nav::-webkit-scrollbar { width: 0; height: 0; }
 
     .header {
       height: 52px; line-height: 52px; flex: 0 0 auto;
