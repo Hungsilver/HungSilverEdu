@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -18,9 +18,7 @@ import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { ExamService } from '../../core/exam.service';
-import {
-  EXAM_STATUS_LABELS, ExamGenerationMode, ExamGenerationResult, ExamListItem, GenerateExamRequest
-} from '../../core/models';
+import { EXAM_STATUS_LABELS, ExamGenerationMode, ExamGenerationResult, ExamListItem, GenerateExamRequest } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
 
 @Component({
@@ -69,7 +67,7 @@ import { PageHeader } from '../../shared/page-header';
         @if (generating()) {
           <div class="gen-loading">
             <nz-spin nzSimple />
-            <p>Đang phân tích tài liệu bằng AI… có thể mất đến ~1 phút.</p>
+            <p>{{ generationStatus() }}</p>
           </div>
         } @else {
           <form nz-form nzLayout="vertical">
@@ -123,7 +121,7 @@ import { PageHeader } from '../../shared/page-header';
     .verify-label { color: var(--hs-text-muted); font-size: 13px; margin-left: 8px; }
   `
 })
-export class ExamListPage implements OnInit {
+export class ExamListPage implements OnInit, OnDestroy {
   private readonly examService = inject(ExamService);
   private readonly router = inject(Router);
   private readonly message = inject(NzMessageService);
@@ -139,6 +137,7 @@ export class ExamListPage implements OnInit {
   // Form tạo đề
   protected readonly genOpen = signal(false);
   protected readonly generating = signal(false);
+  protected readonly generationStatus = signal('Đang gửi yêu cầu sinh đề...');
   protected mode: ExamGenerationMode = 'Extract';
   protected title = '';
   protected durationMinutes = 60;
@@ -150,6 +149,10 @@ export class ExamListPage implements OnInit {
     const t = this.title2();
     if (t) this.headerTitle.set(t);
     this.load();
+  }
+
+  ngOnDestroy(): void {
+    this.clearPollTimer();
   }
 
   protected load(): void {
@@ -165,16 +168,19 @@ export class ExamListPage implements OnInit {
   }
 
   protected openGenerate(): void {
+    this.clearPollTimer();
     this.mode = 'Extract';
     this.title = '';
     this.durationMinutes = 60;
     this.maxQuestions = 20;
     this.difficulty = '';
     this.verify = true;
+    this.generationStatus.set('Đang gửi yêu cầu sinh đề...');
     this.genOpen.set(true);
   }
 
   protected generate(): void {
+    if (this.generating()) return;
     const req: GenerateExamRequest = {
       mode: this.mode,
       title: this.title.trim() || null,
@@ -185,18 +191,62 @@ export class ExamListPage implements OnInit {
       verify: this.verify
     };
     this.generating.set(true);
-    this.examService.generate(this.materialId(), req).subscribe({
-      next: (r: ExamGenerationResult) => {
-        this.generating.set(false);
-        this.genOpen.set(false);
-        this.reportResult(r);
-        this.router.navigate(['/exams', r.examId]);
+    this.generationStatus.set('Đã đưa vào hàng đợi, đang chờ AI xử lý...');
+    this.examService.startGeneration(this.materialId(), req).subscribe({
+      next: job => {
+        this.schedulePoll(job.jobId, job.pollAfterSeconds);
       },
       error: (err: HttpErrorResponse) => {
         this.generating.set(false);
         this.message.error(err.error?.message ?? err.message ?? 'Tạo đề thất bại.');
       }
     });
+  }
+
+  private pollTimer: number | null = null;
+
+  private schedulePoll(jobId: string, delaySeconds: number): void {
+    this.clearPollTimer();
+    const delayMs = Math.max(1, delaySeconds || 2) * 1000;
+    this.pollTimer = window.setTimeout(() => this.pollJob(jobId), delayMs);
+  }
+
+  private pollJob(jobId: string): void {
+    this.examService.getGenerationJob(jobId).subscribe({
+      next: job => {
+        if (job.status === 'Queued') {
+          this.generationStatus.set('Đang chờ xử lý. Bạn giữ cửa sổ này mở thêm một lát.');
+          this.schedulePoll(jobId, job.pollAfterSeconds);
+          return;
+        }
+        if (job.status === 'Running') {
+          this.generationStatus.set('AI đang phân tích tài liệu và tạo câu hỏi. Việc này có thể mất vài phút.');
+          this.schedulePoll(jobId, job.pollAfterSeconds);
+          return;
+        }
+        this.generating.set(false);
+        this.clearPollTimer();
+        if (job.status === 'Succeeded' && job.result) {
+          this.genOpen.set(false);
+          this.reportResult(job.result);
+          this.router.navigate(['/exams', job.result.examId]);
+          return;
+        }
+        this.message.error(job.errorMessage ?? 'Tạo đề thất bại.');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.generating.set(false);
+        this.clearPollTimer();
+        this.message.error(err.error?.message ?? err.message ?? 'Không lấy được trạng thái tạo đề.');
+      }
+    });
+  }
+
+  private clearPollTimer(): void {
+    if (this.pollTimer !== null) {
+      window.clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   private reportResult(r: ExamGenerationResult): void {

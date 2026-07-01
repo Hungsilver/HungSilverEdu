@@ -1269,6 +1269,27 @@ export interface ExamGenerationResult {
   warnings: string[];
 }
 
+export type ExamGenerationJobStatus = 'Queued' | 'Running' | 'Succeeded' | 'Failed';
+
+export interface ExamGenerationJobStartResult {
+  jobId: string;
+  status: ExamGenerationJobStatus;
+  createdAt: string;
+  pollAfterSeconds: number;
+}
+
+export interface ExamGenerationJob {
+  jobId: string;
+  status: ExamGenerationJobStatus;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  result: ExamGenerationResult | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  pollAfterSeconds: number;
+}
+
 export interface UpdateExamRequest {
   title: string;
   description: string | null;

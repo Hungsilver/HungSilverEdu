@@ -8,3 +8,11 @@ public interface IExamGenerationService
     Task<Result<ExamGenerationResult>> GenerateFromMaterialAsync(
         Guid materialId, GenerateExamRequest request, Guid userId, CancellationToken ct = default);
 }
+
+public interface IExamGenerationJobService
+{
+    Task<Result<ExamGenerationJobStartResult>> StartAsync(
+        Guid materialId, GenerateExamRequest request, Guid userId, CancellationToken ct = default);
+
+    Result<ExamGenerationJobDto> Get(Guid jobId, Guid userId);
+}

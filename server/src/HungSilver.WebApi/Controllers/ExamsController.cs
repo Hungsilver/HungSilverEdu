@@ -17,15 +17,20 @@ namespace HungSilver.WebApi.Controllers;
 [Authorize(Policy = "TeacherOrAdmin")]
 public class ExamsController(
     IExamService service,
-    IExamGenerationService generation,
+    IExamGenerationJobService generationJobs,
     IExamAssignmentService assignments,
     IExamReportService reports,
     ICurrentUser currentUser) : ControllerBase
 {
-    /// <summary>Sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả về đề nháp + cảnh báo kiểm chứng.</summary>
+    /// <summary>Bắt đầu job sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả jobId ngay để client polling, tránh timeout proxy.</summary>
     [HttpPost("generate/{materialId:guid}")]
-    public async Task<ActionResult<ExamGenerationResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct) =>
-        (await generation.GenerateFromMaterialAsync(materialId, request, UserId, ct)).ToActionResult();
+    public async Task<ActionResult<ExamGenerationJobStartResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct) =>
+        (await generationJobs.StartAsync(materialId, request, UserId, ct)).ToActionResult();
+
+    /// <summary>Trạng thái job sinh đề AI; khi Succeeded có ExamGenerationResult để mở đề nháp.</summary>
+    [HttpGet("generation-jobs/{jobId:guid}")]
+    public ActionResult<ExamGenerationJobDto> GenerationJob(Guid jobId) =>
+        generationJobs.Get(jobId, UserId).ToActionResult();
 
     /// <summary>Danh sách đề theo Môn (kèm bộ lọc trạng thái) hoặc theo tài liệu — phân trang.</summary>
     [HttpGet]

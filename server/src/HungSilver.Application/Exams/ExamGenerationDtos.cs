@@ -24,6 +24,32 @@ public sealed record ExamGenerationResult(
     int DroppedCount,
     IReadOnlyList<string> Warnings);
 
+/// <summary>Trạng thái job sinh đề chạy nền, tránh giữ request HTTP quá lâu qua proxy/Cloudflare.</summary>
+public enum ExamGenerationJobStatus
+{
+    Queued = 0,
+    Running = 1,
+    Succeeded = 2,
+    Failed = 3
+}
+
+public sealed record ExamGenerationJobStartResult(
+    Guid JobId,
+    ExamGenerationJobStatus Status,
+    DateTime CreatedAt,
+    int PollAfterSeconds);
+
+public sealed record ExamGenerationJobDto(
+    Guid JobId,
+    ExamGenerationJobStatus Status,
+    DateTime CreatedAt,
+    DateTime? StartedAt,
+    DateTime? CompletedAt,
+    ExamGenerationResult? Result,
+    string? ErrorCode,
+    string? ErrorMessage,
+    int PollAfterSeconds);
+
 // ----------------- DTO khớp JSON Gemini trả về (PropertyNameCaseInsensitive) -----------------
 
 public sealed class GenExamPayload

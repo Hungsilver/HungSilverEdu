@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  AssignExamRequest, ExamAssignment, ExamDetail, ExamGenerationResult, ExamListItem, ExamQuestion, ExamReport,
+  AssignExamRequest, ExamAssignment, ExamDetail, ExamGenerationJob, ExamGenerationJobStartResult, ExamListItem, ExamQuestion, ExamReport,
   ExamStatus, GenerateExamRequest, PagedResult, UpdateExamRequest, UpsertQuestionRequest
 } from './models';
 
@@ -13,8 +13,12 @@ export class ExamService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/exams`;
 
-  generate(materialId: string, request: GenerateExamRequest): Observable<ExamGenerationResult> {
-    return this.http.post<ExamGenerationResult>(`${this.apiUrl}/generate/${materialId}`, request);
+  startGeneration(materialId: string, request: GenerateExamRequest): Observable<ExamGenerationJobStartResult> {
+    return this.http.post<ExamGenerationJobStartResult>(`${this.apiUrl}/generate/${materialId}`, request);
+  }
+
+  getGenerationJob(jobId: string): Observable<ExamGenerationJob> {
+    return this.http.get<ExamGenerationJob>(`${this.apiUrl}/generation-jobs/${jobId}`);
   }
 
   listByMaterial(materialId: string, page = 1, pageSize = 50): Observable<PagedResult<ExamListItem>> {
