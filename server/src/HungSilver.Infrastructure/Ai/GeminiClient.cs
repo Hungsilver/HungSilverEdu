@@ -267,6 +267,8 @@ public sealed class GeminiClient(HttpClient http, ILogger<GeminiClient> logger) 
             ["candidateCount"] = 1
         };
         if (req.MaxOutputTokens is int max) generationConfig["maxOutputTokens"] = max;
+        if (req.ThinkingBudget is int budget) generationConfig["thinkingConfig"] = new { thinkingBudget = budget };
+        else if (!string.IsNullOrWhiteSpace(req.ThinkingLevel)) generationConfig["thinkingConfig"] = new { thinkingLevel = req.ThinkingLevel };
         if (!string.IsNullOrWhiteSpace(req.ResponseSchemaJson))
             generationConfig["responseSchema"] = JsonNode.Parse(req.ResponseSchemaJson);
 

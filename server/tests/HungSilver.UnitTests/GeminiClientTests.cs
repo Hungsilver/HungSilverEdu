@@ -131,6 +131,35 @@ public sealed class GeminiClientTests
         Assert.Equal("test-key", call.ApiKeyHeader);
         Assert.DoesNotContain("key=", call.Uri);
         Assert.EndsWith("v1beta/models/gemini-2.5-flash:generateContent", call.Uri);
+        Assert.DoesNotContain("thinkingConfig", call.Body); // không truyền budget ⇒ giữ mặc định model
+    }
+
+    [Fact]
+    public async Task GenerateContent_WithThinkingBudget_SendsThinkingConfig()
+    {
+        var handler = new StubHttpHandler();
+        handler.Enqueue(Success("ok"));
+
+        var result = await NewClient(handler).GenerateContentAsync(Request with { ThinkingBudget = 0 });
+
+        Assert.True(result.IsSuccess);
+        var call = Assert.Single(handler.Calls);
+        Assert.Contains("\"thinkingConfig\":{\"thinkingBudget\":0}", call.Body);
+    }
+
+    [Fact]
+    public async Task GenerateContent_WithThinkingLevel_SendsThinkingConfig()
+    {
+        var handler = new StubHttpHandler();
+        handler.Enqueue(Success("ok"));
+
+        var result = await NewClient(handler).GenerateContentAsync(
+            Request with { Model = "gemini-3.5-flash", ThinkingLevel = "low" });
+
+        Assert.True(result.IsSuccess);
+        var call = Assert.Single(handler.Calls);
+        Assert.Contains("\"thinkingConfig\":{\"thinkingLevel\":\"low\"}", call.Body);
+        Assert.DoesNotContain("thinkingBudget", call.Body);
     }
 
     [Fact]
@@ -200,19 +229,20 @@ public sealed class GeminiClientTests
         return Json(HttpStatusCode.OK, body);
     }
 
-    /// <summary>Handler giả: trả response theo hàng đợi, ghi lại URI + header key tại thời điểm gửi.</summary>
+    /// <summary>Handler giả: trả response theo hàng đợi, ghi lại URI + header key + body tại thời điểm gửi.</summary>
     private sealed class StubHttpHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new();
-        public List<(string Uri, string? ApiKeyHeader)> Calls { get; } = [];
+        public List<(string Uri, string? ApiKeyHeader, string? Body)> Calls { get; } = [];
 
         public void Enqueue(HttpResponseMessage response) => _responses.Enqueue(response);
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             var key = request.Headers.TryGetValues("x-goog-api-key", out var values) ? values.FirstOrDefault() : null;
-            Calls.Add((request.RequestUri!.ToString(), key));
-            return Task.FromResult(_responses.Dequeue());
+            var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
+            Calls.Add((request.RequestUri!.ToString(), key, body));
+            return _responses.Dequeue();
         }
     }
 

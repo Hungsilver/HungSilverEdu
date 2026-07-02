@@ -47,6 +47,7 @@ public sealed class ExamGenerationService(
         var system = BuildSystemPrompt();
         var basePrompt = BuildUserPrompt(request);
         var temperature = request.Mode == ExamGenerationMode.Extract ? 0.1 : 0.6;
+        var (thinkingBudget, thinkingLevel) = ThinkingFor(cred.Model, request.Mode);
 
         GenExamPayload? payload = null;
         string? parseError = null;
@@ -59,7 +60,8 @@ public sealed class ExamGenerationService(
             // Không đặt maxOutputTokens: để mặc định = trần của từng model (thinking tokens cũng tính vào trần,
             // đặt cứng dễ gây cắt dở JSON hoặc 400 với model trần thấp).
             var genResult = await gemini.GenerateContentAsync(
-                new GeminiContentRequest(cred.ApiKey, cred.Model, system, prompt, new[] { docPart }, ExamSchemaJson, temperature),
+                new GeminiContentRequest(cred.ApiKey, cred.Model, system, prompt, new[] { docPart }, ExamSchemaJson, temperature,
+                    ThinkingBudget: thinkingBudget, ThinkingLevel: thinkingLevel),
                 ct);
             if (genResult.IsFailure) return Result.Failure<ExamGenerationResult>(genResult.Error);
 
@@ -263,6 +265,20 @@ public sealed class ExamGenerationService(
     private static string? Trunc(string? s, int max) =>
         string.IsNullOrWhiteSpace(s) ? null : (s.Length <= max ? s.Trim() : s.Trim()[..max]);
 
+    /// <summary>
+    /// Trích xuất là việc "chép lại" — docs Gemini xếp loại thinking tối thiểu, mà thinking tokens lại
+    /// TÍNH VÀO trần output (nguyên nhân MAX_TOKENS với tài liệu nhỏ). Khi Extract: dòng 2.5 Flash/Flash-Lite
+    /// tắt thinking (`thinkingBudget: 0`); dòng 3.x dùng `thinkingLevel: "low"` (không hỗ trợ budget).
+    /// Generate và model khác (2.5 Pro không cho tắt) giữ mặc định model.
+    /// </summary>
+    private static (int? Budget, string? Level) ThinkingFor(string model, ExamGenerationMode mode)
+    {
+        if (mode != ExamGenerationMode.Extract) return (null, null);
+        if (model.StartsWith("gemini-2.5-flash", StringComparison.OrdinalIgnoreCase)) return (0, null);
+        if (model.StartsWith("gemini-3", StringComparison.OrdinalIgnoreCase)) return (null, "low");
+        return (null, null);
+    }
+
     private static string BuildSystemPrompt() =>
         "Bạn là chuyên gia khảo thí tiếng Anh. Đọc tài liệu (PDF đính kèm) và trả về bộ câu hỏi TRẮC NGHIỆM. " +
         "CHỈ dùng 4 loại: " +
@@ -270,7 +286,7 @@ public sealed class ExamGenerationService(
         "TrueFalse (answerKey là 'true' hoặc 'false'); " +
         "FillBlank (answerBlanks: mỗi ô một phần tử, các đáp án chấp nhận ngăn bởi '/', kèm wordBox nếu tài liệu có hộp từ); " +
         "Matching (options = cột trái {key,text}, optionsRight = cột phải {key,text}, answerPairs là các cặp {left,right} theo key). " +
-        "Mỗi câu BẮT BUỘC có explanation bằng TIẾNG VIỆT giải thích vì sao đáp án đúng. " +
+        "Mỗi câu BẮT BUỘC có explanation bằng TIẾNG VIỆT giải thích vì sao đáp án đúng — NGẮN GỌN, tối đa 2 câu. " +
         "Giữ NGUYÊN VĂN nội dung tiếng Anh của câu hỏi/lựa chọn. " +
         "Gộp các câu dùng chung ngữ liệu (đoạn đọc/hội thoại/hộp từ) vào cùng một group kèm passage. " +
         "BỎ QUA phần Writing tự luận và Listening (cần audio). " +

@@ -359,12 +359,14 @@ export class ProfilePage {
   protected readonly aiDeleteBusy = signal(false);
   protected readonly aiEditing = signal(false);
   protected apiKeyInput = '';
-  protected modelInput = 'gemini-2.5-flash';
+  protected modelInput = 'gemini-3.5-flash';
+  // Mặc định = model free tốt nhất hiện tại; còn lại sắp theo tầng phí (giá /1M token in/out, 07/2026).
   protected readonly aiModels = [
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (nhanh, mặc định)' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (mạnh nhất dòng 2.5)' },
-    { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (tiết kiệm)' },
-    { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (mới nhất)' }
+    { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash — mặc định, mạnh nhất dòng Flash, miễn phí' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash — miễn phí, nhẹ và nhanh' },
+    { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite — miễn phí, quota cao nhất, tiết kiệm' },
+    { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (preview) — miễn phí, đọc tài liệu tốt' },
+    { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (preview) — chất lượng tối đa, CHỈ trả phí' }
   ];
 
   constructor() {
@@ -472,7 +474,7 @@ export class ProfilePage {
 
   protected startEditAiKey(): void {
     this.apiKeyInput = '';
-    this.modelInput = this.aiCred()?.model ?? 'gemini-2.5-flash';
+    this.modelInput = this.aiCred()?.model ?? 'gemini-3.5-flash';
     this.aiEditing.set(true);
   }
 

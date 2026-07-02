@@ -21,7 +21,12 @@ public interface IGeminiClient
     Task<Result<string>> GenerateContentAsync(GeminiContentRequest request, CancellationToken ct = default);
 }
 
-/// <summary>Tham số gọi Gemini <c>generateContent</c>.</summary>
+/// <summary>
+/// Tham số gọi Gemini <c>generateContent</c>. Điều khiển thinking theo dòng model (thinking tokens TÍNH VÀO
+/// trần output — tác vụ trích xuất nên hạn chế để khỏi tràn MAX_TOKENS):
+/// <c>ThinkingBudget</c> cho dòng 2.5 Flash/Flash-Lite (0 = tắt); <c>ThinkingLevel</c> cho dòng 3.x
+/// (enum <c>minimal|low|medium|high</c>). null = mặc định của model; chỉ truyền cho dòng tương ứng.
+/// </summary>
 public sealed record GeminiContentRequest(
     string ApiKey,
     string Model,
@@ -30,7 +35,9 @@ public sealed record GeminiContentRequest(
     IReadOnlyList<GeminiInlineDoc>? Docs = null,
     string? ResponseSchemaJson = null,
     double Temperature = 0.1,
-    int? MaxOutputTokens = null);
+    int? MaxOutputTokens = null,
+    int? ThinkingBudget = null,
+    string? ThinkingLevel = null);
 
 /// <summary>Tài liệu đính kèm gửi cho Gemini (vd PDF để đọc bằng vision).</summary>
 public sealed record GeminiInlineDoc(string MimeType, byte[] Data);
