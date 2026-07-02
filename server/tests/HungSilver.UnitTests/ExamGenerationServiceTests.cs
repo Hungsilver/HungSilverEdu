@@ -172,7 +172,7 @@ public sealed class ExamGenerationServiceTests : IDisposable
     private sealed class FakeGemini : IGeminiClient
     {
         public string NextJson { get; set; } = "{\"groups\":[]}";
-        public Task<Result> ValidateKeyAsync(string apiKey, CancellationToken ct = default) => Task.FromResult(Result.Success());
+        public Task<Result> ValidateKeyAsync(string apiKey, string? model = null, CancellationToken ct = default) => Task.FromResult(Result.Success());
         public Task<Result<string>> GenerateContentAsync(GeminiContentRequest request, CancellationToken ct = default) =>
             Task.FromResult(Result.Success(NextJson));
     }

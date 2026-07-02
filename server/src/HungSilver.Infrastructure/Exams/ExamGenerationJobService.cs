@@ -91,6 +91,8 @@ public sealed class ExamGenerationJobService(
                     job.Status = ExamGenerationJobStatus.Failed;
                     job.ErrorCode = result.Error.Code;
                     job.ErrorMessage = result.Error.Message;
+                    logger.LogWarning("Sinh đề thất bại. JobId={JobId} Code={ErrorCode} Message={ErrorMessage}",
+                        job.JobId, result.Error.Code, result.Error.Message);
                 }
             }
         }
@@ -112,7 +114,8 @@ public sealed class ExamGenerationJobService(
                 job.Status = ExamGenerationJobStatus.Failed;
                 job.CompletedAt = DateTime.Now;
                 job.ErrorCode = "ExamGenerationJob.Failed";
-                job.ErrorMessage = "Sinh đề thất bại. Vui lòng thử lại sau.";
+                job.ErrorMessage = "Sinh đề thất bại. Vui lòng thử lại; nếu vẫn lỗi, báo quản trị viên kèm mã tham chiếu " +
+                    $"{job.JobId.ToString("N")[..8]}.";
             }
         }
     }

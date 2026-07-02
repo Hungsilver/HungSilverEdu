@@ -59,14 +59,16 @@ public sealed class AiCredentialService(
             return Result.Failure<ValidateAiKeyResult>(NotConfigured);
 
         var apiKey = protector.Unprotect(cred.ApiKeyEncrypted);
-        var result = await gemini.ValidateKeyAsync(apiKey, ct);
+        // Kiểm tra cả model đang cấu hình (model bị Google gỡ sẽ báo ngay ở đây thay vì 404 lúc sinh đề).
+        var model = string.IsNullOrWhiteSpace(cred.Model) ? geminiOptions.Value.DefaultModel : cred.Model!.Trim();
+        var result = await gemini.ValidateKeyAsync(apiKey, model, ct);
 
         cred.LastValidatedAt = DateTime.Now;
         cred.IsValid = result.IsSuccess;
         repo.Update(cred);
         await unitOfWork.SaveChangesAsync(ct);
 
-        return new ValidateAiKeyResult(result.IsSuccess, result.IsSuccess ? "API Key hợp lệ." : result.Error.Message);
+        return new ValidateAiKeyResult(result.IsSuccess, result.IsSuccess ? $"API Key hợp lệ, model {model} khả dụng." : result.Error.Message);
     }
 
     public async Task<Result> DeleteAsync(Guid userId, CancellationToken ct = default)

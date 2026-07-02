@@ -151,7 +151,7 @@ public sealed class AiCredentialServiceTests : IDisposable
     private sealed class FakeGemini : IGeminiClient
     {
         public Result NextResult { get; set; } = Result.Success();
-        public Task<Result> ValidateKeyAsync(string apiKey, CancellationToken ct = default) => Task.FromResult(NextResult);
+        public Task<Result> ValidateKeyAsync(string apiKey, string? model = null, CancellationToken ct = default) => Task.FromResult(NextResult);
         public Task<Result<string>> GenerateContentAsync(GeminiContentRequest request, CancellationToken ct = default)
             => Task.FromResult(Result.Failure<string>(Error.Failure("Ai.NotUsed", "Không dùng trong test này.")));
     }

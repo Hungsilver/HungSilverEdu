@@ -8,8 +8,11 @@ namespace HungSilver.Application.AiCredentials;
 /// </summary>
 public interface IGeminiClient
 {
-    /// <summary>Gọi nhẹ tới Gemini để xác thực API key. Trả <see cref="Result.Success"/> nếu key dùng được.</summary>
-    Task<Result> ValidateKeyAsync(string apiKey, CancellationToken ct = default);
+    /// <summary>
+    /// Gọi nhẹ tới Gemini để xác thực API key; truyền <paramref name="model"/> để kiểm tra luôn model
+    /// còn tồn tại (1 lệnh <c>GET models/{model}</c>). Trả <see cref="Result.Success"/> nếu dùng được.
+    /// </summary>
+    Task<Result> ValidateKeyAsync(string apiKey, string? model = null, CancellationToken ct = default);
 
     /// <summary>
     /// Sinh nội dung có cấu trúc — ép JSON theo <c>responseSchema</c>, đính kèm tài liệu (PDF vision) nếu có.

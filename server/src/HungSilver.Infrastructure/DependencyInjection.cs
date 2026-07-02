@@ -134,7 +134,7 @@ public static class DependencyInjection
         {
             var opt = sp.GetRequiredService<IOptions<GeminiOptions>>().Value;
             client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
-            // Timeout điều khiển theo từng lệnh (CTS) trong GeminiClient: validate ~20s, generate ~120s.
+            // Timeout điều khiển theo từng lệnh (CTS) trong GeminiClient: validate ~20s, generate ~300s/lượt.
             client.Timeout = Timeout.InfiniteTimeSpan;
         });
         services.AddScoped<AiCredentialService>();

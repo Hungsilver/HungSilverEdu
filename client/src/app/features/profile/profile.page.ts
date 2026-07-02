@@ -362,9 +362,9 @@ export class ProfilePage {
   protected modelInput = 'gemini-2.5-flash';
   protected readonly aiModels = [
     { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (nhanh, mặc định)' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (mạnh nhất)' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (mạnh nhất dòng 2.5)' },
     { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (tiết kiệm)' },
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' }
+    { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (mới nhất)' }
   ];
 
   constructor() {

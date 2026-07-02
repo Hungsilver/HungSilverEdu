@@ -56,8 +56,10 @@ public sealed class ExamGenerationService(
                 ? basePrompt
                 : basePrompt + $"\n\nLƯU Ý: lần trước JSON không hợp lệ ({parseError}). Trả về DUY NHẤT JSON đúng schema.";
 
+            // Không đặt maxOutputTokens: để mặc định = trần của từng model (thinking tokens cũng tính vào trần,
+            // đặt cứng dễ gây cắt dở JSON hoặc 400 với model trần thấp).
             var genResult = await gemini.GenerateContentAsync(
-                new GeminiContentRequest(cred.ApiKey, cred.Model, system, prompt, new[] { docPart }, ExamSchemaJson, temperature, 32768),
+                new GeminiContentRequest(cred.ApiKey, cred.Model, system, prompt, new[] { docPart }, ExamSchemaJson, temperature),
                 ct);
             if (genResult.IsFailure) return Result.Failure<ExamGenerationResult>(genResult.Error);
 
@@ -212,7 +214,7 @@ public sealed class ExamGenerationService(
         const string schema = "{\"type\":\"OBJECT\",\"properties\":{\"issues\":{\"type\":\"ARRAY\",\"items\":{\"type\":\"STRING\"}}},\"propertyOrdering\":[\"issues\"],\"required\":[\"issues\"]}";
 
         var res = await gemini.GenerateContentAsync(
-            new GeminiContentRequest(cred.ApiKey, cred.Model, null, prompt, new[] { doc }, schema, 0.1, 2048), ct);
+            new GeminiContentRequest(cred.ApiKey, cred.Model, null, prompt, new[] { doc }, schema, 0.1), ct);
         if (res.IsFailure) return null; // best-effort — không chặn tạo đề
 
         try
