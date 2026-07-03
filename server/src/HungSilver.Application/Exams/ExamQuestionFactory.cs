@@ -64,6 +64,8 @@ public static class ExamQuestionFactory
                 var rk = right.Select(o => o.Key!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 if (!pairs.All(p => lk.Contains(p.Left!.Trim()) && rk.Contains(p.Right!.Trim())))
                     return Err("Cặp đáp án tham chiếu lựa chọn không tồn tại.");
+                if (pairs.Select(p => p.Left!.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != pairs.Count)
+                    return Err("Cặp đáp án bị trùng vế trái."); // AI trả trùng left ⇒ bỏ câu, không để ToDictionary ném exception
                 return new ExamQuestionContent(
                     JsonSerializer.Serialize(new
                     {

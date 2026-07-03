@@ -118,6 +118,41 @@ public sealed class ExamGenerationServiceTests : IDisposable
         Assert.Equal(10m, qs.Sum(q => q.Points));
     }
 
+    [Theory]
+    [InlineData(150)] // ngưỡng cách chia cũ bắt đầu cho câu cuối điểm ÂM (−0.43)
+    [InlineData(284)] // cỡ thực tế: tài liệu tổng ôn ~284 câu trắc nghiệm (câu cuối cũ −1.32)
+    public async Task LargeExam_DistributesPoints_SumTo10_NoNegative(int count)
+    {
+        var items = string.Join(",", Enumerable.Range(1, count).Select(n =>
+            $"{{\"number\":{n},\"type\":\"TrueFalse\",\"stem\":\"q{n}\",\"answerKey\":\"true\",\"explanation\":\"e\"}}"));
+        _gemini.NextJson = $"{{\"groups\":[{{\"exerciseLabel\":\"Exercise 3\",\"questions\":[{items}]}}]}}";
+
+        var result = await NewService().GenerateFromMaterialAsync(_materialId, ExtractReq(), Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        var qs = await _context.ExamQuestions.ToListAsync();
+        Assert.Equal(count, qs.Count);
+        Assert.Equal(10m, qs.Sum(q => q.Points));
+        Assert.All(qs, q => Assert.True(q.Points > 0m));
+    }
+
+    [Fact]
+    public async Task Matching_DuplicateLeftPairs_DropsQuestion_InsteadOfThrowing()
+    {
+        _gemini.NextJson = """
+        {"groups":[{"questions":[
+          {"number":1,"type":"Matching","stem":"match","options":[{"key":"1","text":"l1"},{"key":"2","text":"l2"}],"optionsRight":[{"key":"a","text":"r1"},{"key":"b","text":"r2"}],"answerPairs":[{"left":"1","right":"a"},{"left":"1","right":"b"}],"explanation":"trùng left ⇒ loại"},
+          {"number":2,"type":"TrueFalse","stem":"ok","answerKey":"true","explanation":"e"}
+        ]}]}
+        """;
+
+        var result = await NewService().GenerateFromMaterialAsync(_materialId, ExtractReq(), Guid.NewGuid());
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.QuestionCount);
+        Assert.Equal(1, result.Value.DroppedCount);
+    }
+
     [Fact]
     public async Task FlagsNumberGaps_AsWarning()
     {

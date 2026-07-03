@@ -183,13 +183,13 @@ public sealed class ExamGenerationService(
     private static void DistributePoints(List<ExamQuestion> qs, decimal total)
     {
         if (qs.Count == 0) return;
-        var each = Math.Round(total / qs.Count, 2, MidpointRounding.AwayFromZero);
-        decimal running = 0;
+        // Chia theo đơn vị 0.01: n câu đầu nhận thêm 0.01 phần dư ⇒ tổng LUÔN đúng bằng total và
+        // không câu nào bị điểm âm (cách cũ round từng câu rồi trừ dồn làm câu cuối ÂM khi đề ≥ ~150 câu).
+        var totalCents = (int)decimal.Round(total * 100m, 0, MidpointRounding.AwayFromZero);
+        var baseCents = totalCents / qs.Count;
+        var extra = totalCents - baseCents * qs.Count;
         for (var i = 0; i < qs.Count; i++)
-        {
-            if (i == qs.Count - 1) qs[i].Points = Math.Round(total - running, 2);
-            else { qs[i].Points = each; running += each; }
-        }
+            qs[i].Points = (baseCents + (i < extra ? 1 : 0)) / 100m;
     }
 
     private static void CheckNumberGaps(List<int> numbers, string? label, List<string> warnings)
@@ -284,12 +284,15 @@ public sealed class ExamGenerationService(
         "CHỈ dùng 4 loại: " +
         "SingleChoice (options là các lựa chọn {key,text}, answerKey là key đúng); " +
         "TrueFalse (answerKey là 'true' hoặc 'false'); " +
-        "FillBlank (answerBlanks: mỗi ô một phần tử, các đáp án chấp nhận ngăn bởi '/', kèm wordBox nếu tài liệu có hộp từ); " +
-        "Matching (options = cột trái {key,text}, optionsRight = cột phải {key,text}, answerPairs là các cặp {left,right} theo key). " +
+        "FillBlank (answerBlanks: mỗi ô một phần tử, các đáp án chấp nhận ngăn bởi '/' và mỗi phương án phải VIẾT ĐẦY ĐỦ " +
+        "— vd 'should stay/ought to stay', KHÔNG viết tắt kiểu 'should/ought to stay'; kèm wordBox nếu tài liệu có hộp từ); " +
+        "Matching (options = cột trái {key,text}, optionsRight = cột phải {key,text}, answerPairs là các cặp {left,right} theo key — mỗi left chỉ xuất hiện đúng 1 lần). " +
         "Mỗi câu BẮT BUỘC có explanation bằng TIẾNG VIỆT giải thích vì sao đáp án đúng — NGẮN GỌN, tối đa 2 câu. " +
-        "Giữ NGUYÊN VĂN nội dung tiếng Anh của câu hỏi/lựa chọn. " +
+        "Giữ NGUYÊN VĂN nội dung tiếng Anh của câu hỏi/lựa chọn; phần được GẠCH CHÂN trong câu/lựa chọn thì bọc trong ngoặc đơn để giữ thông tin " +
+        "— vd 's(ou)nd', 'the word (accomplished)'. " +
         "Gộp các câu dùng chung ngữ liệu (đoạn đọc/hội thoại/hộp từ) vào cùng một group kèm passage. " +
-        "BỎ QUA phần Writing tự luận và Listening (cần audio). " +
+        "BỎ QUA: câu TỰ LUẬN (tự viết/sắp xếp câu, không có lựa chọn cho sẵn), câu cần NGHE audio, và câu PHỤ THUỘC hình ảnh/biển báo (không tái hiện được bằng chữ); " +
+        "câu TRẮC NGHIỆM nằm trong mục Writing thì VẪN lấy bình thường. " +
         "Trả về DUY NHẤT JSON đúng schema, không kèm chữ nào khác.";
 
     private static string BuildUserPrompt(GenerateExamRequest req)
@@ -299,8 +302,10 @@ public sealed class ExamGenerationService(
         {
             sb.Append("Hãy TRÍCH XUẤT chính xác và ĐẦY ĐỦ tất cả câu hỏi trắc nghiệm có trong tài liệu, theo đúng thứ tự. ");
             sb.Append("Ghi số thứ tự gốc của mỗi câu vào 'number' và nhãn bài (vd 'Exercise 5') vào 'exerciseLabel'. ");
-            sb.Append("Đáp án đúng đã được đánh dấu trong tài liệu (in đậm/gạch chân/điền sẵn/bảng đáp án) — lấy đúng đáp án đó. ");
-            sb.Append("KHÔNG tự bịa câu, KHÔNG bỏ sót câu nào. Bỏ qua các phần Writing/Listening.");
+            sb.Append("Đáp án đúng đã được đánh dấu trong tài liệu (TÔ NỀN/highlight màu, in đậm, khoanh tròn, điền sẵn hoặc bảng đáp án) — lấy đúng đáp án đó. ");
+            sb.Append("LƯU Ý: chữ GẠCH CHÂN thường là nội dung của câu hỏi (phần phát âm/từ được hỏi), KHÔNG phải đánh dấu đáp án. ");
+            sb.Append("KHÔNG tự bịa câu, KHÔNG bỏ sót câu trắc nghiệm nào (kể cả câu trắc nghiệm trong mục Writing); ");
+            sb.Append("chỉ bỏ câu tự luận, câu cần nghe audio và câu phụ thuộc hình ảnh.");
         }
         else
         {
