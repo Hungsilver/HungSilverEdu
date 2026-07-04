@@ -137,14 +137,6 @@ export enum MaterialSource {
   ServerFile = 'ServerFile'
 }
 
-export enum MaterialType {
-  Pdf = 'Pdf',
-  Video = 'Video',
-  Vocabulary = 'Vocabulary',
-  Test = 'Test',
-  Homework = 'Homework'
-}
-
 export enum ReportType {
   SessionNotice = 'SessionNotice',
   ScheduleNotice = 'ScheduleNotice'
@@ -953,6 +945,7 @@ export const TUITION_STATUS_COLORS: Record<TuitionStatus, string> = {
 
 export interface Material {
   id: string;
+  code: string;
   classId: string | null;
   categoryId: string | null;
   categoryName: string | null;
@@ -960,22 +953,20 @@ export interface Material {
   subjectName: string | null;
   gradeBand: string | null;
   title: string;
-  type: MaterialType;
   source: MaterialSource;
   url: string | null;
   storedFileId: string | null;
+  fileName: string | null;
   description: string | null;
   downloadUrl: string;
   createdAt: string;
 }
 
 export interface CreateMaterialRequest {
-  classId: string | null;
   categoryId: string | null;
   subjectId: string | null;
   gradeBand: string | null;
   title: string;
-  type: MaterialType;
   source: MaterialSource;
   url: string | null;
   storedFileId: string | null;
@@ -987,11 +978,20 @@ export interface UpdateMaterialRequest {
   subjectId: string | null;
   gradeBand: string | null;
   title: string;
-  type: MaterialType;
   source: MaterialSource;
   url: string | null;
   storedFileId: string | null;
   description: string | null;
+}
+
+/** Bộ lọc danh sách tài liệu (phân trang) — tab Danh sách Kho tài liệu. */
+export interface MaterialPagedFilter {
+  search?: string | null;
+  subjectId?: string | null;
+  categoryId?: string | null;
+  gradeBand?: string | null;
+  page: number;
+  pageSize: number;
 }
 
 // ----------------- Nhập danh sách lớp từ Excel (Đợt 7) -----------------
@@ -1062,13 +1062,13 @@ export interface MaterialCategory {
   id: string;
   name: string;
   description: string | null;
-  indexOrder: number;
+  sortOrder: number;
 }
 
 export interface MaterialCategoryRequest {
   name: string;
   description: string | null;
-  indexOrder: number;
+  sortOrder: number;
 }
 
 // ----------------- Bài tập & nộp bài (Đợt 4) -----------------
@@ -1169,14 +1169,6 @@ export interface StudentImportResult {
   skipped: number;
   errors: string[];
 }
-
-export const MATERIAL_TYPE_LABELS: Record<MaterialType, string> = {
-  [MaterialType.Pdf]: 'PDF',
-  [MaterialType.Video]: 'Video',
-  [MaterialType.Vocabulary]: 'Từ vựng',
-  [MaterialType.Test]: 'Đề kiểm tra',
-  [MaterialType.Homework]: 'Bài tập'
-};
 
 // ----------------- Đề trắc nghiệm AI -----------------
 

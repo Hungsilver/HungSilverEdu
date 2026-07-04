@@ -1,7 +1,10 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { Subject as RxSubject } from 'rxjs';
+import { debounceTime, switchMap } from 'rxjs/operators';
 import { Router, RouterLink } from '@angular/router';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -380,8 +383,10 @@ import { PageHeader } from '../../shared/page-header';
             <nz-form-control><input nz-input [(ngModel)]="aTitle" name="t" /></nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Học liệu (nguồn bài)</nz-form-label>
             <nz-form-control>
-              <nz-select [(ngModel)]="aMaterialId" name="m" nzAllowClear nzShowSearch nzPlaceHolder="Chọn học liệu" class="full">
-                @for (m of materials(); track m.id) { <nz-option [nzValue]="m.id" [nzLabel]="m.title" /> }
+              <!-- Kho tài liệu phân trang server-side ⇒ tìm học liệu qua server-search (gõ mã/tên) -->
+              <nz-select [(ngModel)]="aMaterialId" name="m" nzAllowClear nzShowSearch nzServerSearch
+                (nzOnSearch)="searchMaterials($event)" nzPlaceHolder="Gõ mã/tên để tìm học liệu" class="full">
+                @for (m of materials(); track m.id) { <nz-option [nzValue]="m.id" [nzLabel]="m.code + ' — ' + m.title" /> }
               </nz-select>
             </nz-form-control></nz-form-item>
           <nz-form-item><nz-form-label>Buổi học (tùy chọn)</nz-form-label>
@@ -624,6 +629,8 @@ export class ClassDetailPage implements OnInit {
   // Bài tập & nộp bài
   protected readonly assignments = signal<Assignment[]>([]);
   protected readonly materials = signal<Material[]>([]);
+  /** Server-search học liệu cho modal Giao bài tập (debounce, hủy theo vòng đời component). */
+  private readonly materialSearch$ = new RxSubject<string>();
   protected readonly submissions = signal<SubmissionStatusInfo[]>([]);
   protected readonly currentAssignment = signal<Assignment | null>(null);
   protected readonly assignOpen = signal(false);
@@ -683,6 +690,14 @@ export class ClassDetailPage implements OnInit {
   protected slotStart: Date | null = null;
   protected slotEnd: Date | null = null;
 
+  constructor() {
+    this.materialSearch$.pipe(
+      debounceTime(300),
+      switchMap(term => this.materialsService.getPaged({ search: term, page: 1, pageSize: 50 })),
+      takeUntilDestroyed()
+    ).subscribe(r => this.materials.set(r.items));
+  }
+
   ngOnInit(): void {
     this.reload();
     if (this.canManage()) {
@@ -706,17 +721,15 @@ export class ClassDetailPage implements OnInit {
     if (this.canManage()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
     this.warningsService.getWarnings(id).subscribe(w => this.warnings.set(w));
     this.loadAssignments();
-    this.loadMaterials();
   }
 
   private loadAssignments(): void {
     this.assignmentsService.getByClass(this.id()).subscribe(a => this.assignments.set(a));
   }
 
-  private loadMaterials(): void {
-    this.materialsService.getByClass(this.id()).subscribe(cls => {
-      this.materialsService.getLibrary().subscribe(lib => this.materials.set([...cls, ...lib]));
-    });
+  /** Tìm học liệu theo mã/tên qua kho tài liệu phân trang (debounce ở materialSearch$). */
+  protected searchMaterials(term: string): void {
+    this.materialSearch$.next(term);
   }
 
   // ---- Popup chi tiết học viên ----
@@ -739,6 +752,7 @@ export class ClassDetailPage implements OnInit {
     this.aSessionId = null;
     this.aDueDate = null;
     this.aInstructions = '';
+    this.searchMaterials(''); // nạp trang đầu danh sách học liệu
     this.assignOpen.set(true);
   }
 

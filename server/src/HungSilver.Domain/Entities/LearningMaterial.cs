@@ -3,19 +3,22 @@ using HungSilver.Domain.Enums;
 
 namespace HungSilver.Domain.Entities;
 
-/// <summary>Tài liệu học tập theo lớp (Module 11). Lưu link ngoài hoặc tham chiếu file đã upload.</summary>
+/// <summary>Tài liệu trong Kho tài liệu. Lưu link ngoài hoặc tham chiếu file đã upload.</summary>
 public class LearningMaterial : BaseEntity
 {
-    /// <summary>Học liệu gắn 1 lớp; null = học liệu thư viện chung (phân loại theo <see cref="CategoryId"/>).</summary>
+    /// <summary>Mã tài liệu tự sinh dạng TL0001, duy nhất (kể cả bản ghi đã xóa mềm — không tái cấp).</summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>Lớp gắn học liệu (legacy — thiết kế mới không dùng, giữ cho dữ liệu cũ).</summary>
     public Guid? ClassId { get; set; }
 
-    /// <summary>Danh mục/khối học liệu (thư viện). Tùy chọn.</summary>
+    /// <summary>Loại tài liệu (đề kiểm tra, lý thuyết... — trỏ MaterialCategory, không khóa ngoại).</summary>
     public Guid? CategoryId { get; set; }
 
-    /// <summary>Khối lớp gắn học liệu (danh sách chuẩn ở Settings, vd "Khối 6"). Tùy chọn (Đợt 7).</summary>
+    /// <summary>Khối (snapshot tên từ danh mục Khối GradeCategory). Tùy chọn.</summary>
     public string? GradeBand { get; set; }
 
-    /// <summary>Môn học (trục quản lý mới — Guid + snapshot tên, không khóa ngoại). Tùy chọn.</summary>
+    /// <summary>Môn học (Guid + snapshot tên, không khóa ngoại).</summary>
     public Guid? SubjectId { get; set; }
     public string? SubjectName { get; set; }
 

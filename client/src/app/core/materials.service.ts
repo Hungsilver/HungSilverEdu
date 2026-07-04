@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialType, PagedResult, UpdateMaterialRequest
+  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialPagedFilter, PagedResult, UpdateMaterialRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -12,26 +12,14 @@ export class MaterialsService {
   private readonly apiUrl = `${environment.apiUrl}/materials`;
   private readonly catUrl = `${environment.apiUrl}/material-categories`;
 
-  getByClass(classId: string): Observable<Material[]> {
-    const params = new HttpParams().set('classId', classId);
-    return this.http.get<Material[]>(this.apiUrl, { params });
-  }
-
-  /** Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại/khối. */
-  getLibrary(categoryId?: string | null, type?: MaterialType | null, gradeBand?: string | null): Observable<Material[]> {
-    let params = new HttpParams();
-    if (categoryId) params = params.set('categoryId', categoryId);
-    if (type) params = params.set('type', type);
-    if (gradeBand) params = params.set('gradeBand', gradeBand);
-    return this.http.get<Material[]>(`${this.apiUrl}/library`, { params });
-  }
-
-  /** Tài liệu theo Môn (lưới phân trang) — trục quản lý mới. */
-  getBySubject(subjectId: string, type: MaterialType | null, gradeBand: string | null, page: number, pageSize: number): Observable<PagedResult<Material>> {
-    let params = new HttpParams().set('subjectId', subjectId).set('page', page).set('pageSize', pageSize);
-    if (type) params = params.set('type', type);
-    if (gradeBand) params = params.set('gradeBand', gradeBand);
-    return this.http.get<PagedResult<Material>>(`${this.apiUrl}/by-subject`, { params });
+  /** Danh sách tất cả tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên. */
+  getPaged(filter: MaterialPagedFilter): Observable<PagedResult<Material>> {
+    let params = new HttpParams().set('page', filter.page).set('pageSize', filter.pageSize);
+    if (filter.search?.trim()) params = params.set('search', filter.search.trim());
+    if (filter.subjectId) params = params.set('subjectId', filter.subjectId);
+    if (filter.categoryId) params = params.set('categoryId', filter.categoryId);
+    if (filter.gradeBand) params = params.set('gradeBand', filter.gradeBand);
+    return this.http.get<PagedResult<Material>>(this.apiUrl, { params });
   }
 
   create(request: CreateMaterialRequest): Observable<Material> {
@@ -46,7 +34,7 @@ export class MaterialsService {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
 
-  // ---- Danh mục học liệu ----
+  // ---- Loại tài liệu (MaterialCategory) ----
   getCategories(): Observable<MaterialCategory[]> {
     return this.http.get<MaterialCategory[]>(this.catUrl);
   }

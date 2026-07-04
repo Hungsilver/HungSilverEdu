@@ -4,6 +4,7 @@ namespace HungSilver.Application.Materials;
 
 public sealed record MaterialDto(
     Guid Id,
+    string Code,
     Guid? ClassId,
     Guid? CategoryId,
     string? CategoryName,
@@ -11,21 +12,19 @@ public sealed record MaterialDto(
     string? SubjectName,
     string? GradeBand,
     string Title,
-    MaterialType Type,
     MaterialSource Source,
     string? Url,
     Guid? StoredFileId,
+    string? FileName,
     string? Description,
     string DownloadUrl,
     DateTime CreatedAt);
 
 public sealed record CreateMaterialRequest(
-    Guid? ClassId,
     Guid? CategoryId,
     Guid? SubjectId,
     string? GradeBand,
     string Title,
-    MaterialType Type,
     MaterialSource Source,
     string? Url,
     Guid? StoredFileId,
@@ -36,7 +35,6 @@ public sealed record UpdateMaterialRequest(
     Guid? SubjectId,
     string? GradeBand,
     string Title,
-    MaterialType Type,
     MaterialSource Source,
     string? Url,
     Guid? StoredFileId,

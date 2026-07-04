@@ -1,0 +1,166 @@
+using HungSilver.Application.Abstractions;
+using HungSilver.Application.Common;
+using HungSilver.Application.Common.Models;
+using HungSilver.Application.Materials;
+using HungSilver.Domain.Common.Results;
+using HungSilver.Domain.Entities;
+using HungSilver.Domain.Enums;
+using HungSilver.Infrastructure.Common;
+using HungSilver.Infrastructure.Persistence;
+using HungSilver.Infrastructure.Persistence.Interceptors;
+using HungSilver.Infrastructure.Persistence.Repositories;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+
+namespace HungSilver.UnitTests;
+
+/// <summary>
+/// Kiểm thử Kho tài liệu thiết kế mới: mã TL0001 tăng dần (không tái cấp sau xóa mềm),
+/// danh sách phân trang lọc môn/loại/khối + search, update không đổi mã, validator môn/loại bắt buộc.
+/// </summary>
+public sealed class MaterialServiceTests : IDisposable
+{
+    private readonly SqliteConnection _connection;
+    private readonly AppDbContext _context;
+    private readonly Guid _subjectId;
+    private readonly Guid _categoryId;
+
+    public MaterialServiceTests()
+    {
+        _connection = new SqliteConnection("DataSource=:memory:");
+        _connection.Open();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(_connection)
+            .AddInterceptors(new AuditSaveChangesInterceptor())
+            .Options;
+        _context = new AppDbContext(options);
+        _context.Database.EnsureCreated();
+
+        var subject = new Subject { Code = "ANH", Name = "Tiếng Anh" };
+        var category = new MaterialCategory { Name = "Đề kiểm tra", SortOrder = 1 };
+        _context.Subjects.Add(subject);
+        _context.MaterialCategories.Add(category);
+        _context.SaveChanges();
+        _subjectId = subject.Id;
+        _categoryId = category.Id;
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+        _connection.Dispose();
+    }
+
+    private MaterialService NewService() => new(
+        new Repository<LearningMaterial>(_context),
+        new Repository<MaterialCategory>(_context),
+        new Repository<Subject>(_context),
+        new Repository<StoredFile>(_context),
+        new AdminGuard(),
+        new CurrentRelationCleanupService(_context),
+        new UnitOfWork(_context),
+        new FakeCurrentUser(),
+        new CreateMaterialRequestValidator(),
+        new UpdateMaterialRequestValidator());
+
+    private CreateMaterialRequest NewRequest(string title, string? gradeBand = null) =>
+        new(_categoryId, _subjectId, gradeBand, title, MaterialSource.ExternalUrl, "https://x.vn/tl", null, null);
+
+    [Fact]
+    public async Task Create_GeneratesSequentialCodes()
+    {
+        var svc = NewService();
+
+        var first = await svc.CreateAsync(NewRequest("Tài liệu 1"));
+        var second = await svc.CreateAsync(NewRequest("Tài liệu 2"));
+
+        Assert.True(first.IsSuccess);
+        Assert.Equal("TL0001", first.Value.Code);
+        Assert.Equal("TL0002", second.Value.Code);
+        Assert.Equal("Tiếng Anh", first.Value.SubjectName);
+        Assert.Equal("Đề kiểm tra", first.Value.CategoryName);
+    }
+
+    [Fact]
+    public async Task Create_AfterSoftDelete_DoesNotReuseCode()
+    {
+        var svc = NewService();
+        await svc.CreateAsync(NewRequest("Tài liệu 1"));
+        var second = await svc.CreateAsync(NewRequest("Tài liệu 2"));
+
+        var deleted = await svc.DeleteAsync(second.Value.Id);
+        Assert.True(deleted.IsSuccess);
+
+        var third = await svc.CreateAsync(NewRequest("Tài liệu 3"));
+        Assert.Equal("TL0003", third.Value.Code); // TL0002 đã cấp cho bản ghi xóa mềm — không tái cấp
+    }
+
+    [Fact]
+    public async Task GetPaged_FiltersBySearchSubjectCategoryGradeBand()
+    {
+        var svc = NewService();
+        await svc.CreateAsync(NewRequest("Unit 3 Grade 9", gradeBand: "9"));
+        await svc.CreateAsync(NewRequest("Unit 1 Grade 6", gradeBand: "6"));
+
+        var byBand = await svc.GetPagedAsync(null, null, "9", new PagedRequest());
+        Assert.Single(byBand.Value.Items);
+        Assert.Equal("Unit 3 Grade 9", byBand.Value.Items[0].Title);
+
+        var bySearchCode = await svc.GetPagedAsync(null, null, null, new PagedRequest { Search = "tl0002" });
+        Assert.Single(bySearchCode.Value.Items);
+        Assert.Equal("TL0002", bySearchCode.Value.Items[0].Code);
+
+        var bySubject = await svc.GetPagedAsync(_subjectId, _categoryId, null, new PagedRequest());
+        Assert.Equal(2, bySubject.Value.TotalCount);
+
+        var noMatch = await svc.GetPagedAsync(Guid.NewGuid(), null, null, new PagedRequest());
+        Assert.Empty(noMatch.Value.Items);
+    }
+
+    [Fact]
+    public async Task Update_KeepsCode()
+    {
+        var svc = NewService();
+        var created = await svc.CreateAsync(NewRequest("Tên cũ"));
+
+        var updated = await svc.UpdateAsync(created.Value.Id,
+            new UpdateMaterialRequest(_categoryId, _subjectId, "9", "Tên mới", MaterialSource.ExternalUrl, "https://x.vn/tl2", null, null));
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal("Tên mới", updated.Value.Title);
+        Assert.Equal(created.Value.Code, updated.Value.Code);
+    }
+
+    [Fact]
+    public async Task Create_WithoutSubjectOrCategory_FailsValidation()
+    {
+        var svc = NewService();
+
+        var noSubject = await svc.CreateAsync(new CreateMaterialRequest(_categoryId, null, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null));
+        var noCategory = await svc.CreateAsync(new CreateMaterialRequest(null, _subjectId, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null));
+
+        Assert.True(noSubject.IsFailure);
+        Assert.True(noCategory.IsFailure);
+        Assert.Equal("Material.Validation", noSubject.Error.Code);
+    }
+
+    // ----- Fakes -----
+
+    private sealed class FakeCurrentUser : ICurrentUser
+    {
+        public Guid? UserId => Guid.NewGuid();
+        public string? Email => "gv@hs.local";
+        public bool IsAuthenticated => true;
+        public bool IsInRole(string role) => true;
+    }
+
+    private sealed class AdminGuard : IClassAccessGuard
+    {
+        public bool IsAdmin => true;
+        public Task<Guid?> GetTeacherScopeIdAsync(CancellationToken ct = default) => Task.FromResult<Guid?>(null);
+        public Task<Result> EnsureCanAccessClassAsync(Guid classId, CancellationToken ct = default) => Task.FromResult(Result.Success());
+        public Task<bool> CanAccessClassAsync(Guid classId, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<Result> EnsureCanAccessStudentAsync(Guid studentId, CancellationToken ct = default) => Task.FromResult(Result.Success());
+    }
+}

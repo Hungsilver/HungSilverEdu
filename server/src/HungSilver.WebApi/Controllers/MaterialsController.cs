@@ -1,6 +1,5 @@
 using HungSilver.Application.Common.Models;
 using HungSilver.Application.Materials;
-using HungSilver.Domain.Enums;
 using HungSilver.WebApi.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,22 +11,12 @@ namespace HungSilver.WebApi.Controllers;
 [Authorize(Policy = "TeacherOrAdmin")]
 public class MaterialsController(IMaterialService materialService) : ControllerBase
 {
+    /// <summary>Danh sách tất cả tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên.</summary>
     [HttpGet]
-    public async Task<ActionResult<List<MaterialDto>>> GetByClass([FromQuery] Guid classId, CancellationToken ct) =>
-        (await materialService.GetByClassAsync(classId, ct)).ToActionResult();
-
-    /// <summary>Thư viện học liệu chung (không gắn lớp), lọc theo danh mục/loại/khối.</summary>
-    [HttpGet("library")]
-    public async Task<ActionResult<List<MaterialDto>>> GetLibrary(
-        [FromQuery] Guid? categoryId, [FromQuery] MaterialType? type, [FromQuery] string? gradeBand, CancellationToken ct) =>
-        (await materialService.GetLibraryAsync(categoryId, type, gradeBand, ct)).ToActionResult();
-
-    /// <summary>Tài liệu theo Môn học (lưới phân trang) — trục quản lý mới của Kho tài liệu.</summary>
-    [HttpGet("by-subject")]
-    public async Task<ActionResult<PagedResult<MaterialDto>>> GetBySubject(
-        [FromQuery] Guid subjectId, [FromQuery] MaterialType? type, [FromQuery] string? gradeBand,
+    public async Task<ActionResult<PagedResult<MaterialDto>>> GetPaged(
+        [FromQuery] Guid? subjectId, [FromQuery] Guid? categoryId, [FromQuery] string? gradeBand,
         [FromQuery] PagedRequest paging, CancellationToken ct) =>
-        (await materialService.GetPagedBySubjectAsync(subjectId, type, gradeBand, paging, ct)).ToActionResult();
+        (await materialService.GetPagedAsync(subjectId, categoryId, gradeBand, paging, ct)).ToActionResult();
 
     [HttpPost]
     public async Task<ActionResult<MaterialDto>> Create(CreateMaterialRequest request, CancellationToken ct) =>

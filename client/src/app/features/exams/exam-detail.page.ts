@@ -67,6 +67,12 @@ interface Section {
     <app-page-header [title]="detail()?.title || 'Duyệt đề'" subtitle="Duyệt & chỉnh sửa trước khi phát hành" icon="file-text">
       <button nz-button (click)="back()"><nz-icon nzType="arrow-left" /> Quay lại</button>
       @if (detail(); as d) {
+        @if (d.sourceFileUrl) {
+          <button nz-button [nzLoading]="pdfLoading()" (click)="togglePdf()">
+            <nz-icon nzType="eye" /> {{ pdfUrl() ? 'Ẩn tài liệu gốc' : 'Xem tài liệu gốc' }}
+          </button>
+          <button nz-button (click)="downloadSource()"><nz-icon nzType="download" /> Download tài liệu</button>
+        }
         <button nz-button (click)="openMeta()"><nz-icon nzType="edit" /> Sửa thông tin</button>
         <button nz-button nzType="primary" (click)="addQuestion()"><nz-icon nzType="plus" /> Thêm câu</button>
         @if (d.status === 'Draft') {
@@ -350,6 +356,7 @@ export class ExamDetailPage implements OnInit, OnDestroy {
   protected readonly allQuestions = computed(() => this.detailRaw()?.questions ?? []);
   protected readonly sections = signal<Section[]>([]);
   protected readonly pdfUrl = signal<SafeResourceUrl | null>(null);
+  protected readonly pdfLoading = signal(false);
 
   // Sửa thông tin đề
   protected readonly metaOpen = signal(false);
@@ -381,11 +388,38 @@ export class ExamDetailPage implements OnInit, OnDestroy {
       next: d => {
         this.detailRaw.set(d);
         this.buildSections(d);
-        this.loadPdf(d.sourceFileUrl);
+        // KHÔNG tự tải PDF gốc — GV bấm "Xem tài liệu gốc" mới load (mobile iframe hay bị ép tải file).
         if (d.status === 'Published') this.loadAssignments();
         this.loading.set(false);
       },
       error: () => this.loading.set(false)
+    });
+  }
+
+  /** Bật/tắt khung xem tài liệu gốc song song — chỉ tải blob khi GV bấm xem. */
+  protected togglePdf(): void {
+    if (this.pdfUrl()) {
+      if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
+      this.pdfUrl.set(null);
+      return;
+    }
+    this.loadPdf(this.detailRaw()?.sourceFileUrl ?? null);
+  }
+
+  /** Download tài liệu gốc về máy (blob kèm token; suy đuôi file từ content-type). */
+  protected downloadSource(): void {
+    const d = this.detailRaw();
+    if (!d?.sourceFileUrl) return;
+    this.http.get(d.sourceFileUrl, { responseType: 'blob' }).subscribe(blob => {
+      const ext = blob.type === 'application/pdf' ? '.pdf'
+        : blob.type.includes('wordprocessingml') ? '.docx'
+        : blob.type === 'application/msword' ? '.doc' : '';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${d.title}${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
     });
   }
 
@@ -394,12 +428,14 @@ export class ExamDetailPage implements OnInit, OnDestroy {
     if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
     this.pdfUrl.set(null);
     if (!url) return;
+    this.pdfLoading.set(true);
     this.http.get(url, { responseType: 'blob' }).subscribe({
       next: blob => {
         this.objectUrl = URL.createObjectURL(blob);
         this.pdfUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.objectUrl));
+        this.pdfLoading.set(false);
       },
-      error: () => this.pdfUrl.set(null)
+      error: () => { this.pdfUrl.set(null); this.pdfLoading.set(false); }
     });
   }
 

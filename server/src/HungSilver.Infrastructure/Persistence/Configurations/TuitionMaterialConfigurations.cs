@@ -23,6 +23,9 @@ public sealed class LearningMaterialConfiguration : IEntityTypeConfiguration<Lea
 {
     public void Configure(EntityTypeBuilder<LearningMaterial> e)
     {
+        e.Property(x => x.Code).HasMaxLength(20);
+        // Unique phủ cả bản ghi soft-deleted ⇒ mã không bao giờ tái cấp.
+        e.HasIndex(x => x.Code).IsUnique();
         e.Property(x => x.Title).HasMaxLength(200);
         e.Property(x => x.Url).HasMaxLength(1000);
         e.Property(x => x.Description).HasMaxLength(2000);

@@ -67,6 +67,7 @@ public static class DbSeeder
         }
 
         await SeedGradeCategoriesAsync(context, logger);
+        await SeedMaterialCategoriesAsync(context, logger);
         await SeedPointReasonsAsync(context, logger);
 
         // Auto-seed tài khoản Admin nếu chưa có admin nào trong hệ thống.
@@ -175,5 +176,22 @@ public static class DbSeeder
             await context.SaveChangesAsync();
             logger.LogInformation("Seeded default grade categories");
         }
+    }
+
+    /// <summary>Loại tài liệu mặc định cho Kho tài liệu — chỉ seed khi bảng trống hoàn toàn (kể cả đã xóa mềm).</summary>
+    private static async Task SeedMaterialCategoriesAsync(AppDbContext context, ILogger logger)
+    {
+        if (await context.MaterialCategories.IgnoreQueryFilters().AnyAsync())
+            return;
+
+        var defaults = new (string Name, int SortOrder)[]
+        {
+            ("Giáo trình", 1), ("Lý thuyết", 2), ("Đề kiểm tra", 3), ("Bài tập", 4), ("Từ vựng", 5), ("Video", 6)
+        };
+        foreach (var (name, sort) in defaults)
+            context.MaterialCategories.Add(new MaterialCategory { Name = name, SortOrder = sort });
+
+        await context.SaveChangesAsync();
+        logger.LogInformation("Seeded default material categories");
     }
 }
