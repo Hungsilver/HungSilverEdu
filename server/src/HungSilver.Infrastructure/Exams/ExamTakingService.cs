@@ -15,7 +15,8 @@ namespace HungSilver.Infrastructure.Exams;
 /// </summary>
 public sealed class ExamTakingService(AppDbContext context, ICurrentUser currentUser) : IExamTakingService
 {
-    private const int GraceSeconds = 20; // dung sai đồng hồ quanh mốc hết giờ
+    /// <summary>Dung sai đồng hồ quanh mốc hết giờ — dùng chung với service nền chốt bài bỏ dở.</summary>
+    public const int GraceSeconds = 20;
 
     public async Task<Result<List<PortalExamDto>>> GetMyExamsAsync(CancellationToken ct = default)
     {
@@ -26,16 +27,19 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
         var classIds = await StudentClassIdsAsync(student.Id, ct);
         if (classIds.Count == 0) return new List<PortalExamDto>();
 
+        // Nạp attempt của HS trước: đề đã ĐÓNG nhưng HS có lượt làm vẫn phải hiện (giữ điểm + Xem lại);
+        // chỉ ẩn đề đã đóng mà HS chưa từng làm.
+        var myAttempts = await context.ExamAttempts.AsNoTracking()
+            .Where(t => t.StudentId == student.Id).ToListAsync(ct);
+        var attemptByAssignment = myAttempts.ToDictionary(t => t.ExamAssignmentId);
+        var attemptAssignmentIds = myAttempts.Select(t => t.ExamAssignmentId).ToList();
+
         var assignments = await context.ExamAssignments.AsNoTracking()
-            .Where(a => classIds.Contains(a.ClassId) && a.Status == ExamAssignmentStatus.Open)
+            .Where(a => classIds.Contains(a.ClassId)
+                && (a.Status == ExamAssignmentStatus.Open || attemptAssignmentIds.Contains(a.Id)))
             .OrderByDescending(a => a.OpenAt)
             .ToListAsync(ct);
         if (assignments.Count == 0) return new List<PortalExamDto>();
-
-        var aIds = assignments.Select(a => a.Id).ToList();
-        var attemptByAssignment = (await context.ExamAttempts.AsNoTracking()
-                .Where(t => t.StudentId == student.Id && aIds.Contains(t.ExamAssignmentId)).ToListAsync(ct))
-            .ToDictionary(t => t.ExamAssignmentId);
 
         var cIds = assignments.Select(a => a.ClassId).Distinct().ToList();
         var classNames = await context.Classes.Where(c => cIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
@@ -44,9 +48,11 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
         return assignments.Select(a =>
         {
             attemptByAssignment.TryGetValue(a.Id, out var at);
-            var isOpen = now >= a.OpenAt && (a.CloseAt is null || now <= a.CloseAt);
+            // Khớp điều kiện StartAsync: đề GV đã đóng tay thì không còn "đang mở" dù chưa tới CloseAt.
+            var isOpen = a.Status == ExamAssignmentStatus.Open
+                && now >= a.OpenAt && (a.CloseAt is null || now <= a.CloseAt);
             return new PortalExamDto(a.Id, a.ExamId, a.ExamTitle ?? "Đề", classNames.GetValueOrDefault(a.ClassId, ""),
-                a.Mode, a.DurationMinutes, a.OpenAt, a.CloseAt, isOpen, at?.Status, at?.Id, at?.Score, a.TotalPoints);
+                a.Mode, a.DurationMinutes, a.OpenAt, a.CloseAt, isOpen, a.Status, at?.Status, at?.Id, at?.Score, a.TotalPoints);
         }).ToList();
     }
 
@@ -185,8 +191,24 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
         if (attempt.Status != ExamAttemptStatus.InProgress)
             return new ExamAttemptResultDto(attempt.Score ?? 0, assignment.TotalPoints, attempt.CorrectCount ?? 0, attempt.TotalCount ?? 0, attempt.Status);
 
+        var expiresAt = (attempt.StartedAt ?? DateTime.Now).AddMinutes(assignment.DurationMinutes);
+        var finalStatus = DateTime.Now > expiresAt.AddSeconds(GraceSeconds) ? ExamAttemptStatus.AutoSubmitted : ExamAttemptStatus.Submitted;
+        await GradeAndFinalizeAsync(context, attempt, assignment, finalStatus, ct);
+
+        await context.SaveChangesAsync(ct);
+        return new ExamAttemptResultDto(attempt.Score ?? 0, assignment.TotalPoints, attempt.CorrectCount ?? 0, attempt.TotalCount ?? 0, attempt.Status);
+    }
+
+    /// <summary>
+    /// Lõi chấm + chốt 1 attempt (dùng chung: HS nộp bài và service nền chốt bài bỏ dở).
+    /// Ghi IsCorrect/AwardedPoints từng câu, tạo bản ghi rỗng cho câu không trả lời,
+    /// set Status/SubmittedAt/Score/CorrectCount/TotalCount. KHÔNG SaveChanges — caller lo.
+    /// </summary>
+    public static async Task GradeAndFinalizeAsync(AppDbContext context, ExamAttempt attempt,
+        ExamAssignment assignment, ExamAttemptStatus finalStatus, CancellationToken ct = default)
+    {
         var questions = await context.ExamQuestions.Where(q => q.ExamId == assignment.ExamId).ToListAsync(ct);
-        var answerByQ = (await context.ExamAttemptAnswers.Where(x => x.AttemptId == attemptId).ToListAsync(ct))
+        var answerByQ = (await context.ExamAttemptAnswers.Where(x => x.AttemptId == attempt.Id).ToListAsync(ct))
             .ToDictionary(x => x.QuestionId);
 
         decimal score = 0;
@@ -200,7 +222,7 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
             if (correct) correctCount++;
 
             if (ans is null)
-                context.ExamAttemptAnswers.Add(new ExamAttemptAnswer { AttemptId = attemptId, QuestionId = q.Id, ResponseJson = null, IsCorrect = false, AwardedPoints = 0m });
+                context.ExamAttemptAnswers.Add(new ExamAttemptAnswer { AttemptId = attempt.Id, QuestionId = q.Id, ResponseJson = null, IsCorrect = false, AwardedPoints = 0m });
             else
             {
                 ans.IsCorrect = correct;
@@ -208,15 +230,11 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
             }
         }
 
-        var expiresAt = (attempt.StartedAt ?? DateTime.Now).AddMinutes(assignment.DurationMinutes);
-        attempt.Status = DateTime.Now > expiresAt.AddSeconds(GraceSeconds) ? ExamAttemptStatus.AutoSubmitted : ExamAttemptStatus.Submitted;
+        attempt.Status = finalStatus;
         attempt.SubmittedAt = DateTime.Now;
         attempt.Score = Math.Round(score, 2);
         attempt.CorrectCount = correctCount;
         attempt.TotalCount = questions.Count;
-
-        await context.SaveChangesAsync(ct);
-        return new ExamAttemptResultDto(attempt.Score.Value, assignment.TotalPoints, correctCount, questions.Count, attempt.Status);
     }
 
     public async Task<Result<PortalReviewDto>> GetReviewAsync(Guid attemptId, CancellationToken ct = default)

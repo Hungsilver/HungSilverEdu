@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -21,33 +21,12 @@ import { NzTagModule } from 'ng-zorro-antd/tag';
 import { ClassesService } from '../../core/classes.service';
 import { ExamService } from '../../core/exam.service';
 import {
-  AssignExamRequest, ClassListItem, EXAM_TYPE_LABELS, ExamAssignment, ExamDeliveryMode, ExamDetail, ExamOption,
-  ExamPair, ExamQuestion, ExamQuestionType, UpsertQuestionRequest
+  AssignExamRequest, ClassListItem, EXAM_TYPE_LABELS, ExamAssignment, ExamDeliveryMode, ExamDetail, ExamQuestion
 } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
-
-/** Câu hỏi ở dạng có thể sửa (đã parse từ JSON lưu trữ). */
-interface EditQuestion {
-  id: string | null;
-  groupId: string | null;
-  type: ExamQuestionType;
-  stem: string;
-  options: ExamOption[];       // SingleChoice + Matching (cột trái)
-  optionsRight: ExamOption[];  // Matching (cột phải)
-  answerKey: string;           // SingleChoice
-  trueFalse: boolean;          // TrueFalse
-  blanks: string[];            // FillBlank (mỗi ô = "a/b")
-  wordBox: string;             // FillBlank hộp từ (ngăn bởi ",")
-  pairs: ExamPair[];           // Matching
-  explanation: string;
-  points: number | null;
-}
-
-interface QView {
-  q: ExamQuestion;
-  options: { key: string; text: string; correct: boolean }[];
-  answerSummary: string;
-}
+import {
+  EditQuestion, QView, QuestionEditorForm, buildQuestionView, emptyEditQuestion, toEditQuestion, toUpsertRequest
+} from './question-editor';
 
 interface Section {
   groupId: string | null;
@@ -61,7 +40,8 @@ interface Section {
   imports: [
     FormsModule,
     NzCardModule, NzButtonModule, NzIconModule, NzTagModule, NzModalModule, NzFormModule, NzInputModule,
-    NzInputNumberModule, NzRadioModule, NzSelectModule, NzDatePickerModule, NzSpinModule, NzAlertModule, NzPopconfirmModule, PageHeader
+    NzInputNumberModule, NzRadioModule, NzSelectModule, NzDatePickerModule, NzSpinModule, NzAlertModule, NzPopconfirmModule,
+    PageHeader, QuestionEditorForm
   ],
   template: `
     <app-page-header [title]="detail()?.title || 'Duyệt đề'" subtitle="Duyệt & chỉnh sửa trước khi phát hành" icon="file-text">
@@ -74,6 +54,9 @@ interface Section {
           <button nz-button (click)="downloadSource()"><nz-icon nzType="download" /> Download tài liệu</button>
         }
         <button nz-button (click)="openMeta()"><nz-icon nzType="edit" /> Sửa thông tin</button>
+        <button nz-button nz-popconfirm nzPopconfirmTitle="Tạo bản sao Draft của đề này?" (nzOnConfirm)="duplicate()">
+          <nz-icon nzType="copy" /> Nhân bản
+        </button>
         <button nz-button nzType="primary" (click)="addQuestion()"><nz-icon nzType="plus" /> Thêm câu</button>
         @if (d.status === 'Draft') {
           <button nz-button nzType="primary" nz-popconfirm nzPopconfirmTitle="Phát hành đề vào bộ đề?"
@@ -172,105 +155,7 @@ interface Section {
       <nz-modal [nzVisible]="true" [nzTitle]="e.id ? 'Sửa câu hỏi' : 'Thêm câu hỏi'" nzWidth="640px"
         [nzOkLoading]="saving()" (nzOnOk)="saveQuestion()" (nzOnCancel)="edit.set(null)">
         <ng-container *nzModalContent>
-          <form nz-form nzLayout="vertical">
-            <nz-form-item><nz-form-label>Loại</nz-form-label>
-              <nz-form-control>
-                <nz-radio-group [(ngModel)]="e.type" name="type" (ngModelChange)="onTypeChange(e)">
-                  <label nz-radio-button nzValue="SingleChoice">Trắc nghiệm</label>
-                  <label nz-radio-button nzValue="TrueFalse">Đúng/Sai</label>
-                  <label nz-radio-button nzValue="FillBlank">Điền từ</label>
-                  <label nz-radio-button nzValue="Matching">Nối</label>
-                </nz-radio-group>
-              </nz-form-control></nz-form-item>
-
-            <nz-form-item><nz-form-label nzRequired>Nội dung câu hỏi</nz-form-label>
-              <nz-form-control><textarea nz-input [(ngModel)]="e.stem" name="stem" rows="2"></textarea></nz-form-control></nz-form-item>
-
-            @switch (e.type) {
-              @case ('SingleChoice') {
-                <nz-form-item><nz-form-label>Lựa chọn (chọn đáp án đúng)</nz-form-label>
-                  <nz-form-control>
-                    <nz-radio-group [(ngModel)]="e.answerKey" name="ak" class="opt-radio">
-                      @for (o of e.options; track $index) {
-                        <div class="opt-row">
-                          <label nz-radio [nzValue]="o.key"></label>
-                          <input nz-input class="k" [(ngModel)]="o.key" [ngModelOptions]="{standalone:true}" placeholder="A" />
-                          <input nz-input [(ngModel)]="o.text" [ngModelOptions]="{standalone:true}" placeholder="Nội dung" />
-                          <button nz-button nzType="text" nzDanger (click)="e.options.splice($index,1)"><nz-icon nzType="minus" /></button>
-                        </div>
-                      }
-                    </nz-radio-group>
-                    <button nz-button nzSize="small" (click)="e.options.push({key:'',text:''})"><nz-icon nzType="plus" /> Thêm lựa chọn</button>
-                  </nz-form-control></nz-form-item>
-              }
-              @case ('TrueFalse') {
-                <nz-form-item><nz-form-label>Đáp án đúng</nz-form-label>
-                  <nz-form-control>
-                    <nz-radio-group [(ngModel)]="e.trueFalse" name="tf">
-                      <label nz-radio-button [nzValue]="true">Đúng</label>
-                      <label nz-radio-button [nzValue]="false">Sai</label>
-                    </nz-radio-group>
-                  </nz-form-control></nz-form-item>
-              }
-              @case ('FillBlank') {
-                <nz-form-item><nz-form-label>Đáp án từng ô (ngăn cách các đáp án chấp nhận bằng "/")</nz-form-label>
-                  <nz-form-control>
-                    @for (b of e.blanks; track $index) {
-                      <div class="opt-row">
-                        <span class="blank-no">Ô {{ $index + 1 }}</span>
-                        <input nz-input [(ngModel)]="e.blanks[$index]" [ngModelOptions]="{standalone:true}" placeholder="mental / tinh thần" />
-                        <button nz-button nzType="text" nzDanger (click)="e.blanks.splice($index,1)"><nz-icon nzType="minus" /></button>
-                      </div>
-                    }
-                    <button nz-button nzSize="small" (click)="e.blanks.push('')"><nz-icon nzType="plus" /> Thêm ô</button>
-                  </nz-form-control></nz-form-item>
-                <nz-form-item><nz-form-label>Hộp từ (tùy chọn, ngăn bởi ",")</nz-form-label>
-                  <nz-form-control><input nz-input [(ngModel)]="e.wordBox" name="wb" /></nz-form-control></nz-form-item>
-              }
-              @case ('Matching') {
-                <nz-form-item><nz-form-label>Cột trái / Cột phải / Cặp nối</nz-form-label>
-                  <nz-form-control>
-                    <div class="match-cols">
-                      <div>
-                        <div class="col-h">Cột trái</div>
-                        @for (o of e.options; track $index) {
-                          <div class="opt-row">
-                            <input nz-input class="k" [(ngModel)]="o.key" [ngModelOptions]="{standalone:true}" placeholder="1" />
-                            <input nz-input [(ngModel)]="o.text" [ngModelOptions]="{standalone:true}" placeholder="..." />
-                            <button nz-button nzType="text" nzDanger (click)="e.options.splice($index,1)"><nz-icon nzType="minus" /></button>
-                          </div>
-                        }
-                        <button nz-button nzSize="small" (click)="e.options.push({key:'',text:''})"><nz-icon nzType="plus" /></button>
-                      </div>
-                      <div>
-                        <div class="col-h">Cột phải</div>
-                        @for (o of e.optionsRight; track $index) {
-                          <div class="opt-row">
-                            <input nz-input class="k" [(ngModel)]="o.key" [ngModelOptions]="{standalone:true}" placeholder="a" />
-                            <input nz-input [(ngModel)]="o.text" [ngModelOptions]="{standalone:true}" placeholder="..." />
-                            <button nz-button nzType="text" nzDanger (click)="e.optionsRight.splice($index,1)"><nz-icon nzType="minus" /></button>
-                          </div>
-                        }
-                        <button nz-button nzSize="small" (click)="e.optionsRight.push({key:'',text:''})"><nz-icon nzType="plus" /></button>
-                      </div>
-                    </div>
-                    <div class="col-h">Cặp nối (key trái → key phải)</div>
-                    @for (p of e.pairs; track $index) {
-                      <div class="opt-row">
-                        <input nz-input class="k" [(ngModel)]="p.left" [ngModelOptions]="{standalone:true}" placeholder="1" />
-                        <span>→</span>
-                        <input nz-input class="k" [(ngModel)]="p.right" [ngModelOptions]="{standalone:true}" placeholder="a" />
-                        <button nz-button nzType="text" nzDanger (click)="e.pairs.splice($index,1)"><nz-icon nzType="minus" /></button>
-                      </div>
-                    }
-                    <button nz-button nzSize="small" (click)="e.pairs.push({left:'',right:''})"><nz-icon nzType="plus" /> Thêm cặp</button>
-                  </nz-form-control></nz-form-item>
-              }
-            }
-
-            <nz-form-item><nz-form-label>Giải thích (vì sao đúng)</nz-form-label>
-              <nz-form-control><textarea nz-input [(ngModel)]="e.explanation" name="ex" rows="2"></textarea></nz-form-control></nz-form-item>
-          </form>
+          <app-question-editor [question]="e" />
         </ng-container>
       </nz-modal>
     }
@@ -321,12 +206,6 @@ interface Section {
     .answer { margin-top: 8px; }
     .expl { margin-top: 4px; color: var(--hs-text-muted); }
     .muted { color: var(--hs-text-muted); }
-    .opt-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-    .opt-row .k { max-width: 64px; }
-    .opt-radio { display: block; }
-    .blank-no { min-width: 48px; }
-    .match-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .col-h { font-weight: 600; margin: 8px 0 4px; }
     .assign-card { margin-bottom: 12px; }
     .asg-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--hs-border); flex-wrap: wrap; }
     .asg-row:last-child { border-bottom: none; }
@@ -334,7 +213,7 @@ interface Section {
     @media (max-width: 991px) { .split { grid-template-columns: 1fr; } .pdf { height: 60vh; position: static; } }
   `
 })
-export class ExamDetailPage implements OnInit, OnDestroy {
+export class ExamDetailPage implements OnDestroy {
   private readonly examService = inject(ExamService);
   private readonly classesService = inject(ClassesService);
   private readonly http = inject(HttpClient);
@@ -378,12 +257,21 @@ export class ExamDetailPage implements OnInit, OnDestroy {
   protected asgOpenAt: Date | null = null;
   protected asgCloseAt: Date | null = null;
 
-  ngOnInit(): void {
-    this.load();
+  constructor() {
+    // Nạp theo id — effect thay ngOnInit để tự nạp lại khi id đổi trên CÙNG route
+    // (vd sau "Nhân bản" điều hướng /exams/{id cũ} → /exams/{id mới}, component được tái sử dụng).
+    effect(() => {
+      this.id();
+      untracked(() => this.load());
+    });
   }
 
   private load(): void {
     this.loading.set(true);
+    // Reset trạng thái gắn với đề cũ khi chuyển sang đề khác trên cùng route.
+    if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
+    this.pdfUrl.set(null);
+    this.assignments.set([]);
     this.examService.detail(this.id()).subscribe({
       next: d => {
         this.detailRaw.set(d);
@@ -448,7 +336,7 @@ export class ExamDetailPage implements OnInit, OnDestroy {
     for (const q of d.questions) {
       const key = q.groupId ?? null;
       if (!byGroup.has(key)) byGroup.set(key, []);
-      byGroup.get(key)!.push(this.buildView(q));
+      byGroup.get(key)!.push(buildQuestionView(q));
     }
     const sections: Section[] = [];
     for (const g of d.groups) {
@@ -461,28 +349,6 @@ export class ExamDetailPage implements OnInit, OnDestroy {
     const ungrouped = byGroup.get(null);
     if (ungrouped?.length) sections.push({ groupId: null, title: null, passage: null, items: ungrouped });
     this.sections.set(sections);
-  }
-
-  private buildView(q: ExamQuestion): QView {
-    const options: { key: string; text: string; correct: boolean }[] = [];
-    let answerSummary = '';
-    try {
-      if (q.type === 'SingleChoice') {
-        const opts = q.optionsJson ? JSON.parse(q.optionsJson) as ExamOption[] : [];
-        const key = (JSON.parse(q.answerJson).key ?? '') as string;
-        for (const o of opts) options.push({ key: o.key, text: o.text, correct: o.key === key });
-        answerSummary = key;
-      } else if (q.type === 'TrueFalse') {
-        answerSummary = JSON.parse(q.answerJson).value ? 'Đúng' : 'Sai';
-      } else if (q.type === 'FillBlank') {
-        const blanks = (JSON.parse(q.answerJson).blanks ?? []) as string[][];
-        answerSummary = blanks.map((b, i) => `Ô${i + 1}: ${b.join(' / ')}`).join('  •  ');
-      } else if (q.type === 'Matching') {
-        const pairs = (JSON.parse(q.answerJson).pairs ?? {}) as Record<string, string>;
-        answerSummary = Object.entries(pairs).map(([l, r]) => `${l}→${r}`).join(', ');
-      }
-    } catch { /* JSON hỏng — hiển thị rỗng, GV sửa lại */ }
-    return { q, options, answerSummary };
   }
 
   protected back(): void {
@@ -515,46 +381,13 @@ export class ExamDetailPage implements OnInit, OnDestroy {
     });
   }
 
-  // ---- Sửa/thêm câu hỏi ----
+  // ---- Sửa/thêm câu hỏi (editor dùng chung ./question-editor) ----
   protected addQuestion(): void {
-    this.edit.set({
-      id: null, groupId: null, type: 'SingleChoice', stem: '',
-      options: [{ key: 'A', text: '' }, { key: 'B', text: '' }], optionsRight: [],
-      answerKey: 'A', trueFalse: true, blanks: [''], wordBox: '', pairs: [], explanation: '', points: null
-    });
+    this.edit.set(emptyEditQuestion());
   }
 
   protected editQuestion(q: ExamQuestion): void {
-    const e: EditQuestion = {
-      id: q.id, groupId: q.groupId, type: q.type, stem: q.stem,
-      options: [], optionsRight: [], answerKey: '', trueFalse: true, blanks: [], wordBox: '', pairs: [],
-      explanation: q.explanation ?? '', points: q.points
-    };
-    try {
-      if (q.type === 'SingleChoice') {
-        e.options = q.optionsJson ? JSON.parse(q.optionsJson) : [];
-        e.answerKey = JSON.parse(q.answerJson).key ?? '';
-      } else if (q.type === 'TrueFalse') {
-        e.trueFalse = !!JSON.parse(q.answerJson).value;
-      } else if (q.type === 'FillBlank') {
-        const opt = q.optionsJson ? JSON.parse(q.optionsJson) : {};
-        e.wordBox = (opt.wordBox ?? []).join(', ');
-        e.blanks = ((JSON.parse(q.answerJson).blanks ?? []) as string[][]).map(b => b.join(' / '));
-        if (e.blanks.length === 0) e.blanks = [''];
-      } else if (q.type === 'Matching') {
-        const opt = q.optionsJson ? JSON.parse(q.optionsJson) : {};
-        e.options = opt.left ?? [];
-        e.optionsRight = opt.right ?? [];
-        const pairs = JSON.parse(q.answerJson).pairs ?? {};
-        e.pairs = Object.entries(pairs).map(([left, right]) => ({ left, right: right as string }));
-      }
-    } catch { /* JSON hỏng — để GV nhập lại */ }
-    this.edit.set(e);
-  }
-
-  protected onTypeChange(e: EditQuestion): void {
-    if (e.type === 'SingleChoice' && e.options.length === 0) e.options = [{ key: 'A', text: '' }, { key: 'B', text: '' }];
-    if (e.type === 'FillBlank' && e.blanks.length === 0) e.blanks = [''];
+    this.edit.set(toEditQuestion(q));
   }
 
   protected saveQuestion(): void {
@@ -562,20 +395,7 @@ export class ExamDetailPage implements OnInit, OnDestroy {
     if (!e) return;
     if (!e.stem.trim()) { this.message.warning('Nhập nội dung câu hỏi.'); return; }
 
-    const req: UpsertQuestionRequest = {
-      groupId: e.groupId,
-      type: e.type,
-      stem: e.stem.trim(),
-      options: (e.type === 'SingleChoice' || e.type === 'Matching') ? e.options : null,
-      optionsRight: e.type === 'Matching' ? e.optionsRight : null,
-      answerKey: e.type === 'SingleChoice' ? e.answerKey : (e.type === 'TrueFalse' ? String(e.trueFalse) : null),
-      answerBlanks: e.type === 'FillBlank' ? e.blanks.filter(b => b.trim()) : null,
-      wordBox: e.type === 'FillBlank' && e.wordBox.trim() ? e.wordBox.split(',').map(x => x.trim()).filter(Boolean) : null,
-      answerPairs: e.type === 'Matching' ? e.pairs : null,
-      explanation: e.explanation.trim() || null,
-      points: e.points
-    };
-
+    const req = toUpsertRequest(e);
     this.saving.set(true);
     const op = e.id
       ? this.examService.updateQuestion(this.id(), e.id, req)
@@ -597,6 +417,14 @@ export class ExamDetailPage implements OnInit, OnDestroy {
     this.examService.publish(this.id()).subscribe({
       next: () => { this.message.success('Đã phát hành đề.'); this.load(); },
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Phát hành thất bại.')
+    });
+  }
+
+  /** Nhân bản nguyên trạng thành đề Draft mới — đường chỉnh sửa khi đề gốc đã giao cho lớp. */
+  protected duplicate(): void {
+    this.examService.duplicate(this.id()).subscribe({
+      next: r => { this.message.success('Đã tạo bản sao — chỉnh sửa trên đề mới.'); this.router.navigate(['/exams', r.examId]); },
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Nhân bản thất bại.')
     });
   }
 

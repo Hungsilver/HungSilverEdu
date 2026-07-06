@@ -49,6 +49,8 @@ import { PageHeader } from '../../shared/page-header';
             <td>{{ e.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
             <td nzRight (click)="$event.stopPropagation()">
               <button nz-button nzType="link" nzSize="small" (click)="open(e)"><nz-icon nzType="edit" /> Duyệt</button>
+              <button nz-button nzType="link" nzSize="small" nz-popconfirm nzPopconfirmTitle="Tạo bản sao Draft của đề này?"
+                      (nzOnConfirm)="duplicate(e)"><nz-icon nzType="copy" /> Nhân bản</button>
               <button nz-button nzType="link" nzSize="small" nzDanger nz-popconfirm nzPopconfirmTitle="Xóa đề này?"
                       (nzOnConfirm)="remove(e)"><nz-icon nzType="delete" /></button>
             </td>
@@ -260,6 +262,14 @@ export class ExamListPage implements OnInit, OnDestroy {
     this.examService.delete(e.id).subscribe({
       next: () => { this.message.success('Đã xóa đề.'); this.load(); },
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
+    });
+  }
+
+  /** Nhân bản nguyên trạng thành đề Draft mới — đường chỉnh sửa khi đề gốc đã giao cho lớp. */
+  protected duplicate(e: ExamListItem): void {
+    this.examService.duplicate(e.id).subscribe({
+      next: r => { this.message.success('Đã tạo bản sao — chỉnh sửa trên đề mới.'); this.router.navigate(['/exams', r.examId]); },
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Nhân bản thất bại.')
     });
   }
 }

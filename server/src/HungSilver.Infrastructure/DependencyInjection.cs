@@ -151,6 +151,9 @@ public static class DependencyInjection
         services.AddScoped<IExamAssignmentService, ExamAssignmentService>();
         services.AddScoped<IExamTakingService, ExamTakingService>();
         services.AddScoped<IExamReportService, ExamReportService>();
+        services.AddScoped<IExamQuestionBankService, ExamQuestionBankService>();
+        // Chốt lượt làm bài bỏ dở (tự chấm AutoSubmitted khi quá hạn giờ làm).
+        services.AddHostedService<ExamAttemptFinalizeService>();
 
         // Service nghiệp vụ (Infrastructure)
         services.AddScoped<IClassService, ClassService>();

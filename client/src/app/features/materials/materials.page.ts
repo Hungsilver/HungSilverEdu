@@ -33,6 +33,7 @@ import { PageHeader } from '../../shared/page-header';
 import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
 import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 import { MaterialsCatalogTab } from './materials-catalog.tab';
+import { QuestionBankTab } from './question-bank.tab';
 
 @Component({
   selector: 'app-materials-page',
@@ -40,7 +41,7 @@ import { MaterialsCatalogTab } from './materials-catalog.tab';
     FormsModule, ReactiveFormsModule,
     NzTableModule, NzTabsModule, NzButtonModule, NzCardModule, NzIconModule, NzTagModule, NzSelectModule,
     NzModalModule, NzPaginationModule, NzFormModule, NzInputModule, NzPopconfirmModule, NzTooltipModule, NzUploadModule,
-    ColumnSettings, PageHeader, TableDragScroll, MaterialsCatalogTab
+    ColumnSettings, PageHeader, TableDragScroll, MaterialsCatalogTab, QuestionBankTab
   ],
   template: `
     <app-page-header title="Kho tài liệu" subtitle="Danh sách tài liệu và danh mục dùng khi tạo tài liệu" icon="link">
@@ -145,6 +146,12 @@ import { MaterialsCatalogTab } from './materials-catalog.tab';
       @if (canManage()) {
         <nz-tab nzTitle="Danh mục">
           <app-materials-catalog-tab (changed)="loadLookups()" />
+        </nz-tab>
+        <nz-tab nzTitle="Quản lí câu hỏi">
+          <!-- Lazy: chỉ khởi tạo (và gọi API ngân hàng câu hỏi) khi GV mở tab. -->
+          <ng-template nz-tab>
+            <app-question-bank-tab [subjects]="subjects()" [grades]="grades()" />
+          </ng-template>
         </nz-tab>
       }
     </nz-tabs>

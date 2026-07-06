@@ -82,6 +82,8 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
             } @else if (e.isOpen) {
               <nz-tag nzColor="processing">{{ e.attemptStatus === 'InProgress' ? 'Đang làm' : 'Chưa làm' }}</nz-tag>
               <a nz-button nzType="primary" nzSize="small" [routerLink]="['/portal/exams', e.assignmentId]"><nz-icon nzType="form" /> Làm bài</a>
+            } @else if (isExamExpired(e)) {
+              <nz-tag>Đã hết hạn</nz-tag>
             } @else {
               <span class="muted">Mở lúc {{ e.openAt | date: 'dd/MM HH:mm' }}</span>
             }
@@ -161,6 +163,11 @@ export class PortalPage {
 
   protected readonly statusLabels = SUBMISSION_STATUS_LABELS;
   protected readonly statusColors = SUBMISSION_STATUS_COLORS;
+
+  /** Đề không còn làm được nữa (GV đóng hoặc quá hạn CloseAt) — phân biệt với đề CHƯA mở. */
+  protected isExamExpired(e: PortalExam): boolean {
+    return e.assignmentStatus === 'Closed' || (!!e.closeAt && new Date(e.closeAt).getTime() < Date.now());
+  }
 
   protected readonly submitOpen = signal(false);
   protected readonly busy = signal(false);

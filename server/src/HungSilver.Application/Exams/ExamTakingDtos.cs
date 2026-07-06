@@ -6,7 +6,7 @@ namespace HungSilver.Application.Exams;
 
 public sealed record PortalExamDto(
     Guid AssignmentId, Guid ExamId, string ExamTitle, string ClassName, ExamDeliveryMode Mode,
-    int DurationMinutes, DateTime OpenAt, DateTime? CloseAt, bool IsOpen,
+    int DurationMinutes, DateTime OpenAt, DateTime? CloseAt, bool IsOpen, ExamAssignmentStatus AssignmentStatus,
     ExamAttemptStatus? AttemptStatus, Guid? AttemptId, decimal? Score, decimal TotalPoints);
 
 // ---------------- Câu hỏi cho học viên (KHÔNG có đáp án/giải thích) ----------------

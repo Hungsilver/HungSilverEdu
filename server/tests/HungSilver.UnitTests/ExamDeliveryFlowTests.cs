@@ -277,6 +277,42 @@ public sealed class ExamDeliveryFlowTests : IDisposable
         Assert.Contains(report.Students, s => s.Score == 6.25m);
     }
 
+    [Fact]
+    public async Task GetMyExams_ClosedAssignment_WithAttempt_StillVisibleWithScore_WithoutAttempt_Hidden()
+    {
+        var classId = SeedClass();
+        var examId = SeedPublishedExam();
+        var userId = Guid.NewGuid();
+        SeedStudent(userId, classId);
+        _currentUser.UserId = userId;
+        var svc = Taking();
+
+        // Đề 1: HS đã nộp rồi GV đóng ⇒ vẫn hiện kèm điểm + trạng thái Closed (giữ đường "Xem lại").
+        var doneId = SeedAssignment(examId, classId);
+        var attempt = (await svc.StartAsync(doneId)).Value;
+        await AnswerAllAsync(svc, attempt.AttemptId, attempt);
+        await svc.SubmitAsync(attempt.AttemptId);
+
+        // Đề 2: GV đóng mà HS chưa từng làm ⇒ ẩn khỏi portal.
+        var skippedId = SeedAssignment(examId, classId);
+
+        foreach (var id in new[] { doneId, skippedId })
+        {
+            var asg = await _context.ExamAssignments.FirstAsync(x => x.Id == id);
+            asg.Status = ExamAssignmentStatus.Closed;
+        }
+        await _context.SaveChangesAsync();
+
+        var list = (await svc.GetMyExamsAsync()).Value;
+
+        var done = Assert.Single(list); // đề 2 bị ẩn
+        Assert.Equal(doneId, done.AssignmentId);
+        Assert.Equal(ExamAssignmentStatus.Closed, done.AssignmentStatus);
+        Assert.Equal(ExamAttemptStatus.Submitted, done.AttemptStatus);
+        Assert.Equal(6.25m, done.Score);
+        Assert.False(done.IsOpen); // GV đóng tay ⇒ hết "đang mở" dù CloseAt còn xa (khớp StartAsync)
+    }
+
     // ---- Fakes ----
 
     private sealed class FakeCurrentUser : ICurrentUser

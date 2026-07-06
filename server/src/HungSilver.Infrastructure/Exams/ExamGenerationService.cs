@@ -132,7 +132,7 @@ public sealed class ExamGenerationService(
         if (pendingQuestions.Count == 0)
             return Result.Failure<ExamGenerationResult>(Error.Failure("Exam.NoValidQuestions", "Không trích được câu hỏi hợp lệ nào từ tài liệu."));
 
-        DistributePoints(pendingQuestions, exam.TotalPoints);
+        ExamPoints.Distribute(pendingQuestions, exam.TotalPoints);
 
         // ---- Lớp 2: AI đối chiếu (best-effort, không chặn) ----
         if (request.Verify)
@@ -178,18 +178,6 @@ public sealed class ExamGenerationService(
             Explanation = string.IsNullOrWhiteSpace(q.Explanation) ? null : q.Explanation!.Trim(),
             Points = 0m
         };
-    }
-
-    private static void DistributePoints(List<ExamQuestion> qs, decimal total)
-    {
-        if (qs.Count == 0) return;
-        // Chia theo đơn vị 0.01: n câu đầu nhận thêm 0.01 phần dư ⇒ tổng LUÔN đúng bằng total và
-        // không câu nào bị điểm âm (cách cũ round từng câu rồi trừ dồn làm câu cuối ÂM khi đề ≥ ~150 câu).
-        var totalCents = (int)decimal.Round(total * 100m, 0, MidpointRounding.AwayFromZero);
-        var baseCents = totalCents / qs.Count;
-        var extra = totalCents - baseCents * qs.Count;
-        for (var i = 0; i < qs.Count; i++)
-            qs[i].Points = (baseCents + (i < extra ? 1 : 0)) / 100m;
     }
 
     private static void CheckNumberGaps(List<int> numbers, string? label, List<string> warnings)

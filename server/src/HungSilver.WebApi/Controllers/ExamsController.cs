@@ -20,8 +20,31 @@ public class ExamsController(
     IExamGenerationJobService generationJobs,
     IExamAssignmentService assignments,
     IExamReportService reports,
+    IExamQuestionBankService questionBank,
     ICurrentUser currentUser) : ControllerBase
 {
+    // ---- Ngân hàng câu hỏi (route literal — không đụng nhóm {id:guid} nhờ ràng buộc :guid) ----
+
+    /// <summary>Ngân hàng câu hỏi: mọi câu từ mọi đề, lọc Môn/Khối/Tài liệu/Đề/Loại câu/Trạng thái + search — phân trang.</summary>
+    [HttpGet("questions")]
+    public async Task<ActionResult<PagedResult<ExamQuestionBankItemDto>>> Questions([FromQuery] ExamQuestionBankFilter filter, CancellationToken ct) =>
+        (await questionBank.GetPagedAsync(filter, ct)).ToActionResult();
+
+    /// <summary>Toàn bộ id câu hỏi khớp bộ lọc (phục vụ "chọn tất cả" — cap 1000).</summary>
+    [HttpGet("questions/ids")]
+    public async Task<ActionResult<ExamQuestionIdsDto>> QuestionIds([FromQuery] ExamQuestionBankFilter filter, CancellationToken ct) =>
+        (await questionBank.GetIdsAsync(filter, ct)).ToActionResult();
+
+    /// <summary>Tạo đề thủ công (Draft) từ các câu hỏi đã chọn trong ngân hàng — copy câu + nhóm ngữ liệu.</summary>
+    [HttpPost("from-questions")]
+    public async Task<ActionResult<CreateExamFromQuestionsResult>> CreateFromQuestions(CreateExamFromQuestionsRequest request, CancellationToken ct) =>
+        (await questionBank.CreateExamFromQuestionsAsync(request, UserId, ct)).ToActionResult();
+
+    /// <summary>Nhân bản nguyên trạng một đề thành đề Draft mới (chỉnh trên bản sao khi đề gốc đã giao).</summary>
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<ActionResult<CreateExamFromQuestionsResult>> Duplicate(Guid id, CancellationToken ct) =>
+        (await questionBank.DuplicateExamAsync(id, UserId, ct)).ToActionResult();
+
     /// <summary>Bắt đầu job sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả jobId ngay để client polling, tránh timeout proxy.</summary>
     [HttpPost("generate/{materialId:guid}")]
     public async Task<ActionResult<ExamGenerationJobStartResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct) =>

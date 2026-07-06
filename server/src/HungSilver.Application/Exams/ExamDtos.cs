@@ -22,7 +22,10 @@ public sealed record ExamDetailDto(
 
 public sealed record UpdateExamRequest(string Title, string? Description, string? GradeBand, int DurationMinutes);
 
-/// <summary>Thêm/sửa 1 câu hỏi (GV nhập cấu trúc; server dựng lại OptionsJson/AnswerJson qua ExamQuestionFactory).</summary>
+/// <summary>
+/// Thêm/sửa 1 câu hỏi (GV nhập cấu trúc; server dựng lại OptionsJson/AnswerJson qua ExamQuestionFactory).
+/// Không nhận điểm — điểm luôn do hệ thống chia đều trên tổng điểm đề (ExamPoints.Distribute).
+/// </summary>
 public sealed record UpsertQuestionRequest(
     Guid? GroupId,
     ExamQuestionType Type,
@@ -33,5 +36,4 @@ public sealed record UpsertQuestionRequest(
     List<string>? AnswerBlanks,
     List<string>? WordBox,
     List<GenPair>? AnswerPairs,
-    string? Explanation,
-    decimal? Points);
+    string? Explanation);

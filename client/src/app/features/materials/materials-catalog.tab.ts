@@ -11,14 +11,12 @@ import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { AuthService } from '../../core/auth.service';
-import { GradesService } from '../../core/grades.service';
 import { MaterialsService } from '../../core/materials.service';
-import { SubjectsService } from '../../core/subjects.service';
-import { Grade, GradeRequest, MaterialCategory, Subject, SubjectRequest } from '../../core/models';
+import { MaterialCategory } from '../../core/models';
 
 /**
- * Tab "Danh mục" của Kho tài liệu — CRUD dữ liệu nguồn cho các dropdown của form tạo tài liệu:
- * Loại tài liệu (Teacher + Admin), Môn học và Khối (chỉ Admin sửa — dùng chung với module Lớp học).
+ * Tab "Danh mục" của Kho tài liệu — chỉ quản lý danh mục thuộc về tài liệu: Loại tài liệu
+ * (Teacher + Admin). Môn học & Khối là danh mục dùng chung, quản lý tại module Lớp học → Danh mục.
  * Phát `(changed)` sau mỗi thay đổi để trang cha nạp lại dropdown.
  */
 @Component({
@@ -55,76 +53,20 @@ import { Grade, GradeRequest, MaterialCategory, Subject, SubjectRequest } from '
             }
           </tbody>
         </nz-table>
-      </section>
-
-      <section>
-        <h3>Môn học @if (!auth.isAdmin()) { <span class="muted">(chỉ Admin sửa)</span> }</h3>
-        @if (auth.isAdmin()) {
-          <form nz-form nzLayout="inline">
-            <input nz-input placeholder="Tên môn" [(ngModel)]="subjectName" name="subjectName" />
-            <nz-input-number [(ngModel)]="subjectIndex" name="subjectIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
-            <button nz-button nzType="primary" (click)="saveSubject()">{{ editingSubject() ? 'Cập nhật' : 'Thêm' }}</button>
-            @if (editingSubject()) { <button nz-button (click)="resetSubject()">Hủy</button> }
-          </form>
-        }
-        <nz-table [nzData]="subjects()" [nzFrontPagination]="false" nzSize="small">
-          <thead><tr><th nzWidth="64px" style="white-space: nowrap">STT</th><th>Mã</th><th>Tên</th>@if (auth.isAdmin()) { <th>Thao tác</th> }</tr></thead>
-          <tbody>
-            @for (s of subjects(); track s.id; let i = $index) {
-              <tr><td>{{ i + 1 }}</td><td>{{ s.code }}</td><td>{{ s.name }}</td>
-                @if (auth.isAdmin()) {
-                  <td>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa môn" aria-label="Sửa môn" (click)="editSubject(s)"><nz-icon nzType="edit" /></button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa môn" aria-label="Xóa môn"
-                      nz-popconfirm nzPopconfirmTitle="Xóa môn?" (nzOnConfirm)="deleteSubject(s)"><nz-icon nzType="delete" /></button>
-                  </td>
-                }
-              </tr>
-            }
-          </tbody>
-        </nz-table>
-      </section>
-
-      <section>
-        <h3>Khối @if (!auth.isAdmin()) { <span class="muted">(chỉ Admin sửa)</span> }</h3>
-        @if (auth.isAdmin()) {
-          <form nz-form nzLayout="inline">
-            <input nz-input placeholder="Tên khối" [(ngModel)]="gradeName" name="gradeName" />
-            <nz-input-number [(ngModel)]="gradeIndex" name="gradeIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
-            <button nz-button nzType="primary" (click)="saveGrade()">{{ editingGrade() ? 'Cập nhật' : 'Thêm' }}</button>
-            @if (editingGrade()) { <button nz-button (click)="resetGrade()">Hủy</button> }
-          </form>
-        }
-        <nz-table [nzData]="grades()" [nzFrontPagination]="false" nzSize="small">
-          <thead><tr><th nzWidth="64px" style="white-space: nowrap">STT</th><th>Mã</th><th>Tên</th>@if (auth.isAdmin()) { <th>Thao tác</th> }</tr></thead>
-          <tbody>
-            @for (g of grades(); track g.id; let i = $index) {
-              <tr><td>{{ i + 1 }}</td><td>{{ g.code }}</td><td>{{ g.name }}</td>
-                @if (auth.isAdmin()) {
-                  <td>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa khối" aria-label="Sửa khối" (click)="editGrade(g)"><nz-icon nzType="edit" /></button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa khối" aria-label="Xóa khối"
-                      nz-popconfirm nzPopconfirmTitle="Xóa khối?" (nzOnConfirm)="deleteGrade(g)"><nz-icon nzType="delete" /></button>
-                  </td>
-                }
-              </tr>
-            }
-          </tbody>
-        </nz-table>
+        <p class="muted">Môn học &amp; Khối được quản lý tại Lớp học → Danh mục.</p>
       </section>
     </div>
   `,
   styles: `
     .catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .catalog-grid section { max-width: 640px; }
     .catalog-grid form { margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .muted { color: var(--hs-text-muted); font-size: 13px; font-weight: 400; }
+    .muted { color: var(--hs-text-muted); font-size: 13px; font-weight: 400; margin-top: 12px; }
   `
 })
 export class MaterialsCatalogTab {
   protected readonly auth = inject(AuthService);
   private readonly materialsService = inject(MaterialsService);
-  private readonly subjectsService = inject(SubjectsService);
-  private readonly gradesService = inject(GradesService);
   private readonly message = inject(NzMessageService);
 
   /** Báo trang cha nạp lại dropdown sau khi danh mục thay đổi. */
@@ -133,18 +75,10 @@ export class MaterialsCatalogTab {
   protected readonly canManage = () => this.auth.isAdmin() || this.auth.isTeacher();
 
   protected readonly categories = signal<MaterialCategory[]>([]);
-  protected readonly subjects = signal<Subject[]>([]);
-  protected readonly grades = signal<Grade[]>([]);
 
   protected readonly editingCategory = signal<MaterialCategory | null>(null);
   protected catName = '';
   protected catSort = 0;
-  protected readonly editingSubject = signal<Subject | null>(null);
-  protected subjectName = '';
-  protected subjectIndex = 0;
-  protected readonly editingGrade = signal<Grade | null>(null);
-  protected gradeName = '';
-  protected gradeIndex = 0;
 
   constructor() {
     this.load();
@@ -152,8 +86,6 @@ export class MaterialsCatalogTab {
 
   private load(): void {
     this.materialsService.getCategories().subscribe(c => this.categories.set(c));
-    this.subjectsService.getAll().subscribe(s => this.subjects.set(s));
-    this.gradesService.getAll().subscribe(g => this.grades.set(g));
   }
 
   private onSaved(): void {
@@ -165,7 +97,6 @@ export class MaterialsCatalogTab {
     this.message.error(err.error?.message ?? err.message ?? fallback);
   }
 
-  // ---- Loại tài liệu ----
   protected saveCategory(): void {
     const name = this.catName.trim();
     if (!name) { this.message.warning('Nhập tên loại tài liệu.'); return; }
@@ -178,33 +109,5 @@ export class MaterialsCatalogTab {
   protected resetCategory(): void { this.editingCategory.set(null); this.catName = ''; this.catSort = 0; }
   protected deleteCategory(c: MaterialCategory): void {
     this.materialsService.deleteCategory(c.id).subscribe({ next: () => this.onSaved(), error: err => this.showError(err, 'Xóa loại tài liệu thất bại.') });
-  }
-
-  // ---- Môn học (chỉ Admin — BE đã chặn) ----
-  protected saveSubject(): void {
-    const req: SubjectRequest = { name: this.subjectName.trim(), description: null, indexOrder: this.subjectIndex, isActive: true };
-    if (!req.name) return;
-    const editing = this.editingSubject();
-    const op = editing ? this.subjectsService.update(editing.id, req) : this.subjectsService.create(req);
-    op.subscribe({ next: () => { this.resetSubject(); this.onSaved(); }, error: err => this.showError(err, 'Lưu môn thất bại.') });
-  }
-  protected editSubject(s: Subject): void { this.editingSubject.set(s); this.subjectName = s.name; this.subjectIndex = s.indexOrder; }
-  protected resetSubject(): void { this.editingSubject.set(null); this.subjectName = ''; this.subjectIndex = 0; }
-  protected deleteSubject(s: Subject): void {
-    this.subjectsService.delete(s.id).subscribe({ next: () => this.onSaved(), error: err => this.showError(err, 'Xóa môn thất bại.') });
-  }
-
-  // ---- Khối (chỉ Admin — BE đã chặn) ----
-  protected saveGrade(): void {
-    const req: GradeRequest = { name: this.gradeName.trim(), indexOrder: this.gradeIndex, isActive: true };
-    if (!req.name) return;
-    const editing = this.editingGrade();
-    const op = editing ? this.gradesService.update(editing.id, req) : this.gradesService.create(req);
-    op.subscribe({ next: () => { this.resetGrade(); this.onSaved(); }, error: err => this.showError(err, 'Lưu khối thất bại.') });
-  }
-  protected editGrade(g: Grade): void { this.editingGrade.set(g); this.gradeName = g.name; this.gradeIndex = g.indexOrder; }
-  protected resetGrade(): void { this.editingGrade.set(null); this.gradeName = ''; this.gradeIndex = 0; }
-  protected deleteGrade(g: Grade): void {
-    this.gradesService.delete(g.id).subscribe({ next: () => this.onSaved(), error: err => this.showError(err, 'Xóa khối thất bại.') });
   }
 }

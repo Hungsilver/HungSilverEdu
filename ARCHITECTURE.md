@@ -212,6 +212,8 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `/api/materials` | GET | Teacher/Admin | Danh sách TẤT CẢ tài liệu (paged) — lọc `subjectId/categoryId/gradeBand` + search Mã/Tên (thay `?classId`, `/library`, `/by-subject` cũ) |
 | `/api/exams` · `/generate/{materialId}` · `/generation-jobs/{jobId}` | GET · POST · GET | Teacher/Admin | Danh sách đề (theo môn/tài liệu, paged) · bắt đầu job sinh đề bằng AI · poll trạng thái job |
 | `/api/exams/{id}` (+`/publish`,`/questions*`) | GET/PUT/DELETE/POST | Teacher/Admin | Chi tiết/sửa/xóa/phát hành đề + CRUD câu hỏi — xem §15.14 |
+| `/api/exams/questions` (+`/ids`) | GET | Teacher/Admin | **Ngân hàng câu hỏi**: mọi câu từ mọi đề, lọc Môn/Khối/Tài liệu/Đề/Loại/Trạng thái + search; `/ids` = chọn-tất-cả theo filter (cap 1000) — xem §15.14 |
+| `/api/exams/from-questions` · `/api/exams/{id}/duplicate` | POST | Teacher/Admin | Tạo đề thủ công từ câu đã chọn (copy) · nhân bản nguyên trạng đề thành Draft — xem §15.14 |
 | `/api/exams/{id}/assign` (+`/assignments`,`/assignments/{id}/close\|report`) | POST/GET | Teacher/Admin | Giao đề cho lớp (hẹn giờ), xem/đóng lượt giao, **báo cáo kết quả** — xem §15.15–16 |
 | `/api/portal/exams` (+`/{id}/start`, `/attempts/{id}/answer\|submit\|review`) | GET/POST/PUT | User | HS làm đề hẹn giờ, tự chấm, xem lại — xem §15.15 |
 | `/api/users` | GET | **Admin** | List user (kèm đã xóa), tìm theo email/tên |
@@ -396,8 +398,10 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   tất cả tài liệu (paged, lọc môn/khối/loại + search) — **mã tự sinh `TL0001`** (cột `Code` unique kể cả soft-deleted, backfill
   migration `AddMaterialCode`); trường chính Mã/Tên/Môn/Khối/Loại — "Loại tài liệu" = `MaterialCategory` (CRUD, chặn xóa khi đang dùng),
   Khối lấy từ danh mục `GradeCategory` (snapshot tên vào `GradeBand`), enum `MaterialType` cũ chỉ còn ở DB (UI/DTO bỏ). FE `/materials`
-  2 tab: **Danh sách** (chuẩn students: lọc bằng nút Tìm kiếm, column-settings, nút Download mỗi dòng) + **Danh mục**
-  (`materials-catalog.tab.ts`: Loại tài liệu Teacher+Admin, Môn/Khối chỉ Admin sửa). `ClassId` trên entity chỉ còn legacy.
+  3 tab (2026-07-06): **Danh sách** (chuẩn students: lọc bằng nút Tìm kiếm, column-settings, nút Download mỗi dòng) + **Danh mục**
+  (`materials-catalog.tab.ts`: CHỈ còn Loại tài liệu — Môn/Khối đã bỏ khỏi tab này, quản lý tại module Lớp học `/classes` tab Danh mục;
+  form tài liệu vẫn chọn Môn/Khối bình thường) + **Quản lí câu hỏi** (`question-bank.tab.ts`, lazy — Ngân hàng câu hỏi, xem §15.14).
+  `ClassId` trên entity chỉ còn legacy.
 - **Đánh giá tháng** (`Evaluation*`): 5 tiêu chí → rank tự tính; **Bảng vàng** tuần (top điểm thưởng/chuyên cần/BTVN).
 - **Báo cáo phụ huynh** (`ParentReportService`): sinh nội dung tháng (đi học/BTVN/điểm/nhận xét) qua template.
 - **Thông báo** (`NotificationService`): tạo + gửi theo kênh — Email gửi thật (nếu HS có tài khoản email), Zalo/Messenger → `Manual` (copy gửi tay).
@@ -499,6 +503,24 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   2026-07-04: **không tự tải PDF gốc** — nút "Xem tài liệu gốc" bấm mới load blob song song + nút "Download tài liệu"). Responsive.
 - **Triển khai:** image API cài **LibreOffice** (`server/Dockerfile`); config `DocumentConversion` (SofficePath trống=PATH). Sinh đề
   chạy nền qua job/polling; GV cần cấu hình API Key Gemini ở `/profile` trước (lỗi `Ai.KeyMissing` nếu thiếu).
+- **Ngân hàng câu hỏi + tạo đề thủ công (2026-07-06):** `IExamQuestionBankService`/`ExamQuestionBankService` (Infrastructure,
+  AppDbContext) — ngân hàng = **VIEW join `ExamQuestion × Exam × LearningMaterial`** (không bảng mới/không migration; left-join
+  tài liệu chịu MaterialId null/xóa mềm). `GET /api/exams/questions` (filter subjectId/gradeBand/materialId/examId/type/examStatus
+  + search Stem/tên đề/mã+tên tài liệu, sort ổn định `Exam.CreatedAt desc, ExamId, OrderNo`) + `/ids` (chọn-tất-cả, **cap 1000**
+  + cờ Truncated). `POST /api/exams/from-questions` — tạo đề **Manual/Draft** từ câu đã chọn: **COPY** câu theo đúng thứ tự chọn
+  (dedupe, cap 500, thiếu id ⇒ lỗi) + copy nhóm ngữ liệu được tham chiếu (remap GroupId, giữ Passage), suy Môn từ đề nguồn khi
+  không truyền; `POST /api/exams/{id}/duplicate` — **nhân bản nguyên trạng** (meta + toàn bộ nhóm/câu, giữ điểm/thứ tự, Draft).
+  **`ExamPoints.Distribute`** (Application) — trích từ ExamGenerationService, dùng chung cho sinh AI / from-questions / ExamService.
+  **Đề đã giao cho lớp bị KHÓA cấu trúc** (`ExamService` kiểm `ExamAssignment` tồn tại): thêm/sửa/xóa câu ⇒ `Exam.Assigned`,
+  đổi DurationMinutes ⇒ `Exam.AssignedDuration`, xóa đề ⇒ `Exam.AssignedDelete` (bảo vệ điểm + trang Xem lại của HS — Start/Submit/Review
+  đọc câu live, không snapshot); chỉnh sửa ⇒ dùng Nhân bản. **Thêm/xóa câu tự chia lại điểm toàn đề** về TotalPoints
+  (`UpsertQuestionRequest` **bỏ tham số Points** — trước đây câu thêm tay bị 0 điểm, xóa câu làm tổng <10). FE: editor 4 loại câu trích
+  thành **`features/exams/question-editor.ts`** (component `app-question-editor` + helpers `emptyEditQuestion/toEditQuestion/
+  toUpsertRequest/buildQuestionView`) dùng chung exam-detail + tab **"Quản lí câu hỏi"** (`features/materials/question-bank.tab.ts`,
+  tab 3 của `/materials`, lazy): bộ lọc đủ + search, bảng checkbox **chọn giữ-qua-trang** + "Chọn tất cả N câu" (qua `/ids`),
+  thanh chọn nổi → modal "Tạo đề từ câu đã chọn" → navigate `/exams/{id}`; preview/sửa/xóa/thêm câu tại chỗ (sửa câu đề Published
+  có confirm cảnh báo); nút **Nhân bản** ở exam-detail + exam-list. Responsive card mobile. Quyền: TeacherOrAdmin, không giới hạn
+  theo GV tạo (giống `/api/exams`).
 
 ### 15.15 Giao đề + làm bài hẹn giờ + tự chấm (Pha 2 — 2026-07-01)
 
@@ -518,6 +540,13 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **FE:** GV `exam-detail` thêm **"Giao cho lớp"** (modal lớp/hình thức/thời gian/mở-đóng dùng `nz-date-picker`) + danh sách "Đã
   giao" (đếm đã nộp, nút Đóng). HS Portal thêm card **"Đề của tôi"** + `exam-take.page` (đồng hồ đếm ngược đồng bộ `ExpiresAt`, **tự
   nộp khi hết giờ**, autosave mỗi câu, khôi phục bài dở, thanh tiến độ) + `exam-review.page` (điểm + đáp án mình vs đúng + giải thích).
+- **Sửa luồng HS (2026-07-06):** (1) `GetMyExamsAsync` trả cả assignment **Closed mà HS có attempt** (giữ điểm + nút Xem lại sau
+  khi GV đóng; Closed-chưa-làm vẫn ẩn) + `PortalExamDto.AssignmentStatus`; `IsOpen` thêm điều kiện `Status==Open` (khớp `StartAsync`).
+  (2) **`ExamAttemptFinalizeService`** (BackgroundService, 2 phút/lần) — chốt attempt InProgress **quá hạn giờ làm**
+  (`StartedAt+Duration+grace 20s`) bằng lõi chấm dùng chung `ExamTakingService.GradeAndFinalizeAsync` (trích từ SubmitAsync) ⇒
+  bài bỏ dở (đóng tab/mất mạng) được tự chấm `AutoSubmitted`, báo cáo GV không còn kẹt "Đang làm"; **chủ đích không chốt sớm**
+  khi GV đóng/quá CloseAt — HS đang làm dở vẫn dùng hết thời gian của mình (nhất quán SaveAnswer/Submit). Attempt mồ côi
+  (assignment xóa mềm) bỏ qua. (3) Portal: đề quá hạn/GV đóng chưa làm hiển thị tag **"Đã hết hạn"** (trước hiện nhầm "Mở lúc {quá khứ}").
 
 ### 15.16 Báo cáo trực quan cho giáo viên (Pha 3 — 2026-07-01)
 
@@ -593,3 +622,4 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **2026-06-23** — **Phân quyền theo Giáo viên toàn hệ thống (đảo lại "Teacher toàn quyền" của 2026-06-21)**: hiện thực 3 method `ClassAccessGuard` (trước là stub) — `GetTeacherScopeIdAsync` tra `TeacherProfile` theo `UserId` (Admin→null, GV→Id hồ sơ, chưa liên kết→`Guid.Empty`), `EnsureCanAccessClassAsync` chặn lớp ngoài phạm vi (NotFound), `EnsureCanAccessStudentAsync` kiểm HS ghi danh active lớp của GV. Một thay đổi keystone này **tự kích hoạt scope** ở Dashboard/Tuition/Warnings/Schedule/Sessions/Materials/Students/Evaluations/Notifications (các service đã sẵn gọi guard). Vá điểm bypass: `TuitionService` CRUD theo invoiceId kiểm `EnsureCanAccessStudentAsync`; `StudentService.CreateAsync` (HS "trần") chỉ Admin; `ClassService` Create/Update **ép `TeacherProfileId`=scope**, `AssignTeacher`→Admin. Siết ghi danh mục/cấu hình về **AdminOnly** (`Subjects/Grades/Branches/Teachers` write + bulk class-import); GET giữ TeacherOrAdmin. Sửa kèm: tỉ lệ chuyên cần `BuildClassDtoAsync` đếm `Present||Late` (khớp overview); `ClassImportService.CommitAsync` bọc **transaction** + **revalidate** Branch/Subject/Grade/Teacher server-side (không tin client). FE: `classes.page` ẩn tab Danh mục/dropdown+filter GV (server gán self qua `Guid.Empty`), bảng lớp **responsive card** mobile (`ScreenService`); `students.page` ẩn nút "Thêm học viên" cho GV. **31/31 test BE** (+4 `ClassAccessGuardTests`), build BE+FE sạch. — `server/src/HungSilver.Application/Common/ClassAccessGuard.cs`, `server/src/HungSilver.Application/Students/StudentService.cs`, `server/src/HungSilver.Infrastructure/{Classes/{ClassService,ClassImportService},Tuition/TuitionService}.cs`, `server/src/HungSilver.WebApi/Controllers/{Classes,Subjects,Grades,Branches,Teachers}Controller.cs`, `client/src/app/features/{classes/classes.page,students/students.page}.ts`, `server/tests/HungSilver.UnitTests/ClassAccessGuardTests.cs`, `ARCHITECTURE.md`.
 - **2026-06-23** — **Import Excel lớp: sửa trực tiếp preview trước khi import** (FE-only). Modal import chuyển 2 bảng read-only → **bảng sửa được tại chỗ** (master-detail dọc): lớp sửa Tên/Giáo viên/Môn/Khối/Cơ sở/Học phí (dropdown lấy từ **danh mục thật** đã nạp ⇒ tránh tham chiếu rác), học viên sửa Mã/Họ tên/Ngày sinh/SĐT/Ghi chú + đổi lớp đích; lớp `existingClassId` hiển thị read-only ("Lớp đã có"). `revalidateImport()` chấm hợp lệ tức thì (mirror logic server) + đếm hợp lệ/lỗi qua computed; tag lỗi có tooltip; xoá dòng/lớp (xoá lớp kéo theo HS). Commit gửi bản đã sửa; **server vẫn revalidate theo Id + transaction** (đã có) làm lưới an toàn; báo `Skipped`/`Errors` khi bỏ qua dòng lỗi. Build FE sạch. — `client/src/app/features/classes/classes.page.ts`, `ARCHITECTURE.md`.
 - **2026-06-24** — **Giữ số 0 đầu trong cột SĐT khi import Excel**: template import học viên vào lớp và import lớp kèm học viên định dạng các cột `SĐT` là text (`@`) + ghi ô mẫu bằng chuỗi, tránh Excel tự chuyển sang number làm mất số `0` đầu; thêm test mở workbook thật để kiểm tra format/value. Không đổi schema/API. — `server/src/HungSilver.Infrastructure/{Students/StudentImportService.cs,Classes/ClassImportService.cs}`, `server/tests/HungSilver.UnitTests/ClassExcelStyleTests.cs`, `ARCHITECTURE.md`.
+- **2026-07-06** — **Kho tài liệu: Danh mục gọn + tab "Quản lí câu hỏi" (Ngân hàng câu hỏi) + sửa 5 lỗi luồng HS làm đề** (không migration): (1) tab Danh mục `/materials` chỉ còn **Loại tài liệu** (bỏ 2 card Môn/Khối trùng lặp — quản lý tại Lớp học). (2) **Ngân hàng câu hỏi** (§15.14): view join câu×đề×tài liệu, lọc/search/chọn-nhiều-giữ-qua-trang/chọn-tất-cả (cap 1000), CRUD câu tại chỗ, **tạo đề từ câu đã chọn** (`POST /api/exams/from-questions`, copy câu+nhóm, Source=Manual/Draft, chia điểm /10) + **Nhân bản đề** (`/{id}/duplicate`); editor 4 loại câu trích thành `question-editor.ts` dùng chung. (3) Sửa luồng HS (§15.15): đề Closed-có-attempt vẫn hiện trên portal (điểm + Xem lại); `ExamAttemptFinalizeService` nền 2' tự chấm bài bỏ dở quá hạn (lõi chấm chung `GradeAndFinalizeAsync`); **khóa cấu trúc đề đã giao** (`Exam.Assigned*` — sửa qua Nhân bản); thêm/xóa câu tự chia lại điểm về 10 (`ExamPoints.Distribute` dùng chung, bỏ `Points` khỏi `UpsertQuestionRequest`); portal tag "Đã hết hạn". Build BE/FE sạch, **118/118 test** (+16 mới: `ExamPointsTests`, `ExamQuestionBankServiceTests`, `ExamServiceTests`, `ExamAttemptFinalizeTests`, mở rộng `ExamDeliveryFlowTests`). — `server/src/HungSilver.Application/Exams/{ExamPoints,ExamQuestionBankDtos,ExamService,ExamDtos,ExamTakingDtos}.cs`, `server/src/HungSilver.Infrastructure/Exams/{ExamQuestionBankService,ExamAttemptFinalizeService,ExamTakingService,ExamGenerationService}.cs`, `server/src/HungSilver.Infrastructure/DependencyInjection.cs`, `server/src/HungSilver.WebApi/Controllers/ExamsController.cs`, `client/src/app/features/materials/{materials-catalog.tab,question-bank.tab,materials.page}.ts`, `client/src/app/features/exams/{question-editor,exam-detail.page,exam-list.page}.ts`, `client/src/app/features/portal/portal.page.ts`, `client/src/app/core/{models,exam.service}.ts`, `server/tests/HungSilver.UnitTests/*`, `ARCHITECTURE.md`.

@@ -1292,6 +1292,7 @@ export interface UpdateExamRequest {
 export interface ExamOption { key: string; text: string; }
 export interface ExamPair { left: string; right: string; }
 
+/** Không có trường điểm — điểm luôn do hệ thống chia đều trên tổng điểm đề. */
 export interface UpsertQuestionRequest {
   groupId: string | null;
   type: ExamQuestionType;
@@ -1303,7 +1304,62 @@ export interface UpsertQuestionRequest {
   wordBox: string[] | null;
   answerPairs: ExamPair[] | null;
   explanation: string | null;
-  points: number | null;
+}
+
+// ---- Ngân hàng câu hỏi (tab "Quản lí câu hỏi" trong Kho tài liệu) ----
+
+export interface ExamQuestionBankItem {
+  questionId: string;
+  groupId: string | null;
+  orderNo: number;
+  type: ExamQuestionType;
+  stem: string;
+  optionsJson: string | null;
+  answerJson: string;
+  explanation: string | null;
+  points: number;
+  examId: string;
+  examTitle: string;
+  examStatus: ExamStatus;
+  materialId: string | null;
+  materialCode: string | null;
+  materialTitle: string | null;
+  subjectId: string | null;
+  subjectName: string | null;
+  gradeBand: string | null;
+  createdAt: string;
+}
+
+export interface ExamQuestionBankFilter {
+  search?: string;
+  subjectId?: string;
+  gradeBand?: string;
+  materialId?: string;
+  examId?: string;
+  type?: ExamQuestionType;
+  examStatus?: ExamStatus;
+  page: number;
+  pageSize: number;
+}
+
+export interface ExamQuestionIdsResult {
+  ids: string[];
+  totalCount: number;
+  truncated: boolean;
+}
+
+export interface CreateExamFromQuestionsRequest {
+  title: string;
+  description: string | null;
+  subjectId: string | null;
+  gradeBand: string | null;
+  durationMinutes: number;
+  questionIds: string[];
+}
+
+export interface CreateExamFromQuestionsResult {
+  examId: string;
+  questionCount: number;
 }
 
 // ---- Giao đề + làm bài + tự chấm (Pha 2) ----
@@ -1354,6 +1410,7 @@ export interface PortalExam {
   openAt: string;
   closeAt: string | null;
   isOpen: boolean;
+  assignmentStatus: ExamAssignmentStatus;
   attemptStatus: ExamAttemptStatus | null;
   attemptId: string | null;
   score: number | null;
