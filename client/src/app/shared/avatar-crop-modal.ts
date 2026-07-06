@@ -12,7 +12,7 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
   template: `
     <nz-modal
       [nzVisible]="visible()"
-      nzTitle="Chỉnh sửa ảnh đại diện"
+      [nzTitle]="title()"
       [nzFooter]="footerTpl"
       (nzOnCancel)="onCancel()"
       [nzWidth]="520"
@@ -22,8 +22,9 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
         <div class="crop-area">
           <image-cropper
             [imageFile]="imageFile() ?? undefined"
-            [aspectRatio]="1"
-            [roundCropper]="true"
+            [aspectRatio]="aspectRatio()"
+            [roundCropper]="roundCropper()"
+            [resizeToWidth]="resizeToWidth()"
             [maintainAspectRatio]="true"
             [transform]="transform()"
             format="png"
@@ -87,6 +88,13 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
 export class AvatarCropModal {
   readonly visible = input(false);
   readonly imageFile = input<File | null>(null);
+  // Tham số hóa để dùng chung (avatar tròn 1:1 mặc định; ảnh bìa tài liệu truyền 16/9 + vuông).
+  readonly aspectRatio = input(1);
+  readonly roundCropper = input(true);
+  readonly title = input('Chỉnh sửa ảnh đại diện');
+  readonly outputFileName = input('avatar.png');
+  /** Bề rộng tối đa của ảnh kết quả (px); 0 = giữ nguyên. Ảnh bìa nên giới hạn để PNG không phình quá trần upload. */
+  readonly resizeToWidth = input(0);
   readonly cropped = output<File>();
   readonly cancelled = output<void>();
 
@@ -120,7 +128,7 @@ export class AvatarCropModal {
   protected onSave(): void {
     const blob = this.croppedBlob();
     if (!blob) return;
-    const file = new File([blob], 'avatar.png', { type: 'image/png' });
+    const file = new File([blob], this.outputFileName(), { type: 'image/png' });
     this.cropped.emit(file);
   }
 

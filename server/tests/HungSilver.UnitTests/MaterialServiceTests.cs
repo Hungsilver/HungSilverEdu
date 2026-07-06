@@ -64,8 +64,23 @@ public sealed class MaterialServiceTests : IDisposable
         new CreateMaterialRequestValidator(),
         new UpdateMaterialRequestValidator());
 
-    private CreateMaterialRequest NewRequest(string title, string? gradeBand = null) =>
-        new(_categoryId, _subjectId, gradeBand, title, MaterialSource.ExternalUrl, "https://x.vn/tl", null, null);
+    private CreateMaterialRequest NewRequest(string title, string? gradeBand = null, Guid? coverFileId = null) =>
+        new(_categoryId, _subjectId, gradeBand, title, MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, coverFileId);
+
+    private async Task<StoredFile> SeedStoredFileAsync(string contentType = "image/png")
+    {
+        var file = new StoredFile
+        {
+            FileName = "cover.png",
+            ContentType = contentType,
+            SizeBytes = 1,
+            StoragePath = $"2026/07/{Guid.NewGuid():N}.png",
+            Sha256 = Guid.NewGuid().ToString("N")
+        };
+        _context.StoredFiles.Add(file);
+        await _context.SaveChangesAsync();
+        return file;
+    }
 
     [Fact]
     public async Task Create_GeneratesSequentialCodes()
@@ -125,7 +140,7 @@ public sealed class MaterialServiceTests : IDisposable
         var created = await svc.CreateAsync(NewRequest("Tên cũ"));
 
         var updated = await svc.UpdateAsync(created.Value.Id,
-            new UpdateMaterialRequest(_categoryId, _subjectId, "9", "Tên mới", MaterialSource.ExternalUrl, "https://x.vn/tl2", null, null));
+            new UpdateMaterialRequest(_categoryId, _subjectId, "9", "Tên mới", MaterialSource.ExternalUrl, "https://x.vn/tl2", null, null, null));
 
         Assert.True(updated.IsSuccess);
         Assert.Equal("Tên mới", updated.Value.Title);
@@ -137,12 +152,46 @@ public sealed class MaterialServiceTests : IDisposable
     {
         var svc = NewService();
 
-        var noSubject = await svc.CreateAsync(new CreateMaterialRequest(_categoryId, null, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null));
-        var noCategory = await svc.CreateAsync(new CreateMaterialRequest(null, _subjectId, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null));
+        var noSubject = await svc.CreateAsync(new CreateMaterialRequest(_categoryId, null, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null, null));
+        var noCategory = await svc.CreateAsync(new CreateMaterialRequest(null, _subjectId, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null, null));
 
         Assert.True(noSubject.IsFailure);
         Assert.True(noCategory.IsFailure);
         Assert.Equal("Material.Validation", noSubject.Error.Code);
+    }
+
+    [Fact]
+    public async Task Create_Update_RoundTripsCoverFileId()
+    {
+        var svc = NewService();
+        var cover = await SeedStoredFileAsync();
+
+        var created = await svc.CreateAsync(NewRequest("Tài liệu có bìa", coverFileId: cover.Id));
+        Assert.True(created.IsSuccess);
+        Assert.Equal(cover.Id, created.Value.CoverFileId);
+
+        // Gỡ ảnh bìa khi sửa ⇒ về null (file cũ thành orphan, FileCleanupService dọn — không lỗi).
+        var updated = await svc.UpdateAsync(created.Value.Id,
+            new UpdateMaterialRequest(_categoryId, _subjectId, null, "Tài liệu có bìa", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null));
+        Assert.True(updated.IsSuccess);
+        Assert.Null(updated.Value.CoverFileId);
+    }
+
+    [Fact]
+    public async Task Create_WithInvalidCover_Fails()
+    {
+        var svc = NewService();
+
+        // Ảnh bìa trỏ file không tồn tại.
+        var missing = await svc.CreateAsync(NewRequest("T", coverFileId: Guid.NewGuid()));
+        Assert.True(missing.IsFailure);
+        Assert.Equal("Material.CoverNotFound", missing.Error.Code);
+
+        // File tồn tại nhưng không phải ảnh.
+        var pdf = await SeedStoredFileAsync(contentType: "application/pdf");
+        var notImage = await svc.CreateAsync(NewRequest("T", coverFileId: pdf.Id));
+        Assert.True(notImage.IsFailure);
+        Assert.Equal("Material.CoverNotImage", notImage.Error.Code);
     }
 
     // ----- Fakes -----

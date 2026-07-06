@@ -32,6 +32,9 @@ public class LearningMaterial : BaseEntity
     /// <summary>Dùng khi Source = ServerFile (tham chiếu StoredFile.Id).</summary>
     public Guid? StoredFileId { get; set; }
 
+    /// <summary>Ảnh bìa hiển thị trên card (tham chiếu StoredFile.Id, Visibility = Public, không khóa ngoại). Tùy chọn.</summary>
+    public Guid? CoverFileId { get; set; }
+
     public string? Description { get; set; }
     public Guid? UploadedByUserId { get; set; }
 }

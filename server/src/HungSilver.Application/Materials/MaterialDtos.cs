@@ -16,6 +16,7 @@ public sealed record MaterialDto(
     string? Url,
     Guid? StoredFileId,
     string? FileName,
+    Guid? CoverFileId,
     string? Description,
     string DownloadUrl,
     DateTime CreatedAt);
@@ -28,7 +29,8 @@ public sealed record CreateMaterialRequest(
     MaterialSource Source,
     string? Url,
     Guid? StoredFileId,
-    string? Description);
+    string? Description,
+    Guid? CoverFileId);
 
 public sealed record UpdateMaterialRequest(
     Guid? CategoryId,
@@ -38,7 +40,8 @@ public sealed record UpdateMaterialRequest(
     MaterialSource Source,
     string? Url,
     Guid? StoredFileId,
-    string? Description);
+    string? Description,
+    Guid? CoverFileId);
 
 // ----------------- Danh mục học liệu (thư viện) -----------------
 

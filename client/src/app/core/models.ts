@@ -957,6 +957,7 @@ export interface Material {
   url: string | null;
   storedFileId: string | null;
   fileName: string | null;
+  coverFileId: string | null;
   description: string | null;
   downloadUrl: string;
   createdAt: string;
@@ -971,6 +972,7 @@ export interface CreateMaterialRequest {
   url: string | null;
   storedFileId: string | null;
   description: string | null;
+  coverFileId: string | null;
 }
 
 export interface UpdateMaterialRequest {
@@ -982,6 +984,7 @@ export interface UpdateMaterialRequest {
   url: string | null;
   storedFileId: string | null;
   description: string | null;
+  coverFileId: string | null;
 }
 
 /** Bộ lọc danh sách tài liệu (phân trang) — tab Danh sách Kho tài liệu. */

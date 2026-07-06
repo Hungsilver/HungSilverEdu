@@ -3,7 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialPagedFilter, PagedResult, UpdateMaterialRequest
+  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialPagedFilter, PagedResult,
+  StoredFile, UpdateMaterialRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -32,6 +33,13 @@ export class MaterialsService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
+  }
+
+  /** Upload ảnh bìa tài liệu (đã crop 16:9) — file Public, hiển thị trực tiếp qua <img>. */
+  uploadCover(file: File): Observable<StoredFile> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<StoredFile>(`${this.apiUrl}/cover-image`, form);
   }
 
   // ---- Loại tài liệu (MaterialCategory) ----

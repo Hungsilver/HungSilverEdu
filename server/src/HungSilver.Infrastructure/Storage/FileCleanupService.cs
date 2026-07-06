@@ -99,6 +99,13 @@ public sealed class FileCleanupService(
             .Select(m => m.StoredFileId!.Value)
             .ToListAsync(ct));
 
+        // Ảnh bìa tài liệu (LearningMaterial.CoverFileId) — thiếu dòng này là ảnh bìa bị dọn nhầm.
+        referenced.UnionWith(await db.LearningMaterials
+            .IgnoreQueryFilters()
+            .Where(m => m.CoverFileId != null)
+            .Select(m => m.CoverFileId!.Value)
+            .ToListAsync(ct));
+
         var avatarUrls = await db.Users
             .IgnoreQueryFilters()
             .Where(u => u.AvatarUrl != null)

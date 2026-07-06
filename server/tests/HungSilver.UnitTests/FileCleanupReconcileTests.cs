@@ -108,6 +108,25 @@ public sealed class FileCleanupReconcileTests : IDisposable
     }
 
     [Fact]
+    public async Task ReferencedByCoverImage_IsKept()
+    {
+        var file = await AddFileAsync(ageHours: 48);
+        _context.LearningMaterials.Add(new LearningMaterial
+        {
+            Title = "Tài liệu có ảnh bìa",
+            Source = MaterialSource.ExternalUrl,
+            Url = "https://x.vn/tl",
+            CoverFileId = file.Id // chỉ tham chiếu qua ảnh bìa, không phải file nội dung
+        });
+        await _context.SaveChangesAsync();
+
+        var marked = await FileCleanupService.ReconcileOrphansCoreAsync(_context, GraceHours);
+
+        Assert.Equal(0, marked);
+        Assert.False(await IsSoftDeletedAsync(file.Id));
+    }
+
+    [Fact]
     public async Task ReferencedByAvatarUrl_IsKept()
     {
         var file = await AddFileAsync(ageHours: 48);

@@ -31,6 +31,8 @@ public sealed class MaterialService(
     IValidator<UpdateMaterialRequest> updateValidator) : IMaterialService
 {
     private static readonly Error NotFoundError = Error.NotFound("Material.NotFound", "Không tìm thấy tài liệu.");
+    private static readonly Error CoverNotFound = Error.Validation("Material.CoverNotFound", "Không tìm thấy ảnh bìa đã tải lên — hãy tải lại ảnh.");
+    private static readonly Error CoverNotImage = Error.Validation("Material.CoverNotImage", "Ảnh bìa phải là file ảnh.");
 
     /// <summary>Danh sách TẤT CẢ tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên, mới nhất trước.</summary>
     public async Task<Result<PagedResult<MaterialDto>>> GetPagedAsync(
@@ -61,6 +63,10 @@ public sealed class MaterialService(
         var subjectId = Normalize(request.SubjectId);
         var subjectName = await SubjectNameAsync(subjectId, ct);
 
+        var cover = await ResolveCoverAsync(request.CoverFileId, ct);
+        if (cover.IsFailure)
+            return Result.Failure<MaterialDto>(cover.Error);
+
         var material = new LearningMaterial
         {
             Code = await NextCodeAsync(ct),
@@ -73,6 +79,7 @@ public sealed class MaterialService(
             Source = request.Source,
             Url = request.Source == MaterialSource.ExternalUrl ? request.Url?.Trim() : null,
             StoredFileId = request.Source == MaterialSource.ServerFile ? request.StoredFileId : null,
+            CoverFileId = cover.Value,
             Description = request.Description?.Trim(),
             UploadedByUserId = currentUser.UserId
         };
@@ -100,6 +107,10 @@ public sealed class MaterialService(
                 return Result.Failure<MaterialDto>(access.Error);
         }
 
+        var cover = await ResolveCoverAsync(request.CoverFileId, ct);
+        if (cover.IsFailure)
+            return Result.Failure<MaterialDto>(cover.Error);
+
         material.CategoryId = Normalize(request.CategoryId);
         material.SubjectId = Normalize(request.SubjectId);
         material.SubjectName = await SubjectNameAsync(material.SubjectId, ct);
@@ -108,6 +119,7 @@ public sealed class MaterialService(
         material.Source = request.Source;
         material.Url = request.Source == MaterialSource.ExternalUrl ? request.Url?.Trim() : null;
         material.StoredFileId = request.Source == MaterialSource.ServerFile ? request.StoredFileId : null;
+        material.CoverFileId = cover.Value; // đổi/xóa ảnh KHÔNG xóa file cũ — orphan để FileCleanupService dọn
         material.Description = request.Description?.Trim();
         // Code/Type giữ nguyên — mã không cho sửa.
 
@@ -151,6 +163,18 @@ public sealed class MaterialService(
         return UniqueCodeGenerator.Next("TL");
     }
 
+    /// <summary>Kiểm tra CoverFileId (nếu có): StoredFile tồn tại và là ảnh. Trả về id đã Normalize.</summary>
+    private async Task<Result<Guid?>> ResolveCoverAsync(Guid? coverFileId, CancellationToken ct)
+    {
+        var cover = Normalize(coverFileId);
+        if (cover is null) return Result.Success<Guid?>(null);
+        var file = await storedFiles.GetByIdAsync(cover.Value, ct: ct);
+        if (file is null) return Result.Failure<Guid?>(CoverNotFound);
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            return Result.Failure<Guid?>(CoverNotImage);
+        return Result.Success<Guid?>(cover);
+    }
+
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
 
     private static string? CleanBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
@@ -189,6 +213,6 @@ public sealed class MaterialService(
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
         return new MaterialDto(m.Id, m.Code, m.ClassId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
-            m.Title, m.Source, m.Url, m.StoredFileId, fileName, m.Description, downloadUrl, m.CreatedAt);
+            m.Title, m.Source, m.Url, m.StoredFileId, fileName, m.CoverFileId, m.Description, downloadUrl, m.CreatedAt);
     }
 }
