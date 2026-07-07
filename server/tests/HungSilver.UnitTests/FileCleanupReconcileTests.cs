@@ -127,6 +127,25 @@ public sealed class FileCleanupReconcileTests : IDisposable
     }
 
     [Fact]
+    public async Task ReferencedByFolderCover_IsKept()
+    {
+        var file = await AddFileAsync(ageHours: 48);
+        _context.MaterialFolders.Add(new MaterialFolder
+        {
+            Name = "Tiếng Anh 10",
+            SubjectId = Guid.NewGuid(),
+            SubjectName = "Tiếng Anh",
+            CoverFileId = file.Id
+        });
+        await _context.SaveChangesAsync();
+
+        var marked = await FileCleanupService.ReconcileOrphansCoreAsync(_context, GraceHours);
+
+        Assert.Equal(0, marked);
+        Assert.False(await IsSoftDeletedAsync(file.Id));
+    }
+
+    [Fact]
     public async Task ReferencedByAvatarUrl_IsKept()
     {
         var file = await AddFileAsync(ageHours: 48);

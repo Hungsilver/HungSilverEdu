@@ -18,12 +18,11 @@ public class MaterialsController(IMaterialService materialService, IFileService 
     private const long MaxCoverBytes = 10L * 1024 * 1024; // giống avatar (ProfileController)
     private static readonly string[] CoverImageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
 
-    /// <summary>Danh sách tất cả tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên.</summary>
+    /// <summary>Danh sách tài liệu (phân trang) — lọc môn/loại/khối/bộ (folderId) hoặc chỉ tài liệu chung (generalOnly) + search Mã/Tên.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<MaterialDto>>> GetPaged(
-        [FromQuery] Guid? subjectId, [FromQuery] Guid? categoryId, [FromQuery] string? gradeBand,
-        [FromQuery] PagedRequest paging, CancellationToken ct) =>
-        (await materialService.GetPagedAsync(subjectId, categoryId, gradeBand, paging, ct)).ToActionResult();
+        [FromQuery] MaterialListFilter filter, [FromQuery] PagedRequest paging, CancellationToken ct) =>
+        (await materialService.GetPagedAsync(filter, paging, ct)).ToActionResult();
 
     [HttpPost]
     public async Task<ActionResult<MaterialDto>> Create(CreateMaterialRequest request, CancellationToken ct) =>

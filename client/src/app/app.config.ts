@@ -39,6 +39,7 @@ import {
   FileAddOutline,
   FileExcelOutline,
   FileTextOutline,
+  FolderOpenOutline,
   GiftOutline,
   HolderOutline,
   IdcardOutline,
@@ -116,8 +117,8 @@ export const appConfig: ApplicationConfig = {
       InsertRowRightOutline, ZoomInOutline, ZoomOutOutline, UserDeleteOutline,
       CloseCircleOutline, FallOutline, RobotOutline, CheckCircleOutline,
       ClockCircleOutline, FileSearchOutline, FormOutline, SendOutline,
-      // Ngân hàng câu hỏi + ảnh bìa tài liệu:
-      CheckSquareOutline, FileAddOutline, PictureOutline
+      // Ngân hàng câu hỏi + ảnh bìa tài liệu + bộ tài liệu:
+      CheckSquareOutline, FileAddOutline, PictureOutline, FolderOpenOutline
     ]),
     // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
     provideNzConfig({

@@ -947,6 +947,7 @@ export interface Material {
   id: string;
   code: string;
   classId: string | null;
+  folderId: string | null;
   categoryId: string | null;
   categoryName: string | null;
   subjectId: string | null;
@@ -973,6 +974,8 @@ export interface CreateMaterialRequest {
   storedFileId: string | null;
   description: string | null;
   coverFileId: string | null;
+  /** Có giá trị ⇒ tài liệu thuộc bộ (Môn/Khối snapshot từ bộ); null ⇒ Tài liệu chung. */
+  folderId?: string | null;
 }
 
 export interface UpdateMaterialRequest {
@@ -985,16 +988,54 @@ export interface UpdateMaterialRequest {
   storedFileId: string | null;
   description: string | null;
   coverFileId: string | null;
+  folderId?: string | null;
 }
 
-/** Bộ lọc danh sách tài liệu (phân trang) — tab Danh sách Kho tài liệu. */
+/** Bộ lọc danh sách tài liệu (phân trang) — Kho tài liệu. */
 export interface MaterialPagedFilter {
   search?: string | null;
   subjectId?: string | null;
   categoryId?: string | null;
   gradeBand?: string | null;
+  /** Lọc tài liệu trong 1 bộ cụ thể. */
+  folderId?: string | null;
+  /** true = chỉ Tài liệu chung (không thuộc bộ nào). */
+  generalOnly?: boolean;
   page: number;
   pageSize: number;
+}
+
+// ---- Bộ tài liệu (MaterialFolder) — phân cấp Môn → Bộ → Tài liệu ----
+
+export interface MaterialFolder {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  name: string;
+  gradeBand: string | null;
+  coverFileId: string | null;
+  description: string | null;
+  materialCount: number;
+  createdAt: string;
+}
+
+export interface CreateMaterialFolderRequest {
+  subjectId: string;
+  name: string;
+  gradeBand: string | null;
+  coverFileId: string | null;
+  description: string | null;
+}
+
+/** Không có subjectId — Môn của bộ bất biến sau khi tạo. */
+export type UpdateMaterialFolderRequest = Omit<CreateMaterialFolderRequest, 'subjectId'>;
+
+/** Mức 1 tab "Tài liệu môn học": mỗi môn kèm số bộ + số tài liệu. */
+export interface MaterialSubjectSummary {
+  subjectId: string;
+  subjectName: string;
+  folderCount: number;
+  materialCount: number;
 }
 
 // ----------------- Nhập danh sách lớp từ Excel (Đợt 7) -----------------

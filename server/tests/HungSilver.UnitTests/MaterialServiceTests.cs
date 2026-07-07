@@ -57,12 +57,21 @@ public sealed class MaterialServiceTests : IDisposable
         new Repository<MaterialCategory>(_context),
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
+        new Repository<MaterialFolder>(_context),
         new AdminGuard(),
         new CurrentRelationCleanupService(_context),
         new UnitOfWork(_context),
         new FakeCurrentUser(),
         new CreateMaterialRequestValidator(),
         new UpdateMaterialRequestValidator());
+
+    private MaterialFolder SeedFolder(string name = "Tiếng Anh 10", string? gradeBand = "10")
+    {
+        var folder = new MaterialFolder { SubjectId = _subjectId, SubjectName = "Tiếng Anh", Name = name, GradeBand = gradeBand };
+        _context.MaterialFolders.Add(folder);
+        _context.SaveChanges();
+        return folder;
+    }
 
     private CreateMaterialRequest NewRequest(string title, string? gradeBand = null, Guid? coverFileId = null) =>
         new(_categoryId, _subjectId, gradeBand, title, MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, coverFileId);
@@ -118,18 +127,18 @@ public sealed class MaterialServiceTests : IDisposable
         await svc.CreateAsync(NewRequest("Unit 3 Grade 9", gradeBand: "9"));
         await svc.CreateAsync(NewRequest("Unit 1 Grade 6", gradeBand: "6"));
 
-        var byBand = await svc.GetPagedAsync(null, null, "9", new PagedRequest());
+        var byBand = await svc.GetPagedAsync(new MaterialListFilter { GradeBand = "9" }, new PagedRequest());
         Assert.Single(byBand.Value.Items);
         Assert.Equal("Unit 3 Grade 9", byBand.Value.Items[0].Title);
 
-        var bySearchCode = await svc.GetPagedAsync(null, null, null, new PagedRequest { Search = "tl0002" });
+        var bySearchCode = await svc.GetPagedAsync(new MaterialListFilter(), new PagedRequest { Search = "tl0002" });
         Assert.Single(bySearchCode.Value.Items);
         Assert.Equal("TL0002", bySearchCode.Value.Items[0].Code);
 
-        var bySubject = await svc.GetPagedAsync(_subjectId, _categoryId, null, new PagedRequest());
+        var bySubject = await svc.GetPagedAsync(new MaterialListFilter { SubjectId = _subjectId, CategoryId = _categoryId }, new PagedRequest());
         Assert.Equal(2, bySubject.Value.TotalCount);
 
-        var noMatch = await svc.GetPagedAsync(Guid.NewGuid(), null, null, new PagedRequest());
+        var noMatch = await svc.GetPagedAsync(new MaterialListFilter { SubjectId = Guid.NewGuid() }, new PagedRequest());
         Assert.Empty(noMatch.Value.Items);
     }
 
@@ -161,6 +170,55 @@ public sealed class MaterialServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_InFolder_SnapshotsSubjectFromFolder_CategoryOptional()
+    {
+        var svc = NewService();
+        var folder = SeedFolder(gradeBand: "10");
+
+        // Không gửi Subject/Category/GradeBand — chỉ FolderId (form tối giản); client có gửi Subject lạ cũng bị bỏ qua.
+        var created = await svc.CreateAsync(new CreateMaterialRequest(
+            null, Guid.NewGuid(), "99", "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, folder.Id));
+
+        Assert.True(created.IsSuccess);
+        Assert.Equal(folder.Id, created.Value.FolderId);
+        Assert.Equal(_subjectId, created.Value.SubjectId);        // snapshot TỪ BỘ, bỏ qua Guid lạ client gửi
+        Assert.Equal("Tiếng Anh", created.Value.SubjectName);
+        Assert.Equal("10", created.Value.GradeBand);              // kế thừa Khối của bộ, bỏ qua "99"
+        Assert.Null(created.Value.CategoryId);
+    }
+
+    [Fact]
+    public async Task Create_WithMissingFolder_Fails()
+    {
+        var svc = NewService();
+        var result = await svc.CreateAsync(new CreateMaterialRequest(
+            null, null, null, "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, Guid.NewGuid()));
+        Assert.True(result.IsFailure);
+        Assert.Equal("Material.FolderNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task GetPaged_FiltersByFolder_AndGeneralOnly()
+    {
+        var svc = NewService();
+        var folder = SeedFolder();
+        await svc.CreateAsync(new CreateMaterialRequest(
+            null, null, null, "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, folder.Id));
+        await svc.CreateAsync(NewRequest("Tài liệu chung")); // FolderId null
+
+        var inFolder = await svc.GetPagedAsync(new MaterialListFilter { FolderId = folder.Id }, new PagedRequest());
+        Assert.Single(inFolder.Value.Items);
+        Assert.Equal("Unit 1", inFolder.Value.Items[0].Title);
+
+        var general = await svc.GetPagedAsync(new MaterialListFilter { GeneralOnly = true }, new PagedRequest());
+        Assert.Single(general.Value.Items);
+        Assert.Equal("Tài liệu chung", general.Value.Items[0].Title);
+
+        var all = await svc.GetPagedAsync(new MaterialListFilter(), new PagedRequest());
+        Assert.Equal(2, all.Value.TotalCount);
+    }
+
+    [Fact]
     public async Task Create_Update_RoundTripsCoverFileId()
     {
         var svc = NewService();
@@ -185,13 +243,13 @@ public sealed class MaterialServiceTests : IDisposable
         // Ảnh bìa trỏ file không tồn tại.
         var missing = await svc.CreateAsync(NewRequest("T", coverFileId: Guid.NewGuid()));
         Assert.True(missing.IsFailure);
-        Assert.Equal("Material.CoverNotFound", missing.Error.Code);
+        Assert.Equal("Materials.CoverNotFound", missing.Error.Code);
 
         // File tồn tại nhưng không phải ảnh.
         var pdf = await SeedStoredFileAsync(contentType: "application/pdf");
         var notImage = await svc.CreateAsync(NewRequest("T", coverFileId: pdf.Id));
         Assert.True(notImage.IsFailure);
-        Assert.Equal("Material.CoverNotImage", notImage.Error.Code);
+        Assert.Equal("Materials.CoverNotImage", notImage.Error.Code);
     }
 
     // ----- Fakes -----

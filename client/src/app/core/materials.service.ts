@@ -3,8 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest, MaterialPagedFilter, PagedResult,
-  StoredFile, UpdateMaterialRequest
+  CreateMaterialFolderRequest, CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest,
+  MaterialFolder, MaterialPagedFilter, MaterialSubjectSummary, PagedResult, StoredFile,
+  UpdateMaterialFolderRequest, UpdateMaterialRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -12,6 +13,7 @@ export class MaterialsService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/materials`;
   private readonly catUrl = `${environment.apiUrl}/material-categories`;
+  private readonly folderUrl = `${environment.apiUrl}/material-folders`;
 
   /** Danh sách tất cả tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên. */
   getPaged(filter: MaterialPagedFilter): Observable<PagedResult<Material>> {
@@ -20,6 +22,8 @@ export class MaterialsService {
     if (filter.subjectId) params = params.set('subjectId', filter.subjectId);
     if (filter.categoryId) params = params.set('categoryId', filter.categoryId);
     if (filter.gradeBand) params = params.set('gradeBand', filter.gradeBand);
+    if (filter.folderId) params = params.set('folderId', filter.folderId);
+    if (filter.generalOnly) params = params.set('generalOnly', 'true');
     return this.http.get<PagedResult<Material>>(this.apiUrl, { params });
   }
 
@@ -40,6 +44,30 @@ export class MaterialsService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<StoredFile>(`${this.apiUrl}/cover-image`, form);
+  }
+
+  // ---- Bộ tài liệu (MaterialFolder) — phân cấp Môn → Bộ → Tài liệu ----
+
+  /** Mức 1 tab "Tài liệu môn học": danh sách môn kèm số bộ + số tài liệu. */
+  getSubjectsSummary(): Observable<MaterialSubjectSummary[]> {
+    return this.http.get<MaterialSubjectSummary[]>(`${this.folderUrl}/subjects-summary`);
+  }
+
+  getFolders(subjectId: string): Observable<MaterialFolder[]> {
+    const params = new HttpParams().set('subjectId', subjectId);
+    return this.http.get<MaterialFolder[]>(this.folderUrl, { params });
+  }
+
+  createFolder(request: CreateMaterialFolderRequest): Observable<MaterialFolder> {
+    return this.http.post<MaterialFolder>(this.folderUrl, request);
+  }
+
+  updateFolder(id: string, request: UpdateMaterialFolderRequest): Observable<MaterialFolder> {
+    return this.http.put<MaterialFolder>(`${this.folderUrl}/${id}`, request);
+  }
+
+  deleteFolder(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.folderUrl}/${id}`);
   }
 
   // ---- Loại tài liệu (MaterialCategory) ----

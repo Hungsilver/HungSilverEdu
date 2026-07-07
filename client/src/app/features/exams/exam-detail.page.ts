@@ -223,6 +223,11 @@ export class ExamDetailPage implements OnDestroy {
   private objectUrl: string | null = null;
 
   readonly id = input.required<string>();
+  // Ngữ cảnh Kho tài liệu (query param, chuyển tiếp từ exam-list) — back giữ đúng tab/bộ đang xem.
+  readonly title = input<string | undefined>();
+  readonly tab = input<string | undefined>();
+  readonly subjectId = input<string | undefined>();
+  readonly folderId = input<string | undefined>();
 
   protected readonly typeLabels = EXAM_TYPE_LABELS;
   protected readonly loading = signal(true);
@@ -353,8 +358,14 @@ export class ExamDetailPage implements OnDestroy {
 
   protected back(): void {
     const d = this.detailRaw();
-    if (d?.materialId) this.router.navigate(['/materials', d.materialId, 'exams']);
-    else this.router.navigate(['/materials']);
+    // Chuyển tiếp ngữ cảnh Kho tài liệu (nếu có) để chuỗi back về đúng tab/bộ.
+    const ctx: Record<string, string> = {};
+    if (this.title()) ctx['title'] = this.title()!;
+    if (this.tab()) ctx['tab'] = this.tab()!;
+    if (this.subjectId()) ctx['subjectId'] = this.subjectId()!;
+    if (this.folderId()) ctx['folderId'] = this.folderId()!;
+    if (d?.materialId) this.router.navigate(['/materials', d.materialId, 'exams'], { queryParams: ctx });
+    else this.router.navigate(['/materials'], { queryParams: ctx });
   }
 
   // ---- Sửa thông tin đề ----

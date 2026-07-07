@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -30,7 +30,7 @@ import { PageHeader } from '../../shared/page-header';
   ],
   template: `
     <app-page-header [title]="headerTitle()" subtitle="Bộ đề trắc nghiệm sinh từ tài liệu" icon="file-text">
-      <a nz-button routerLink="/materials"><nz-icon nzType="arrow-left" /> Kho tài liệu</a>
+      <a nz-button routerLink="/materials" [queryParams]="backParams()"><nz-icon nzType="arrow-left" /> Kho tài liệu</a>
       <button nz-button nzType="primary" (click)="openGenerate()"><nz-icon nzType="robot" /> Tạo đề bằng AI</button>
     </app-page-header>
 
@@ -130,6 +130,22 @@ export class ExamListPage implements OnInit, OnDestroy {
 
   readonly materialId = input.required<string>();
   readonly title2 = input<string>('', { alias: 'title' });
+  // Ngữ cảnh Kho tài liệu (query param) — để nút back quay về đúng tab/bộ đang xem.
+  readonly tab = input<string | undefined>();
+  readonly subjectId = input<string | undefined>();
+  readonly folderId = input<string | undefined>();
+
+  /** Query params cho nút back — chỉ gồm param có giá trị (không có ⇒ về mặc định /materials). */
+  protected readonly backParams = computed(() => {
+    const p: Record<string, string> = {};
+    const tab = this.tab();
+    const subjectId = this.subjectId();
+    const folderId = this.folderId();
+    if (tab) p['tab'] = tab;
+    if (subjectId) p['subjectId'] = subjectId;
+    if (folderId) p['folderId'] = folderId;
+    return p;
+  });
 
   protected readonly statusLabels = EXAM_STATUS_LABELS;
   protected readonly exams = signal<ExamListItem[]>([]);
@@ -166,7 +182,8 @@ export class ExamListPage implements OnInit, OnDestroy {
   }
 
   protected open(e: ExamListItem): void {
-    this.router.navigate(['/exams', e.id]);
+    // Mang theo ngữ cảnh Kho tài liệu để chuỗi back exam-detail → exam-list → /materials giữ đúng tab/bộ.
+    this.router.navigate(['/exams', e.id], { queryParams: { title: this.title2() || null, ...this.backParams() } });
   }
 
   protected openGenerate(): void {

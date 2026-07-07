@@ -12,7 +12,7 @@ namespace HungSilver.Application.Materials;
 public interface IMaterialService
 {
     Task<Result<PagedResult<MaterialDto>>> GetPagedAsync(
-        Guid? subjectId, Guid? categoryId, string? gradeBand, PagedRequest paging, CancellationToken ct = default);
+        MaterialListFilter filter, PagedRequest paging, CancellationToken ct = default);
     Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default);
     Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
@@ -23,6 +23,7 @@ public sealed class MaterialService(
     IRepository<MaterialCategory> categories,
     IRepository<Subject> subjects,
     IRepository<StoredFile> storedFiles,
+    IRepository<MaterialFolder> folders,
     IClassAccessGuard accessGuard,
     ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork,
@@ -31,22 +32,25 @@ public sealed class MaterialService(
     IValidator<UpdateMaterialRequest> updateValidator) : IMaterialService
 {
     private static readonly Error NotFoundError = Error.NotFound("Material.NotFound", "Không tìm thấy tài liệu.");
-    private static readonly Error CoverNotFound = Error.Validation("Material.CoverNotFound", "Không tìm thấy ảnh bìa đã tải lên — hãy tải lại ảnh.");
-    private static readonly Error CoverNotImage = Error.Validation("Material.CoverNotImage", "Ảnh bìa phải là file ảnh.");
+    private static readonly Error FolderNotFound = Error.Validation("Material.FolderNotFound", "Không tìm thấy bộ tài liệu.");
 
-    /// <summary>Danh sách TẤT CẢ tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên, mới nhất trước.</summary>
+    /// <summary>Danh sách tài liệu (phân trang) — lọc môn/loại/khối/bộ hoặc chỉ tài liệu chung + search Mã/Tên, mới nhất trước.</summary>
     public async Task<Result<PagedResult<MaterialDto>>> GetPagedAsync(
-        Guid? subjectId, Guid? categoryId, string? gradeBand, PagedRequest paging, CancellationToken ct = default)
+        MaterialListFilter filter, PagedRequest paging, CancellationToken ct = default)
     {
-        var subj = Normalize(subjectId);
-        var cat = Normalize(categoryId);
-        var band = CleanBand(gradeBand);
+        var subj = Normalize(filter.SubjectId);
+        var cat = Normalize(filter.CategoryId);
+        var band = CleanBand(filter.GradeBand);
+        var folderId = Normalize(filter.FolderId);
+        var generalOnly = folderId == null && filter.GeneralOnly; // FolderId cụ thể thì bỏ qua GeneralOnly
         var term = string.IsNullOrWhiteSpace(paging.Search) ? null : paging.Search.Trim().ToLower();
 
         var paged = await materials.GetPagedAsync(paging.Page, paging.PageSize,
             m => (subj == null || m.SubjectId == subj)
                  && (cat == null || m.CategoryId == cat)
                  && (band == null || m.GradeBand == band)
+                 && (folderId == null || m.FolderId == folderId)
+                 && (!generalOnly || m.FolderId == null)
                  && (term == null || m.Title.ToLower().Contains(term) || m.Code.ToLower().Contains(term)), ct: ct);
 
         var categoryNames = await LoadCategoryNamesAsync(paged.Items, ct);
@@ -60,20 +64,23 @@ public sealed class MaterialService(
         if (!validation.IsValid)
             return Result.Failure<MaterialDto>(validation.ToError("Material.Validation"));
 
-        var subjectId = Normalize(request.SubjectId);
-        var subjectName = await SubjectNameAsync(subjectId, ct);
+        var context = await ResolveFolderContextAsync(request.FolderId, request.SubjectId, request.GradeBand, ct);
+        if (context.IsFailure)
+            return Result.Failure<MaterialDto>(context.Error);
+        var (folderId, subjectId, subjectName, gradeBand) = context.Value;
 
-        var cover = await ResolveCoverAsync(request.CoverFileId, ct);
+        var cover = await CoverFileResolver.ResolveAsync(storedFiles, request.CoverFileId, ct);
         if (cover.IsFailure)
             return Result.Failure<MaterialDto>(cover.Error);
 
         var material = new LearningMaterial
         {
             Code = await NextCodeAsync(ct),
+            FolderId = folderId,
             CategoryId = Normalize(request.CategoryId),
             SubjectId = subjectId,
             SubjectName = subjectName,
-            GradeBand = CleanBand(request.GradeBand),
+            GradeBand = gradeBand,
             Title = request.Title.Trim(),
             Type = MaterialType.Pdf, // enum legacy — UI không dùng nữa, giữ giá trị mặc định
             Source = request.Source,
@@ -107,14 +114,20 @@ public sealed class MaterialService(
                 return Result.Failure<MaterialDto>(access.Error);
         }
 
-        var cover = await ResolveCoverAsync(request.CoverFileId, ct);
+        var context = await ResolveFolderContextAsync(request.FolderId, request.SubjectId, request.GradeBand, ct);
+        if (context.IsFailure)
+            return Result.Failure<MaterialDto>(context.Error);
+        var (folderId, subjectId, subjectName, gradeBand) = context.Value;
+
+        var cover = await CoverFileResolver.ResolveAsync(storedFiles, request.CoverFileId, ct);
         if (cover.IsFailure)
             return Result.Failure<MaterialDto>(cover.Error);
 
+        material.FolderId = folderId;
         material.CategoryId = Normalize(request.CategoryId);
-        material.SubjectId = Normalize(request.SubjectId);
-        material.SubjectName = await SubjectNameAsync(material.SubjectId, ct);
-        material.GradeBand = CleanBand(request.GradeBand);
+        material.SubjectId = subjectId;
+        material.SubjectName = subjectName;
+        material.GradeBand = gradeBand;
         material.Title = request.Title.Trim();
         material.Source = request.Source;
         material.Url = request.Source == MaterialSource.ExternalUrl ? request.Url?.Trim() : null;
@@ -163,16 +176,24 @@ public sealed class MaterialService(
         return UniqueCodeGenerator.Next("TL");
     }
 
-    /// <summary>Kiểm tra CoverFileId (nếu có): StoredFile tồn tại và là ảnh. Trả về id đã Normalize.</summary>
-    private async Task<Result<Guid?>> ResolveCoverAsync(Guid? coverFileId, CancellationToken ct)
+    /// <summary>
+    /// Giải ngữ cảnh Môn/Khối theo bộ tài liệu: có FolderId ⇒ snapshot SubjectId/SubjectName/GradeBand
+    /// TỪ BỘ (bỏ qua giá trị client gửi — chống lệch snapshot); không có ⇒ như tài liệu chung.
+    /// </summary>
+    private async Task<Result<(Guid? FolderId, Guid? SubjectId, string? SubjectName, string? GradeBand)>> ResolveFolderContextAsync(
+        Guid? requestFolderId, Guid? requestSubjectId, string? requestGradeBand, CancellationToken ct)
     {
-        var cover = Normalize(coverFileId);
-        if (cover is null) return Result.Success<Guid?>(null);
-        var file = await storedFiles.GetByIdAsync(cover.Value, ct: ct);
-        if (file is null) return Result.Failure<Guid?>(CoverNotFound);
-        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-            return Result.Failure<Guid?>(CoverNotImage);
-        return Result.Success<Guid?>(cover);
+        var folderId = Normalize(requestFolderId);
+        if (folderId is not null)
+        {
+            var folder = await folders.GetByIdAsync(folderId.Value, ct: ct);
+            if (folder is null)
+                return Result.Failure<(Guid?, Guid?, string?, string?)>(FolderNotFound);
+            return (folderId, folder.SubjectId, folder.SubjectName, folder.GradeBand);
+        }
+
+        var subjectId = Normalize(requestSubjectId);
+        return (folderId, subjectId, await SubjectNameAsync(subjectId, ct), CleanBand(requestGradeBand));
     }
 
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
@@ -212,7 +233,7 @@ public sealed class MaterialService(
         var downloadUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
-        return new MaterialDto(m.Id, m.Code, m.ClassId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
+        return new MaterialDto(m.Id, m.Code, m.ClassId, m.FolderId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
             m.Title, m.Source, m.Url, m.StoredFileId, fileName, m.CoverFileId, m.Description, downloadUrl, m.CreatedAt);
     }
 }

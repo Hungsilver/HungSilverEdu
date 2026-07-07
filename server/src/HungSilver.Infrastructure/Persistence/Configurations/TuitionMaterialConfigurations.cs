@@ -35,6 +35,19 @@ public sealed class LearningMaterialConfiguration : IEntityTypeConfiguration<Lea
         e.HasIndex(x => x.CategoryId);
         e.HasIndex(x => x.GradeBand);
         e.HasIndex(x => x.SubjectId);
+        e.HasIndex(x => x.FolderId);
+    }
+}
+
+public sealed class MaterialFolderConfiguration : IEntityTypeConfiguration<MaterialFolder>
+{
+    public void Configure(EntityTypeBuilder<MaterialFolder> e)
+    {
+        e.Property(x => x.Name).HasMaxLength(200);
+        e.Property(x => x.SubjectName).HasMaxLength(150);
+        e.Property(x => x.GradeBand).HasMaxLength(100);
+        e.Property(x => x.Description).HasMaxLength(2000);
+        e.HasIndex(x => x.SubjectId);
     }
 }
 

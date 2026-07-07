@@ -34,6 +34,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<TuitionInvoice> TuitionInvoices => Set<TuitionInvoice>();
     public DbSet<LearningMaterial> LearningMaterials => Set<LearningMaterial>();
     public DbSet<MaterialCategory> MaterialCategories => Set<MaterialCategory>();
+    public DbSet<MaterialFolder> MaterialFolders => Set<MaterialFolder>();
     public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();

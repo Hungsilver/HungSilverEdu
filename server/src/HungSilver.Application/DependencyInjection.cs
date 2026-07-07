@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddScoped<ITeacherJournalService, TeacherJournalService>();
         services.AddScoped<IMaterialService, MaterialService>();
         services.AddScoped<IMaterialCategoryService, MaterialCategoryService>();
+        services.AddScoped<IMaterialFolderService, MaterialFolderService>();
         services.AddScoped<IExamService, ExamService>();
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<IBranchService, BranchService>();

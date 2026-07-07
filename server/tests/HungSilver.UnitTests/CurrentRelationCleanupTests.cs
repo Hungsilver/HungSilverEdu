@@ -205,6 +205,7 @@ public sealed class CurrentRelationCleanupTests : IDisposable
             new Repository<MaterialCategory>(_context),
             new Repository<Subject>(_context),
             new Repository<StoredFile>(_context),
+            new Repository<MaterialFolder>(_context),
             new AdminGuard(),
             _cleanup,
             new UnitOfWork(_context),
