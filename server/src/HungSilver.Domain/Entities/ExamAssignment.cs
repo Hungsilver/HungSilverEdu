@@ -16,8 +16,8 @@ public class ExamAssignment : BaseEntity
 
     public ExamDeliveryMode Mode { get; set; } = ExamDeliveryMode.InClass;
 
-    /// <summary>Thời gian làm bài (phút) — snapshot từ đề, GV có thể chỉnh.</summary>
-    public int DurationMinutes { get; set; } = 60;
+    /// <summary>Thời gian làm bài (phút) — snapshot từ đề, GV có thể chỉnh. Null = không giới hạn (chỉ bài về nhà, bắt buộc có CloseAt).</summary>
+    public int? DurationMinutes { get; set; }
 
     /// <summary>Mốc mở làm bài.</summary>
     public DateTime OpenAt { get; set; }

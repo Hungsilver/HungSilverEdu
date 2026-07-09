@@ -10,10 +10,11 @@ namespace HungSilver.Infrastructure.Exams;
 /// <summary>
 /// Dịch vụ nền chốt các lượt làm bài BỎ DỞ: tự-nộp chỉ chạy ở client nên HS đóng tab/mất mạng/hết pin
 /// là attempt kẹt InProgress vĩnh viễn — không được chấm, báo cáo GV mãi "Đang làm". Mỗi 2 phút quét
-/// attempt InProgress đã quá hạn giờ làm (StartedAt + DurationMinutes + grace) → tự chấm phần đã lưu
-/// (AutoSubmitted) bằng đúng lõi chấm của luồng nộp bài.
-/// Chủ đích KHÔNG chốt sớm khi GV đóng lượt giao/quá CloseAt: HS đang làm dở vẫn được dùng hết thời
-/// gian của mình (nhất quán SaveAnswer/Submit chỉ chặn theo giờ làm) — hết giờ thì service này chốt.
+/// attempt InProgress đã quá hạn chót hiệu dụng (bài có giờ: StartedAt + DurationMinutes + grace;
+/// bài không giới hạn: CloseAt + grace) → tự chấm phần đã lưu (AutoSubmitted) bằng đúng lõi chấm của luồng nộp bài.
+/// Bài CÓ giờ chủ đích KHÔNG chốt sớm khi GV đóng lượt giao/quá CloseAt: HS đang làm dở vẫn được dùng hết
+/// thời gian của mình (nhất quán SaveAnswer/Submit). Bài KHÔNG giới hạn không có "giờ của mình" để bảo vệ
+/// ⇒ chốt luôn khi GV đóng tay (khớp SaveAnswer chặn theo Closed).
 /// </summary>
 public sealed class ExamAttemptFinalizeService(
     IServiceScopeFactory scopeFactory,
@@ -72,8 +73,10 @@ public sealed class ExamAttemptFinalizeService(
             if (!assignments.TryGetValue(attempt.ExamAssignmentId, out var assignment))
                 continue;
 
-            var expiresAt = (attempt.StartedAt ?? attempt.CreatedAt).AddMinutes(assignment.DurationMinutes);
-            if (now <= expiresAt.AddSeconds(ExamTakingService.GraceSeconds)) continue;
+            var deadline = ExamTakingService.EffectiveDeadline(attempt, assignment);
+            var overdue = deadline is DateTime dl && now > dl.AddSeconds(ExamTakingService.GraceSeconds);
+            var closedUnlimited = assignment.DurationMinutes is null && assignment.Status == ExamAssignmentStatus.Closed;
+            if (!overdue && !closedUnlimited) continue;
 
             await ExamTakingService.GradeAndFinalizeAsync(db, attempt, assignment, ExamAttemptStatus.AutoSubmitted, ct);
             finalized++;

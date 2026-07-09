@@ -32,6 +32,18 @@ public sealed class ExamAssignmentService(
                 return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.SessionClassMismatch", "Buổi học không thuộc lớp đã chọn."));
         }
 
+        if (request.NoTimeLimit && request.Mode != ExamDeliveryMode.Homework)
+            return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.NoTimeLimitOnlyHomework", "Chỉ bài về nhà mới được không giới hạn thời gian làm bài."));
+        // Không giới hạn giờ làm ⇒ hạn nộp là mốc chốt bài duy nhất, bắt buộc phải có (tránh attempt treo "Đang làm" vĩnh viễn).
+        if (request.NoTimeLimit && request.CloseAt is null)
+            return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.CloseAtRequired", "Bài không giới hạn thời gian bắt buộc phải có hạn nộp."));
+
+        // FE (nz-date-picker) gửi ISO UTC ⇒ đổi về giờ local (server TZ Asia/Ho_Chi_Minh) để so với DateTime.Now.
+        var openAt = ToLocal(request.OpenAt);
+        DateTime? closeAt = request.CloseAt is DateTime c ? ToLocal(c) : null;
+        if (closeAt is DateTime cl && cl <= openAt)
+            return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.CloseBeforeOpen", "Hạn nộp phải sau thời điểm mở."));
+
         var assignment = new ExamAssignment
         {
             ExamId = exam.Id,
@@ -39,10 +51,9 @@ public sealed class ExamAssignmentService(
             ClassId = request.ClassId,
             ClassSessionId = request.ClassSessionId,
             Mode = request.Mode,
-            DurationMinutes = request.DurationMinutes is > 0 ? request.DurationMinutes!.Value : exam.DurationMinutes,
-            // FE (nz-date-picker) gửi ISO UTC ⇒ đổi về giờ local (server TZ Asia/Ho_Chi_Minh) để so với DateTime.Now.
-            OpenAt = ToLocal(request.OpenAt),
-            CloseAt = request.CloseAt is DateTime c ? ToLocal(c) : null,
+            DurationMinutes = request.NoTimeLimit ? null : (request.DurationMinutes is > 0 ? request.DurationMinutes!.Value : exam.DurationMinutes),
+            OpenAt = openAt,
+            CloseAt = closeAt,
             TotalPoints = exam.TotalPoints,
             Status = ExamAssignmentStatus.Open,
             AssignedByUserId = currentUser.UserId

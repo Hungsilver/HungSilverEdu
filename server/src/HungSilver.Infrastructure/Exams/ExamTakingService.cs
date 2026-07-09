@@ -107,7 +107,8 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
             }
         }
 
-        var expiresAt = (attempt.StartedAt ?? now).AddMinutes(assignment.DurationMinutes);
+        // Không giới hạn giờ làm ⇒ ExpiresAt null (FE ẩn đồng hồ); mốc chốt là CloseAt (bắt buộc khi giao).
+        DateTime? expiresAt = assignment.DurationMinutes is int d ? (attempt.StartedAt ?? now).AddMinutes(d) : null;
 
         var groups = await context.ExamQuestionGroups.AsNoTracking()
             .Where(g => g.ExamId == assignment.ExamId).OrderBy(g => g.OrderNo)
@@ -125,7 +126,7 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
             .ToListAsync(ct);
 
         return new PortalAttemptDto(attempt.Id, assignmentId, assignment.ExamTitle ?? "Đề", assignment.DurationMinutes,
-            expiresAt, assignment.TotalPoints, groups, questions, saved);
+            expiresAt, assignment.CloseAt, assignment.TotalPoints, groups, questions, saved);
     }
 
     public async Task<Result> SaveAnswerAsync(Guid attemptId, SaveExamAnswerRequest request, CancellationToken ct = default)
@@ -142,9 +143,13 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
 
         var assignment = await context.ExamAssignments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == attempt.ExamAssignmentId, ct);
         if (assignment is null) return Result.Failure(Error.NotFound("Exam.AssignmentNotFound", "Không tìm thấy đề."));
-        var expiresAt = (attempt.StartedAt ?? DateTime.Now).AddMinutes(assignment.DurationMinutes);
-        if (DateTime.Now > expiresAt.AddSeconds(GraceSeconds))
+        var deadline = EffectiveDeadline(attempt, assignment);
+        if (deadline is DateTime dl && DateTime.Now > dl.AddSeconds(GraceSeconds))
             return Result.Failure(Error.Validation("Exam.TimeUp", "Đã hết giờ làm bài."));
+        // Bài không giới hạn không có "thời gian của mình" để bảo vệ ⇒ GV đóng là dừng nhận bài
+        // (bài CÓ giờ giữ hành vi cũ: HS đang làm dở vẫn dùng hết giờ dù GV đã đóng).
+        if (assignment.DurationMinutes is null && assignment.Status == ExamAssignmentStatus.Closed)
+            return Result.Failure(Error.Validation("Exam.Closed", "Đề đã đóng."));
 
         var belongs = await context.ExamQuestions.AnyAsync(q => q.Id == request.QuestionId && q.ExamId == assignment.ExamId, ct);
         if (!belongs) return Result.Failure(Error.Validation("Exam.QuestionInvalid", "Câu hỏi không thuộc đề."));
@@ -191,8 +196,9 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
         if (attempt.Status != ExamAttemptStatus.InProgress)
             return new ExamAttemptResultDto(attempt.Score ?? 0, assignment.TotalPoints, attempt.CorrectCount ?? 0, attempt.TotalCount ?? 0, attempt.Status);
 
-        var expiresAt = (attempt.StartedAt ?? DateTime.Now).AddMinutes(assignment.DurationMinutes);
-        var finalStatus = DateTime.Now > expiresAt.AddSeconds(GraceSeconds) ? ExamAttemptStatus.AutoSubmitted : ExamAttemptStatus.Submitted;
+        var deadline = EffectiveDeadline(attempt, assignment);
+        var finalStatus = deadline is DateTime dl && DateTime.Now > dl.AddSeconds(GraceSeconds)
+            ? ExamAttemptStatus.AutoSubmitted : ExamAttemptStatus.Submitted;
         await GradeAndFinalizeAsync(context, attempt, assignment, finalStatus, ct);
 
         await context.SaveChangesAsync(ct);
@@ -275,6 +281,15 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
     }
 
     // ----------------- Helpers -----------------
+
+    /// <summary>
+    /// Hạn chót hiệu dụng của một attempt: bài có giờ = StartedAt + DurationMinutes;
+    /// bài không giới hạn = CloseAt (bắt buộc khi giao). Dùng chung với service nền chốt bài bỏ dở.
+    /// </summary>
+    internal static DateTime? EffectiveDeadline(ExamAttempt attempt, ExamAssignment assignment) =>
+        assignment.DurationMinutes is int d
+            ? (attempt.StartedAt ?? attempt.CreatedAt).AddMinutes(d)
+            : assignment.CloseAt;
 
     private async Task<Result<Student>> GetStudentAsync(CancellationToken ct)
     {

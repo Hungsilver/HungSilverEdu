@@ -44,12 +44,13 @@ public sealed class ExamAttemptFinalizeTests : IDisposable
         return (exam, q1, q2);
     }
 
-    private ExamAssignment SeedAssignment(Guid examId, int duration = 30)
+    private ExamAssignment SeedAssignment(Guid examId, int? duration = 30, DateTime? closeAt = null)
     {
         var a = new ExamAssignment
         {
             ExamId = examId, ExamTitle = "Đề", ClassId = Guid.NewGuid(), DurationMinutes = duration,
-            OpenAt = DateTime.Now.AddHours(-3), TotalPoints = 10m, Status = ExamAssignmentStatus.Open
+            Mode = duration is null ? ExamDeliveryMode.Homework : ExamDeliveryMode.InClass,
+            OpenAt = DateTime.Now.AddHours(-3), CloseAt = closeAt, TotalPoints = 10m, Status = ExamAssignmentStatus.Open
         };
         _context.ExamAssignments.Add(a);
         _context.SaveChanges();
@@ -117,6 +118,71 @@ public sealed class ExamAttemptFinalizeTests : IDisposable
         var saved = await _context.ExamAttempts.FirstAsync(t => t.Id == attempt.Id);
         Assert.Equal(ExamAttemptStatus.Submitted, saved.Status);
         Assert.Equal(7m, saved.Score); // không chấm lại
+    }
+
+    // ---- Bài không giới hạn thời gian (DurationMinutes = null, mốc chốt = CloseAt) ----
+
+    [Fact]
+    public async Task UnlimitedAttempt_BeforeCloseAt_LeftInProgress()
+    {
+        var (exam, _, _) = SeedExam();
+        var assignment = SeedAssignment(exam.Id, duration: null, closeAt: DateTime.Now.AddDays(1));
+        // Bắt đầu từ 5 tiếng trước — bài có giờ đã quá hạn từ lâu, không giới hạn thì vẫn được làm tiếp.
+        var attempt = SeedAttempt(assignment.Id, DateTime.Now.AddHours(-5));
+
+        var finalized = await ExamAttemptFinalizeService.FinalizeExpiredCoreAsync(_context, DateTime.Now);
+
+        Assert.Equal(0, finalized);
+        Assert.Equal(ExamAttemptStatus.InProgress, (await _context.ExamAttempts.FirstAsync(t => t.Id == attempt.Id)).Status);
+    }
+
+    [Fact]
+    public async Task UnlimitedAttempt_PastCloseAtGrace_IsFinalized()
+    {
+        var (exam, q1, _) = SeedExam();
+        var assignment = SeedAssignment(exam.Id, duration: null, closeAt: DateTime.Now.AddMinutes(-5));
+        var attempt = SeedAttempt(assignment.Id, DateTime.Now.AddHours(-2));
+        _context.ExamAttemptAnswers.Add(new ExamAttemptAnswer { AttemptId = attempt.Id, QuestionId = q1.Id, ResponseJson = "{\"value\":true}" });
+        await _context.SaveChangesAsync();
+
+        var finalized = await ExamAttemptFinalizeService.FinalizeExpiredCoreAsync(_context, DateTime.Now);
+
+        Assert.Equal(1, finalized);
+        var saved = await _context.ExamAttempts.FirstAsync(t => t.Id == attempt.Id);
+        Assert.Equal(ExamAttemptStatus.AutoSubmitted, saved.Status);
+        Assert.Equal(5m, saved.Score); // chấm phần đã lưu
+    }
+
+    [Fact]
+    public async Task UnlimitedAttempt_AssignmentClosedByTeacher_IsFinalized()
+    {
+        var (exam, _, _) = SeedExam();
+        // GV đóng tay dù CloseAt còn xa — bài không giới hạn không có "giờ của mình" ⇒ chốt luôn.
+        var assignment = SeedAssignment(exam.Id, duration: null, closeAt: DateTime.Now.AddDays(1));
+        assignment.Status = ExamAssignmentStatus.Closed;
+        var attempt = SeedAttempt(assignment.Id, DateTime.Now.AddMinutes(-30));
+        await _context.SaveChangesAsync();
+
+        var finalized = await ExamAttemptFinalizeService.FinalizeExpiredCoreAsync(_context, DateTime.Now);
+
+        Assert.Equal(1, finalized);
+        Assert.Equal(ExamAttemptStatus.AutoSubmitted, (await _context.ExamAttempts.FirstAsync(t => t.Id == attempt.Id)).Status);
+    }
+
+    [Fact]
+    public async Task TimedAttempt_AssignmentClosedEarly_WithinOwnTime_NotFinalized()
+    {
+        var (exam, _, _) = SeedExam();
+        // Regression hành vi cũ: bài CÓ giờ bị GV đóng sớm — HS đang làm dở vẫn dùng hết giờ của mình.
+        var assignment = SeedAssignment(exam.Id, duration: 60);
+        assignment.Status = ExamAssignmentStatus.Closed;
+        var attempt = SeedAttempt(assignment.Id, DateTime.Now.AddMinutes(-10));
+        await _context.SaveChangesAsync();
+
+        var finalized = await ExamAttemptFinalizeService.FinalizeExpiredCoreAsync(_context, DateTime.Now);
+
+        Assert.Equal(0, finalized);
+        Assert.Equal(ExamAttemptStatus.InProgress, (await _context.ExamAttempts.FirstAsync(t => t.Id == attempt.Id)).Status);
     }
 
     [Fact]

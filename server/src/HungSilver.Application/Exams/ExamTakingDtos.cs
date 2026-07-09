@@ -6,7 +6,7 @@ namespace HungSilver.Application.Exams;
 
 public sealed record PortalExamDto(
     Guid AssignmentId, Guid ExamId, string ExamTitle, string ClassName, ExamDeliveryMode Mode,
-    int DurationMinutes, DateTime OpenAt, DateTime? CloseAt, bool IsOpen, ExamAssignmentStatus AssignmentStatus,
+    int? DurationMinutes, DateTime OpenAt, DateTime? CloseAt, bool IsOpen, ExamAssignmentStatus AssignmentStatus,
     ExamAttemptStatus? AttemptStatus, Guid? AttemptId, decimal? Score, decimal TotalPoints);
 
 // ---------------- Câu hỏi cho học viên (KHÔNG có đáp án/giải thích) ----------------
@@ -17,8 +17,10 @@ public sealed record PortalQuestionDto(Guid Id, Guid? GroupId, int OrderNo, Exam
 
 public sealed record PortalSavedAnswerDto(Guid QuestionId, string? ResponseJson);
 
+/// <summary>DurationMinutes/ExpiresAt null = không giới hạn giờ làm — FE ẩn đồng hồ, hiện CloseAt làm hạn nộp.</summary>
 public sealed record PortalAttemptDto(
-    Guid AttemptId, Guid AssignmentId, string ExamTitle, int DurationMinutes, DateTime ExpiresAt, decimal TotalPoints,
+    Guid AttemptId, Guid AssignmentId, string ExamTitle, int? DurationMinutes, DateTime? ExpiresAt, DateTime? CloseAt,
+    decimal TotalPoints,
     IReadOnlyList<PortalGroupDto> Groups, IReadOnlyList<PortalQuestionDto> Questions, IReadOnlyList<PortalSavedAnswerDto> SavedAnswers);
 
 public sealed record SaveExamAnswerRequest(Guid QuestionId, string? ResponseJson);
