@@ -135,6 +135,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/exams/exam-report.page').then(m => m.ExamReportPage)
       },
       {
+        path: 'exams/attempts/:attemptId/review',
+        canActivate: [roleGuard],
+        data: teacherOrAdmin,
+        loadComponent: () => import('./features/exams/attempt-review.page').then(m => m.AttemptReviewPage)
+      },
+      {
         path: 'notifications',
         canActivate: [roleGuard],
         data: teacherOrAdmin,

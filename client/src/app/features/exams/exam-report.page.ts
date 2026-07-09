@@ -1,6 +1,7 @@
 import { Location } from '@angular/common';
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import type { EChartsCoreOption } from 'echarts/core';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
@@ -19,7 +20,7 @@ import { PageHeader } from '../../shared/page-header';
 @Component({
   selector: 'app-exam-report-page',
   imports: [
-    DatePipe, NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzTagModule, NzButtonModule,
+    DatePipe, RouterLink, NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzTagModule, NzButtonModule,
     NzIconModule, NzSpinModule, NzEmptyModule, Chart, PageHeader
   ],
   template: `
@@ -54,8 +55,8 @@ import { PageHeader } from '../../shared/page-header';
       </nz-row>
 
       <nz-card nzTitle="Kết quả từng học viên" class="mt">
-        <nz-table #t [nzData]="r.students" [nzFrontPagination]="false" [nzScroll]="{ x: '520px' }">
-          <thead><tr><th>Học viên</th><th>Trạng thái</th><th>Điểm</th><th>Nộp lúc</th></tr></thead>
+        <nz-table #t [nzData]="r.students" [nzFrontPagination]="false" [nzScroll]="{ x: '640px' }">
+          <thead><tr><th>Học viên</th><th>Trạng thái</th><th>Điểm</th><th>Nộp lúc</th><th></th></tr></thead>
           <tbody>
             @for (s of t.data; track s.studentId) {
               <tr>
@@ -67,6 +68,13 @@ import { PageHeader } from '../../shared/page-header';
                 </td>
                 <td>{{ s.score !== null ? (s.score + '/' + r.totalPoints) : '—' }}</td>
                 <td>{{ s.submittedAt ? (s.submittedAt | date: 'dd/MM HH:mm') : '—' }}</td>
+                <td>
+                  @if (s.attemptId && s.status && s.status !== 'InProgress') {
+                    <a nz-button nzType="link" nzSize="small" [routerLink]="['/exams/attempts', s.attemptId, 'review']">
+                      <nz-icon nzType="file-search" /> Xem bài làm
+                    </a>
+                  }
+                </td>
               </tr>
             }
           </tbody>
