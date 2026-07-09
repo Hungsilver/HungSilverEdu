@@ -65,7 +65,7 @@ public sealed class ExamReportService(AppDbContext context, IClassAccessGuard ac
             .Select(s =>
             {
                 attemptByStudent.TryGetValue(s.Id, out var at);
-                return new ExamStudentResultDto(s.Id, s.FullName, at?.Status, at?.Score, at?.SubmittedAt);
+                return new ExamStudentResultDto(s.Id, s.FullName, at?.Id, at?.Status, at?.Score, at?.SubmittedAt);
             })
             .OrderByDescending(r => r.Score ?? -1m)
             .ThenBy(r => r.FullName)
@@ -73,6 +73,27 @@ public sealed class ExamReportService(AppDbContext context, IClassAccessGuard ac
 
         return new ExamReportDto(assignment.Id, assignment.ExamTitle ?? "Đề", className, assignment.TotalPoints,
             students.Count, submittedCount, average, distribution, itemStats, studentResults);
+    }
+
+    public async Task<Result<TeacherAttemptReviewDto>> GetAttemptReviewAsync(Guid attemptId, CancellationToken ct = default)
+    {
+        var attempt = await context.ExamAttempts.AsNoTracking().FirstOrDefaultAsync(t => t.Id == attemptId, ct);
+        if (attempt is null) return Result.Failure<TeacherAttemptReviewDto>(Error.NotFound("Exam.AttemptNotFound", "Không tìm thấy lượt làm bài."));
+
+        var assignment = await context.ExamAssignments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == attempt.ExamAssignmentId, ct);
+        if (assignment is null) return Result.Failure<TeacherAttemptReviewDto>(Error.NotFound("Exam.AssignmentNotFound", "Không tìm thấy lượt giao đề."));
+
+        var access = await accessGuard.EnsureCanAccessClassAsync(assignment.ClassId, ct);
+        if (access.IsFailure) return Result.Failure<TeacherAttemptReviewDto>(access.Error);
+
+        if (attempt.Status == ExamAttemptStatus.InProgress)
+            return Result.Failure<TeacherAttemptReviewDto>(Error.Validation("Exam.NotSubmitted", "Học viên chưa nộp bài."));
+
+        var studentName = await context.Students.AsNoTracking()
+            .Where(s => s.Id == attempt.StudentId).Select(s => s.FullName).FirstOrDefaultAsync(ct) ?? "Học viên";
+
+        var review = await ExamTakingService.BuildReviewDtoAsync(context, attempt, assignment, ct);
+        return new TeacherAttemptReviewDto(attempt.Id, assignment.Id, attempt.StudentId, studentName, review);
     }
 
     /// <summary>Chia điểm (/10) vào 5 khoảng: [0–2), [2–4), [4–6), [6–8), [8–10].</summary>

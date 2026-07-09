@@ -6,4 +6,6 @@ namespace HungSilver.Application.Exams;
 public interface IExamReportService
 {
     Task<Result<ExamReportDto>> GetReportAsync(Guid assignmentId, CancellationToken ct = default);
+    /// <summary>GV xem bài làm một học viên đã nộp (đáp án + bài làm + điểm từng câu).</summary>
+    Task<Result<TeacherAttemptReviewDto>> GetAttemptReviewAsync(Guid attemptId, CancellationToken ct = default);
 }

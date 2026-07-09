@@ -258,12 +258,23 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
         var assignment = await context.ExamAssignments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == attempt.ExamAssignmentId, ct);
         if (assignment is null) return Result.Failure<PortalReviewDto>(Error.NotFound("Exam.AssignmentNotFound", "Không tìm thấy đề."));
 
+        return await BuildReviewDtoAsync(context, attempt, assignment, ct);
+    }
+
+    /// <summary>
+    /// Lõi dựng dữ liệu xem lại bài làm (đáp án đúng + giải thích + bài làm + điểm từng câu) —
+    /// dùng chung: HS tự xem lại (GetReviewAsync) và GV xem bài làm học viên (ExamReportService).
+    /// Caller tự lo guard quyền + trạng thái đã nộp.
+    /// </summary>
+    public static async Task<PortalReviewDto> BuildReviewDtoAsync(AppDbContext context, ExamAttempt attempt,
+        ExamAssignment assignment, CancellationToken ct = default)
+    {
         var groups = await context.ExamQuestionGroups.AsNoTracking()
             .Where(g => g.ExamId == assignment.ExamId).OrderBy(g => g.OrderNo)
             .Select(g => new PortalGroupDto(g.Id, g.OrderNo, g.Section, g.ExerciseLabel, g.Instruction, g.Passage))
             .ToListAsync(ct);
 
-        var ansByQ = (await context.ExamAttemptAnswers.AsNoTracking().Where(x => x.AttemptId == attemptId).ToListAsync(ct))
+        var ansByQ = (await context.ExamAttemptAnswers.AsNoTracking().Where(x => x.AttemptId == attempt.Id).ToListAsync(ct))
             .ToDictionary(x => x.QuestionId);
 
         var questions = await context.ExamQuestions.AsNoTracking()

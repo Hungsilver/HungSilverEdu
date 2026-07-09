@@ -6,6 +6,8 @@ public sealed record SessionSheetDto(
     Guid SessionId,
     Guid ClassId,
     string ClassName,
+    Guid? SubjectId,
+    string? SubjectName,
     int SessionNumber,
     DateOnly SessionDate,
     TimeOnly? StartTime,

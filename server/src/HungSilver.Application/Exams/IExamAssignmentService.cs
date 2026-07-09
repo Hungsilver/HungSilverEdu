@@ -7,5 +7,7 @@ public interface IExamAssignmentService
 {
     Task<Result<ExamAssignmentDto>> AssignAsync(Guid examId, AssignExamRequest request, CancellationToken ct = default);
     Task<Result<List<ExamAssignmentDto>>> ListByExamAsync(Guid examId, CancellationToken ct = default);
+    /// <summary>Các lượt giao gắn với một buổi học (section Bài tập trong màn hình buổi học).</summary>
+    Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default);
     Task<Result> CloseAsync(Guid assignmentId, CancellationToken ct = default);
 }

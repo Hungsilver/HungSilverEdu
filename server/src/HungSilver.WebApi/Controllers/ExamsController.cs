@@ -185,6 +185,11 @@ public class ExamsController(
     public async Task<ActionResult<List<ExamAssignmentDto>>> Assignments(Guid examId, CancellationToken ct) =>
         (await assignments.ListByExamAsync(examId, ct)).ToActionResult();
 
+    /// <summary>Các lượt giao đề gắn với một buổi học (section Bài tập trong màn hình buổi học).</summary>
+    [HttpGet("assignments/by-session/{sessionId:guid}")]
+    public async Task<ActionResult<List<ExamAssignmentDto>>> AssignmentsBySession(Guid sessionId, CancellationToken ct) =>
+        (await assignments.ListBySessionAsync(sessionId, ct)).ToActionResult();
+
     [HttpPost("assignments/{assignmentId:guid}/close")]
     public async Task<ActionResult> CloseAssignment(Guid assignmentId, CancellationToken ct) =>
         (await assignments.CloseAsync(assignmentId, ct)).ToActionResult();
@@ -193,6 +198,11 @@ public class ExamsController(
     [HttpGet("assignments/{assignmentId:guid}/report")]
     public async Task<ActionResult<ExamReportDto>> Report(Guid assignmentId, CancellationToken ct) =>
         (await reports.GetReportAsync(assignmentId, ct)).ToActionResult();
+
+    /// <summary>GV xem bài làm một học viên đã nộp (đáp án + bài làm + điểm từng câu).</summary>
+    [HttpGet("attempts/{attemptId:guid}/review")]
+    public async Task<ActionResult<TeacherAttemptReviewDto>> AttemptReview(Guid attemptId, CancellationToken ct) =>
+        (await reports.GetAttemptReviewAsync(attemptId, ct)).ToActionResult();
 
     private Guid UserId => currentUser.UserId ?? throw new InvalidOperationException("Thiếu user hiện tại.");
 }

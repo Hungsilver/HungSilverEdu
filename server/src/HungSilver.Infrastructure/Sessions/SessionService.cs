@@ -68,7 +68,8 @@ public sealed class SessionService(
         }).ToList();
 
         return new SessionSheetDto(
-            session.Id, session.ClassId, cls?.Name ?? string.Empty, session.SessionNumber, session.SessionDate,
+            session.Id, session.ClassId, cls?.Name ?? string.Empty, cls?.SubjectId, cls?.SubjectName,
+            session.SessionNumber, session.SessionDate,
             session.StartTime, session.EndTime, session.Topic, session.Status, rows);
     }
 

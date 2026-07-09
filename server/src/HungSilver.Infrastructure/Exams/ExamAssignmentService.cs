@@ -69,6 +69,26 @@ public sealed class ExamAssignmentService(
     {
         var assignments = await context.ExamAssignments.AsNoTracking()
             .Where(a => a.ExamId == examId).OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
+        return await ToDtosAsync(assignments, ct);
+    }
+
+    public async Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default)
+    {
+        var session = await context.ClassSessions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+        if (session is null) return Result.Failure<List<ExamAssignmentDto>>(Error.NotFound("Session.NotFound", "Không tìm thấy buổi học."));
+
+        var access = await accessGuard.EnsureCanAccessClassAsync(session.ClassId, ct);
+        if (access.IsFailure) return Result.Failure<List<ExamAssignmentDto>>(access.Error);
+
+        // Chỉ lượt giao gắn đúng buổi này — đề giao cho lớp không gắn buổi xem ở trang chi tiết đề.
+        var assignments = await context.ExamAssignments.AsNoTracking()
+            .Where(a => a.ClassSessionId == sessionId).OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
+        return await ToDtosAsync(assignments, ct);
+    }
+
+    /// <summary>Dựng DTO kèm tên lớp + sĩ số + số đã nộp (dùng chung ListByExam/ListBySession).</summary>
+    private async Task<List<ExamAssignmentDto>> ToDtosAsync(List<ExamAssignment> assignments, CancellationToken ct)
+    {
         if (assignments.Count == 0) return new List<ExamAssignmentDto>();
 
         var classIds = assignments.Select(a => a.ClassId).Distinct().ToList();
@@ -85,11 +105,10 @@ public sealed class ExamAssignmentService(
 
         var sizes = await LoadClassSizesAsync(classIds, ct);
 
-        var list = assignments
+        return assignments
             .Select(a => ToDto(a, classNames.GetValueOrDefault(a.ClassId, ""),
                 sizes.GetValueOrDefault(a.ClassId, 0), submitted.GetValueOrDefault(a.Id, 0)))
             .ToList();
-        return list;
     }
 
     public async Task<Result> CloseAsync(Guid assignmentId, CancellationToken ct = default)

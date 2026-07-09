@@ -84,17 +84,25 @@ public sealed class ExamDeliveryFlowTests : IDisposable
         return exam.Id;
     }
 
-    private Guid SeedAssignment(Guid examId, Guid classId, int duration = 60, DateTime? openAt = null, DateTime? closeAt = null)
+    private Guid SeedAssignment(Guid examId, Guid classId, int duration = 60, DateTime? openAt = null, DateTime? closeAt = null, Guid? sessionId = null)
     {
         var a = new ExamAssignment
         {
             ExamId = examId, ExamTitle = "Unit 3 Test", ClassId = classId, Mode = ExamDeliveryMode.InClass,
             DurationMinutes = duration, OpenAt = openAt ?? DateTime.Now.AddMinutes(-1), CloseAt = closeAt ?? DateTime.Now.AddHours(2),
-            TotalPoints = 10m, Status = ExamAssignmentStatus.Open
+            TotalPoints = 10m, Status = ExamAssignmentStatus.Open, ClassSessionId = sessionId
         };
         _context.ExamAssignments.Add(a);
         _context.SaveChanges();
         return a.Id;
+    }
+
+    private Guid SeedSession(Guid classId, int number = 1)
+    {
+        var s = new ClassSession { ClassId = classId, SessionNumber = number, SessionDate = DateOnly.FromDateTime(DateTime.Now), Status = SessionStatus.Scheduled };
+        _context.ClassSessions.Add(s);
+        _context.SaveChanges();
+        return s.Id;
     }
 
     private async Task AnswerAllAsync(ExamTakingService svc, Guid attemptId, PortalAttemptDto attempt)
@@ -311,6 +319,77 @@ public sealed class ExamDeliveryFlowTests : IDisposable
         Assert.Equal(ExamAttemptStatus.Submitted, done.AttemptStatus);
         Assert.Equal(6.25m, done.Score);
         Assert.False(done.IsOpen); // GV đóng tay ⇒ hết "đang mở" dù CloseAt còn xa (khớp StartAsync)
+    }
+
+    // ---- Giao theo buổi học + GV xem bài làm ----
+
+    [Fact]
+    public async Task ListBySession_ReturnsOnlyAssignmentsOfThatSession()
+    {
+        var classId = SeedClass();
+        var examId = SeedPublishedExam();
+        var sessionId = SeedSession(classId);
+        var otherSessionId = SeedSession(classId, number: 2);
+
+        var inSession = SeedAssignment(examId, classId, sessionId: sessionId);
+        SeedAssignment(examId, classId);                          // giao lớp không gắn buổi
+        SeedAssignment(examId, classId, sessionId: otherSessionId); // buổi khác
+
+        var list = (await Assigning().ListBySessionAsync(sessionId)).Value;
+
+        var only = Assert.Single(list);
+        Assert.Equal(inSession, only.Id);
+        Assert.Equal(sessionId, only.ClassSessionId);
+
+        var notFound = await Assigning().ListBySessionAsync(Guid.NewGuid());
+        Assert.True(notFound.IsFailure);
+        Assert.Equal("Session.NotFound", notFound.Error.Code);
+    }
+
+    [Fact]
+    public async Task TeacherAttemptReview_AfterSubmit_ReturnsAnswersAndStudentName()
+    {
+        var classId = SeedClass();
+        var examId = SeedPublishedExam();
+        var userId = Guid.NewGuid();
+        SeedStudent(userId, classId, "Trần Văn Ôn");
+        var assignmentId = SeedAssignment(examId, classId);
+        _currentUser.UserId = userId;
+        var svc = Taking();
+
+        var attempt = (await svc.StartAsync(assignmentId)).Value;
+        await AnswerAllAsync(svc, attempt.AttemptId, attempt);
+        await svc.SubmitAsync(attempt.AttemptId);
+
+        // Report per-student có AttemptId để GV mở trang xem bài làm.
+        var report = (await Reporting().GetReportAsync(assignmentId)).Value;
+        var row = Assert.Single(report.Students);
+        Assert.Equal(attempt.AttemptId, row.AttemptId);
+
+        var review = await Reporting().GetAttemptReviewAsync(attempt.AttemptId);
+        Assert.True(review.IsSuccess);
+        Assert.Equal("Trần Văn Ôn", review.Value.StudentName);
+        Assert.Equal(assignmentId, review.Value.AssignmentId);
+        Assert.Equal(6.25m, review.Value.Review.Score);
+        Assert.Equal(4, review.Value.Review.Questions.Count);
+        Assert.All(review.Value.Review.Questions, q => Assert.False(string.IsNullOrWhiteSpace(q.AnswerJson)));
+    }
+
+    [Fact]
+    public async Task TeacherAttemptReview_InProgress_Rejected()
+    {
+        var classId = SeedClass();
+        var examId = SeedPublishedExam();
+        var userId = Guid.NewGuid();
+        SeedStudent(userId, classId);
+        var assignmentId = SeedAssignment(examId, classId);
+        _currentUser.UserId = userId;
+
+        var attemptId = (await Taking().StartAsync(assignmentId)).Value.AttemptId;
+
+        var review = await Reporting().GetAttemptReviewAsync(attemptId);
+        Assert.True(review.IsFailure);
+        Assert.Equal("Exam.NotSubmitted", review.Error.Code);
     }
 
     // ---- Fakes ----

@@ -214,12 +214,14 @@ public sealed class ExamsControllerUploadTests
     {
         public Task<Result<ExamAssignmentDto>> AssignAsync(Guid examId, AssignExamRequest request, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<ExamAssignmentDto>>> ListByExamAsync(Guid examId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result> CloseAsync(Guid assignmentId, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
     private sealed class StubReports : IExamReportService
     {
         public Task<Result<ExamReportDto>> GetReportAsync(Guid assignmentId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Result<TeacherAttemptReviewDto>> GetAttemptReviewAsync(Guid attemptId, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
     private sealed class StubQuestionBank : IExamQuestionBankService
