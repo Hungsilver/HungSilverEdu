@@ -72,7 +72,7 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
           <div class="asg">
             <div class="asg-main">
               <strong>{{ e.examTitle }}</strong>
-              <span class="muted">{{ e.className }} · {{ e.mode === 'InClass' ? 'Trên lớp' : 'Về nhà' }} · {{ e.durationMinutes }}'
+              <span class="muted">{{ e.className }} · {{ e.mode === 'InClass' ? 'Trên lớp' : 'Về nhà' }} · {{ e.durationMinutes !== null ? e.durationMinutes + "'" : 'Không giới hạn' }}
                 @if (e.closeAt) { · Hạn: {{ e.closeAt | date: 'dd/MM HH:mm' }} }
               </span>
             </div>

@@ -81,7 +81,7 @@ interface Section {
         <nz-card class="assign-card" nzTitle="Đã giao cho lớp" nzSize="small">
           @for (a of assignments(); track a.id) {
             <div class="asg-row">
-              <span>{{ a.className }} · {{ a.mode === 'InClass' ? 'Trên lớp' : 'Về nhà' }} · {{ a.durationMinutes }}'</span>
+              <span>{{ a.className }} · {{ a.mode === 'InClass' ? 'Trên lớp' : 'Về nhà' }} · {{ a.durationMinutes !== null ? a.durationMinutes + "'" : 'Không giới hạn' }}</span>
               <span class="muted">{{ a.submittedCount }}/{{ a.totalStudents }} đã nộp</span>
               <nz-tag [nzColor]="a.status === 'Open' ? 'processing' : 'default'">{{ a.status === 'Open' ? 'Đang mở' : 'Đã đóng' }}</nz-tag>
               <button nz-button nzSize="small" (click)="openReport(a)"><nz-icon nzType="bar-chart" /> Báo cáo</button>
@@ -465,7 +465,8 @@ export class ExamDetailPage implements OnDestroy {
       mode: this.asgMode,
       durationMinutes: this.asgDuration,
       openAt: this.asgOpenAt.toISOString(),
-      closeAt: this.asgCloseAt ? this.asgCloseAt.toISOString() : null
+      closeAt: this.asgCloseAt ? this.asgCloseAt.toISOString() : null,
+      noTimeLimit: false
     };
     this.assigning.set(true);
     this.examService.assign(this.id(), req).subscribe({

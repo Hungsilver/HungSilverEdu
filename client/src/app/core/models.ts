@@ -620,6 +620,8 @@ export interface SessionSheet {
   sessionId: string;
   classId: string;
   className: string;
+  subjectId: string | null;
+  subjectName: string | null;
   sessionNumber: number;
   sessionDate: string;
   startTime: string | null;
@@ -1437,9 +1439,11 @@ export interface AssignExamRequest {
   classId: string;
   classSessionId: string | null;
   mode: ExamDeliveryMode;
+  /** null + noTimeLimit=false ⇒ lấy thời lượng từ đề; noTimeLimit=true ⇒ không giới hạn (bắt buộc closeAt). */
   durationMinutes: number | null;
   openAt: string;
   closeAt: string | null;
+  noTimeLimit: boolean;
 }
 
 export interface ExamAssignment {
@@ -1450,7 +1454,8 @@ export interface ExamAssignment {
   className: string;
   classSessionId: string | null;
   mode: ExamDeliveryMode;
-  durationMinutes: number;
+  /** null = không giới hạn thời gian làm bài. */
+  durationMinutes: number | null;
   openAt: string;
   closeAt: string | null;
   status: ExamAssignmentStatus;
@@ -1465,7 +1470,7 @@ export interface PortalExam {
   examTitle: string;
   className: string;
   mode: ExamDeliveryMode;
-  durationMinutes: number;
+  durationMinutes: number | null;
   openAt: string;
   closeAt: string | null;
   isOpen: boolean;
@@ -1504,8 +1509,10 @@ export interface PortalAttempt {
   attemptId: string;
   assignmentId: string;
   examTitle: string;
-  durationMinutes: number;
-  expiresAt: string;
+  /** null = không giới hạn thời gian — không có đồng hồ đếm ngược, hạn duy nhất là closeAt. */
+  durationMinutes: number | null;
+  expiresAt: string | null;
+  closeAt: string | null;
   totalPoints: number;
   groups: PortalGroup[];
   questions: PortalQuestion[];
@@ -1568,9 +1575,19 @@ export interface ExamItemStat {
 export interface ExamStudentResult {
   studentId: string;
   fullName: string;
+  attemptId: string | null;
   status: ExamAttemptStatus | null;
   score: number | null;
   submittedAt: string | null;
+}
+
+/** GV xem bài làm một học viên (bọc PortalReview + định danh HS). */
+export interface TeacherAttemptReview {
+  attemptId: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string;
+  review: PortalReview;
 }
 
 export interface ExamReport {

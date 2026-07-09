@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -30,7 +31,7 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
 @Component({
   selector: 'app-exam-take-page',
   imports: [
-    FormsModule,
+    DatePipe, FormsModule,
     NzCardModule, NzButtonModule, NzIconModule, NzTagModule, NzRadioModule, NzInputModule, NzSelectModule,
     NzProgressModule, NzModalModule, NzAlertModule, NzSpinModule, PageHeader
   ],
@@ -39,9 +40,16 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
       <div class="center"><nz-spin nzSimple /></div>
     } @else if (attempt(); as a) {
       <app-page-header [title]="a.examTitle" subtitle="Làm bài — chọn đáp án, hệ thống tự lưu" icon="form">
-        <div class="timer" [class.warn]="remaining() <= 60">
-          <nz-icon nzType="clock-circle" /> {{ mmss() }}
-        </div>
+        @if (a.expiresAt) {
+          <div class="timer" [class.warn]="remaining() <= 60">
+            <nz-icon nzType="clock-circle" /> {{ mmss() }}
+          </div>
+        } @else {
+          <div class="no-limit">
+            <nz-tag nzColor="blue"><nz-icon nzType="clock-circle" /> Không giới hạn thời gian</nz-tag>
+            @if (a.closeAt) { <span class="deadline">Hạn nộp: {{ a.closeAt | date: 'HH:mm dd/MM/yyyy' }}</span> }
+          </div>
+        }
         <button nz-button nzType="primary" (click)="confirmSubmit()"><nz-icon nzType="check" /> Nộp bài</button>
       </app-page-header>
 
@@ -117,6 +125,8 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
     .center { text-align: center; padding: 48px; }
     .timer { font-weight: 700; font-size: 18px; color: var(--hs-primary); display: flex; align-items: center; gap: 6px; }
     .timer.warn { color: #DC2626; }
+    .no-limit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .no-limit .deadline { color: var(--hs-text-muted); font-size: 13px; }
     .questions { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
     .group-card { background: var(--hs-surface-alt, #f5f7ff); }
     .passage { white-space: pre-wrap; margin: 0; }
@@ -266,13 +276,15 @@ export class ExamTakePage implements OnInit, OnDestroy {
   }
 
   private startTimer(): void {
+    // Không giới hạn thời gian ⇒ không có đồng hồ, không auto-submit (mốc chốt = hạn nộp, server lo).
+    if (!this.attempt()?.expiresAt) return;
     this.tick();
     this.timer = setInterval(() => this.tick(), 1000);
   }
 
   private tick(): void {
     const a = this.attempt();
-    if (!a) return;
+    if (!a?.expiresAt) return;
     const rem = Math.max(0, Math.floor((new Date(a.expiresAt).getTime() - Date.now()) / 1000));
     this.remaining.set(rem);
     if (rem <= 0) {
