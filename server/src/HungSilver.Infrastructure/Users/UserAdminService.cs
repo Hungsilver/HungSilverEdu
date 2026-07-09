@@ -1,6 +1,7 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
+using HungSilver.Application.Settings;
 using HungSilver.Application.Users;
 using HungSilver.Domain.Common;
 using HungSilver.Domain.Common.Results;
@@ -16,6 +17,7 @@ public sealed class UserAdminService(
     UserManager<AppUser> userManager,
     AppDbContext context,
     ICurrentRelationCleanupService relationCleanup,
+    ISettingsResolver settingsResolver,
     ICurrentUser currentUser) : IUserAdminService
 {
     private static readonly Error UserNotFound =
@@ -30,6 +32,7 @@ public sealed class UserAdminService(
         {
             var term = request.Search.Trim().ToLower();
             query = query.Where(u =>
+                u.UserName!.ToLower().Contains(term) ||
                 u.Email!.ToLower().Contains(term) ||
                 (u.FullName != null && u.FullName.ToLower().Contains(term)));
         }
@@ -52,14 +55,18 @@ public sealed class UserAdminService(
             .GroupBy(x => x.UserId)
             .ToDictionaryAsync(g => g.Key, g => g.Select(x => x.Name!).ToList(), ct);
 
-        var items = users.Select(u => new UserListItemDto(
-            u.Id,
-            u.UserName!,
-            u.Email!,
-            u.FullName,
+        // Tài khoản liên kết hồ sơ HS/GV: tên đăng nhập = mã hồ sơ nên không cho đổi ở trang Người dùng.
+        var studentUserIds = (await context.Students
+            .Where(s => s.UserId != null && userIds.Contains(s.UserId.Value))
+            .Select(s => s.UserId!.Value).ToListAsync(ct)).ToHashSet();
+        var teacherUserIds = (await context.TeacherProfiles
+            .Where(t => t.UserId != null && userIds.Contains(t.UserId.Value))
+            .Select(t => t.UserId!.Value).ToListAsync(ct)).ToHashSet();
+
+        var items = users.Select(u => ToListItem(
+            u,
             roleMap.TryGetValue(u.Id, out var roles) ? roles : [],
-            u.IsDeleted,
-            u.CreatedAt)).ToList();
+            studentUserIds.Contains(u.Id) ? "Student" : teacherUserIds.Contains(u.Id) ? "Teacher" : null)).ToList();
 
         return new PagedResult<UserListItemDto>
         {
@@ -116,7 +123,126 @@ public sealed class UserAdminService(
             return Result.Failure<UserListItemDto>(Error.Failure(
                 "Users.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
 
-        return new UserListItemDto(user.Id, user.UserName!, user.Email!, user.FullName, [role], user.IsDeleted, user.CreatedAt);
+        return ToListItem(user, [role], null);
+    }
+
+    public async Task<Result<UserListItemDto>> UpdateUserAsync(Guid userId, UpdateUserRequest request, CancellationToken ct = default)
+    {
+        // FindByIdAsync đi qua query filter ⇒ user đã xóa mềm không sửa được (phải khôi phục trước).
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure<UserListItemDto>(UserNotFound);
+
+        string? linkedType = null;
+        if (await context.Students.AnyAsync(s => s.UserId == userId, ct)) linkedType = "Student";
+        else if (await context.TeacherProfiles.AnyAsync(t => t.UserId == userId, ct)) linkedType = "Teacher";
+
+        // Tên đăng nhập: bỏ trống ⇒ giữ nguyên. Tài khoản liên kết hồ sơ HS/GV không được đổi
+        // (bất biến "tên đăng nhập = mã hồ sơ" — đổi mã ở trang Học viên/Giáo viên).
+        var userName = request.UserName?.Trim();
+        if (!string.IsNullOrWhiteSpace(userName) && userName != user.UserName)
+        {
+            if (linkedType is not null)
+                return Result.Failure<UserListItemDto>(Error.Conflict("Users.UserNameLinked",
+                    "Tài khoản này liên kết hồ sơ Học sinh/Giáo viên — tên đăng nhập phải bằng mã hồ sơ, không đổi được ở đây."));
+            if (await context.Users.IgnoreQueryFilters().AnyAsync(
+                    u => u.Id != userId && u.NormalizedUserName == userManager.NormalizeName(userName), ct))
+                return Result.Failure<UserListItemDto>(Error.Conflict("Users.UserNameTaken", "Tên đăng nhập đã tồn tại."));
+            user.UserName = userName;
+        }
+
+        // Email: bỏ trống ⇒ giữ nguyên (mọi tài khoản luôn có email — thật hoặc ảo theo mã).
+        var email = request.Email?.Trim();
+        if (!string.IsNullOrWhiteSpace(email) && !string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!email.Contains('@'))
+                return Result.Failure<UserListItemDto>(Error.Validation("Users.InvalidEmail", "Email không hợp lệ."));
+            if (await context.Users.IgnoreQueryFilters().AnyAsync(
+                    u => u.Id != userId && u.NormalizedEmail == userManager.NormalizeEmail(email), ct))
+                return Result.Failure<UserListItemDto>(Error.Conflict("Users.EmailTaken", "Email đã được sử dụng."));
+            user.Email = email;
+            user.EmailConfirmed = true;
+        }
+
+        user.FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim();
+        user.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber) ? null : request.PhoneNumber.Trim();
+
+        var updated = await userManager.UpdateAsync(user);
+        if (!updated.Succeeded)
+            return Result.Failure<UserListItemDto>(Error.Validation(
+                "Users.UpdateFailed", string.Join(" | ", updated.Errors.Select(e => e.Description))));
+
+        var roles = await userManager.GetRolesAsync(user);
+        return ToListItem(user, roles.ToList(), linkedType);
+    }
+
+    public async Task<Result> ResetPasswordAsync(Guid userId, AdminResetPasswordRequest request, CancellationToken ct = default)
+    {
+        // Đổi mật khẩu của chính mình đi qua trang Hồ sơ (yêu cầu mật khẩu hiện tại) — tránh
+        // admin tự reset rồi bị thu hồi phiên/bắt đổi mật khẩu gây khó hiểu.
+        if (currentUser.UserId == userId)
+            return Result.Failure(Error.Conflict("Users.CannotResetSelf",
+                "Đổi mật khẩu của chính bạn tại trang Hồ sơ cá nhân."));
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure(UserNotFound);
+
+        var password = request.Password;
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            var configured = await settingsResolver.GetEffectiveValueAsync(SettingKeys.AccountDefaultPassword, ct: ct);
+            password = string.IsNullOrWhiteSpace(configured)
+                ? SettingKeys.Defaults[SettingKeys.AccountDefaultPassword]
+                : configured;
+        }
+
+        // Validate mật khẩu TRƯỚC khi gỡ mật khẩu cũ — nếu gỡ xong mới fail thì tài khoản kẹt không còn mật khẩu.
+        foreach (var validator in userManager.PasswordValidators)
+        {
+            var check = await validator.ValidateAsync(userManager, user, password);
+            if (!check.Succeeded)
+                return Result.Failure(Error.Validation(
+                    "Users.ResetPasswordFailed", string.Join(" | ", check.Errors.Select(e => e.Description))));
+        }
+
+        var removed = await userManager.RemovePasswordAsync(user);
+        if (!removed.Succeeded)
+            return Result.Failure(Error.Failure(
+                "Users.ResetPasswordFailed", string.Join(" | ", removed.Errors.Select(e => e.Description))));
+
+        var added = await userManager.AddPasswordAsync(user, password);
+        if (!added.Succeeded)
+            return Result.Failure(Error.Validation(
+                "Users.ResetPasswordFailed", string.Join(" | ", added.Errors.Select(e => e.Description))));
+
+        user.MustChangePassword = request.MustChangePassword;
+        await userManager.UpdateAsync(user);
+
+        await RevokeRefreshTokensAsync(userId, ct);
+        return Result.Success();
+    }
+
+    public async Task<Result> SetLockedAsync(Guid userId, bool locked, CancellationToken ct = default)
+    {
+        // Không cho tự khóa ⇒ luôn còn ít nhất 1 admin (người thao tác) đăng nhập được.
+        if (locked && currentUser.UserId == userId)
+            return Result.Failure(Error.Conflict("Users.CannotLockSelf", "Không thể tự khóa tài khoản của chính mình."));
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure(UserNotFound);
+
+        await userManager.SetLockoutEnabledAsync(user, true);
+        var set = await userManager.SetLockoutEndDateAsync(user, locked ? DateTimeOffset.MaxValue : null);
+        if (!set.Succeeded)
+            return Result.Failure(Error.Failure(
+                "Users.LockFailed", string.Join(" | ", set.Errors.Select(e => e.Description))));
+
+        // Khóa ⇒ đăng xuất các phiên hiện hành.
+        if (locked)
+            await RevokeRefreshTokensAsync(userId, ct);
+        return Result.Success();
     }
 
     public async Task<Result> AssignRolesAsync(Guid userId, AssignRolesRequest request, CancellationToken ct = default)
@@ -205,6 +331,29 @@ public sealed class UserAdminService(
         await context.SaveChangesAsync(ct);
         return Result.Success();
     }
+
+    private async Task RevokeRefreshTokensAsync(Guid userId, CancellationToken ct)
+    {
+        var active = await context.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ToListAsync(ct);
+        foreach (var token in active)
+            token.RevokedAt = DateTime.Now;
+        if (active.Count > 0)
+            await context.SaveChangesAsync(ct);
+    }
+
+    private static UserListItemDto ToListItem(AppUser u, IReadOnlyList<string> roles, string? linkedType) => new(
+        u.Id,
+        u.UserName!,
+        u.Email!,
+        u.FullName,
+        u.PhoneNumber,
+        roles,
+        u.IsDeleted,
+        u.LockoutEnd != null && u.LockoutEnd > DateTimeOffset.Now,
+        linkedType,
+        u.CreatedAt);
 
     private async Task<Result> EnsureNotLastAdminAsync(CancellationToken ct)
     {

@@ -239,6 +239,15 @@ public sealed class AccountProvisioningService(
 
         var password = await ResolvePasswordAsync(newPassword, ct);
 
+        // Validate mật khẩu TRƯỚC khi gỡ mật khẩu cũ — nếu gỡ xong mới fail thì tài khoản kẹt không còn mật khẩu.
+        foreach (var validator in userManager.PasswordValidators)
+        {
+            var check = await validator.ValidateAsync(userManager, user, password);
+            if (!check.Succeeded)
+                return Result.Failure(Error.Validation(
+                    "Account.ResetPasswordFailed", string.Join(" | ", check.Errors.Select(e => e.Description))));
+        }
+
         var removed = await userManager.RemovePasswordAsync(user);
         if (!removed.Succeeded)
             return Result.Failure(Error.Failure("Account.ResetPasswordFailed", string.Join(" | ", removed.Errors.Select(e => e.Description))));

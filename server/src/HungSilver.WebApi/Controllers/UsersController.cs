@@ -1,3 +1,4 @@
+using HungSilver.Application.Accounts;
 using HungSilver.Application.Common.Models;
 using HungSilver.Application.Users;
 using HungSilver.WebApi.Common;
@@ -20,6 +21,24 @@ public class UsersController(IUserAdminService userAdminService) : ControllerBas
     [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<UserListItemDto>> Create(CreateUserRequest request, CancellationToken ct) =>
         (await userAdminService.CreateUserAsync(request, ct)).ToActionResult();
+
+    /// <summary>Admin sửa thông tin cơ bản (tên đăng nhập/email/họ tên/SĐT) của tài khoản.</summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult<UserListItemDto>> Update(Guid id, UpdateUserRequest request, CancellationToken ct) =>
+        (await userAdminService.UpdateUserAsync(id, request, ct)).ToActionResult();
+
+    /// <summary>Admin đổi/đặt lại mật khẩu tài khoản (trống ⇒ mật khẩu mặc định) + thu hồi phiên đăng nhập.</summary>
+    [HttpPost("{id:guid}/reset-password")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult> ResetPassword(Guid id, AdminResetPasswordRequest request, CancellationToken ct) =>
+        (await userAdminService.ResetPasswordAsync(id, request, ct)).ToActionResult();
+
+    /// <summary>Admin khóa/mở khóa đăng nhập tài khoản.</summary>
+    [HttpPost("{id:guid}/lock")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult> SetLocked(Guid id, SetAccountLockedRequest request, CancellationToken ct) =>
+        (await userAdminService.SetLockedAsync(id, request.Locked, ct)).ToActionResult();
 
     [HttpPut("{id:guid}/roles")]
     [Authorize(Policy = "AdminOnly")]

@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { CreateUserRequest, PagedResult, UserListItem } from './models';
+import { CreateUserRequest, PagedResult, UpdateUserRequest, UserListItem } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class UsersService {
@@ -17,6 +17,19 @@ export class UsersService {
 
   create(request: CreateUserRequest): Observable<UserListItem> {
     return this.http.post<UserListItem>(this.apiUrl, request);
+  }
+
+  update(id: string, request: UpdateUserRequest): Observable<UserListItem> {
+    return this.http.put<UserListItem>(`${this.apiUrl}/${id}`, request);
+  }
+
+  /** Trống password ⇒ về mật khẩu mặc định của hệ thống. */
+  resetPassword(id: string, password: string | null, mustChangePassword: boolean): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${id}/reset-password`, { password, mustChangePassword });
+  }
+
+  setLocked(id: string, locked: boolean): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${id}/lock`, { locked });
   }
 
   assignRoles(id: string, roles: string[]): Observable<void> {

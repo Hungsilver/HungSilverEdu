@@ -27,9 +27,21 @@ export interface UserListItem {
   userName: string;
   email: string;
   fullName: string | null;
+  phoneNumber: string | null;
   roles: string[];
   isDeleted: boolean;
+  isLocked: boolean;
+  /** Tài khoản liên kết hồ sơ: 'Student' | 'Teacher' | null. Liên kết ⇒ không đổi được tên đăng nhập. */
+  linkedType: string | null;
   createdAt: string;
+}
+
+/** Admin sửa thông tin cơ bản của tài khoản. UserName/Email bỏ trống ⇒ giữ nguyên. */
+export interface UpdateUserRequest {
+  userName: string | null;
+  email: string | null;
+  fullName: string | null;
+  phoneNumber: string | null;
 }
 
 /** Admin tạo tài khoản Admin/Giáo viên. */

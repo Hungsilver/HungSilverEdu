@@ -12,6 +12,15 @@ public interface IUserAdminService
     /// <summary>Admin tạo tài khoản mới (Admin hoặc Giáo viên).</summary>
     Task<Result<UserListItemDto>> CreateUserAsync(CreateUserRequest request, CancellationToken ct = default);
 
+    /// <summary>Admin sửa thông tin cơ bản (tên đăng nhập/email/họ tên/SĐT) của một tài khoản.</summary>
+    Task<Result<UserListItemDto>> UpdateUserAsync(Guid userId, UpdateUserRequest request, CancellationToken ct = default);
+
+    /// <summary>Admin đổi/đặt lại mật khẩu một tài khoản (trống ⇒ mật khẩu mặc định) + thu hồi phiên đăng nhập.</summary>
+    Task<Result> ResetPasswordAsync(Guid userId, AdminResetPasswordRequest request, CancellationToken ct = default);
+
+    /// <summary>Admin khóa/mở khóa đăng nhập một tài khoản.</summary>
+    Task<Result> SetLockedAsync(Guid userId, bool locked, CancellationToken ct = default);
+
     Task<Result> AssignRolesAsync(Guid userId, AssignRolesRequest request, CancellationToken ct = default);
 
     Task<Result> SoftDeleteAsync(Guid userId, CancellationToken ct = default);
