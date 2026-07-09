@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnDestroy, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -23,6 +23,7 @@ import { ExamService } from '../../core/exam.service';
 import {
   AssignExamRequest, ClassListItem, EXAM_TYPE_LABELS, ExamAssignment, ExamDeliveryMode, ExamDetail, ExamQuestion
 } from '../../core/models';
+import { DocumentPreview } from '../../shared/document-preview';
 import { PageHeader } from '../../shared/page-header';
 import {
   EditQuestion, QView, QuestionEditorForm, buildQuestionView, emptyEditQuestion, toEditQuestion, toUpsertRequest
@@ -41,7 +42,7 @@ interface Section {
     FormsModule,
     NzCardModule, NzButtonModule, NzIconModule, NzTagModule, NzModalModule, NzFormModule, NzInputModule,
     NzInputNumberModule, NzRadioModule, NzSelectModule, NzDatePickerModule, NzSpinModule, NzAlertModule, NzPopconfirmModule,
-    PageHeader, QuestionEditorForm
+    DocumentPreview, PageHeader, QuestionEditorForm
   ],
   template: `
     <app-page-header [title]="detail()?.title || 'Duyệt đề'" subtitle="Duyệt & chỉnh sửa trước khi phát hành" icon="file-text">
@@ -96,6 +97,9 @@ interface Section {
       <div class="split" [class.no-pdf]="!pdfUrl()">
         @if (pdfUrl(); as url) {
           <div class="pdf">
+            <button nz-button nzSize="small" class="pdf-expand" (click)="openFullPreview()">
+              <nz-icon nzType="fullscreen" /> Phóng to
+            </button>
             <iframe [src]="url" title="Tài liệu gốc"></iframe>
           </div>
         }
@@ -184,6 +188,9 @@ interface Section {
         </ng-container>
       </nz-modal>
     }
+
+    <!-- Trình xem tài liệu gốc full màn hình -->
+    <app-document-preview />
   `,
   styles: `
     .center { text-align: center; padding: 48px; }
@@ -192,6 +199,7 @@ interface Section {
     .split.no-pdf { grid-template-columns: 1fr; }
     .pdf { position: sticky; top: 0; height: calc(100vh - 200px); }
     .pdf iframe { width: 100%; height: 100%; border: 1px solid var(--hs-border); border-radius: var(--hs-radius); }
+    .pdf .pdf-expand { position: absolute; top: 8px; right: 8px; z-index: 1; }
     .questions { display: flex; flex-direction: column; gap: 12px; }
     .group-card { background: var(--hs-surface-alt, #f5f7ff); }
     .passage { white-space: pre-wrap; margin: 0; }
@@ -221,6 +229,9 @@ export class ExamDetailPage implements OnDestroy {
   private readonly message = inject(NzMessageService);
   private readonly sanitizer = inject(DomSanitizer);
   private objectUrl: string | null = null;
+
+  /** Trình xem tài liệu gốc full màn hình dùng chung. */
+  private readonly fullPreview = viewChild.required(DocumentPreview);
 
   readonly id = input.required<string>();
   // Ngữ cảnh Kho tài liệu (query param, chuyển tiếp từ exam-list) — back giữ đúng tab/bộ đang xem.
@@ -297,6 +308,18 @@ export class ExamDetailPage implements OnDestroy {
       return;
     }
     this.loadPdf(this.detailRaw()?.sourceFilePreviewUrl ?? null);
+  }
+
+  /** Phóng to tài liệu gốc lên trình xem full màn hình (dùng chung với Kho tài liệu). */
+  protected openFullPreview(): void {
+    const d = this.detailRaw();
+    if (!d?.sourceFilePreviewUrl) return;
+    this.fullPreview().open({
+      previewUrl: d.sourceFilePreviewUrl,
+      downloadUrl: d.sourceFileUrl ?? undefined,
+      title: d.title,
+      fileName: `${d.title}.pdf`
+    });
   }
 
   /** Download tài liệu gốc về máy (blob kèm token; suy đuôi file từ content-type). */

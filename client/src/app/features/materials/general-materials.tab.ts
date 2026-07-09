@@ -1,10 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, inject, input, signal } from '@angular/core';
+import { Component, inject, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
@@ -25,6 +23,7 @@ import { FilesService } from '../../core/files.service';
 import { MaterialsService } from '../../core/materials.service';
 import { Grade, Material, MaterialCategory, MaterialSource, Subject } from '../../core/models';
 import { AvatarCropModal } from '../../shared/avatar-crop-modal';
+import { DocumentPreview } from '../../shared/document-preview';
 
 /**
  * Tab "Tài liệu chung" — tài liệu tự do KHÔNG thuộc bộ nào (FolderId null): lưới card + ảnh bìa,
@@ -34,9 +33,9 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
   selector: 'app-general-materials-tab',
   imports: [
     FormsModule, ReactiveFormsModule,
-    NzAlertModule, NzButtonModule, NzCardModule, NzEmptyModule, NzFormModule, NzIconModule, NzInputModule, NzModalModule,
+    NzButtonModule, NzCardModule, NzEmptyModule, NzFormModule, NzIconModule, NzInputModule, NzModalModule,
     NzPaginationModule, NzPopconfirmModule, NzSelectModule, NzSpinModule, NzTagModule, NzTooltipModule, NzUploadModule,
-    AvatarCropModal
+    AvatarCropModal, DocumentPreview
   ],
   template: `
     <div class="filters">
@@ -179,19 +178,8 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
       </ng-container>
     </nz-modal>
 
-    <!-- Modal xem trước tài liệu -->
-    <nz-modal [nzVisible]="previewOpen()" [nzTitle]="previewTitle()" [nzFooter]="null" [nzWidth]="1000"
-      (nzOnCancel)="closePreview()">
-      <ng-container *nzModalContent>
-        @if (previewLoading()) {
-          <div class="preview-loading"><nz-spin nzSimple /></div>
-        } @else if (previewError()) {
-          <nz-alert nzType="warning" [nzMessage]="previewError()" nzShowIcon />
-        } @else if (previewUrl()) {
-          <iframe class="preview-frame" [src]="previewUrl()" title="Xem tài liệu"></iframe>
-        }
-      </ng-container>
-    </nz-modal>
+    <!-- Trình xem tài liệu full màn hình -->
+    <app-document-preview />
 
     <!-- Modal crop ảnh bìa 16:9 -->
     <app-avatar-crop-modal
@@ -228,8 +216,6 @@ import { AvatarCropModal } from '../../shared/avatar-crop-modal';
     .cover-preview { margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .cover-preview img { width: 100%; max-width: 320px; aspect-ratio: 16 / 9; object-fit: cover;
       border-radius: 8px; border: 1px solid var(--hs-border); }
-    .preview-loading { min-height: 360px; display: grid; place-items: center; }
-    .preview-frame { width: 100%; height: min(72vh, 760px); border: 1px solid var(--hs-border); border-radius: 8px; }
     @media (max-width: 575px) { .filters input, .filters nz-select { max-width: none; width: 100%; } }
   `
 })
@@ -239,8 +225,6 @@ export class GeneralMaterialsTab {
   protected readonly filesService = inject(FilesService);
   private readonly router = inject(Router);
   private readonly message = inject(NzMessageService);
-  private readonly sanitizer = inject(DomSanitizer);
-  private readonly destroyRef = inject(DestroyRef);
 
   /** Danh mục nhận từ trang cha (đã nạp qua loadLookups — không gọi API trùng). */
   readonly subjects = input<Subject[]>([]);
@@ -277,13 +261,8 @@ export class GeneralMaterialsTab {
   protected readonly coverSourceFile = signal<File | null>(null);
   protected readonly coverUploading = signal(false);
 
-  protected readonly previewOpen = signal(false);
-  protected readonly previewTitle = signal('Xem tài liệu');
-  protected readonly previewLoading = signal(false);
-  protected readonly previewError = signal<string | null>(null);
-  protected readonly previewUrl = signal<SafeResourceUrl | null>(null);
-  private previewObjectUrl: string | null = null;
-  private previewRequestId = 0;
+  /** Trình xem tài liệu full màn hình dùng chung. */
+  private readonly preview = viewChild.required(DocumentPreview);
 
   protected readonly form = new FormGroup({
     title: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -296,7 +275,6 @@ export class GeneralMaterialsTab {
   });
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.revokePreviewUrl());
     this.load();
   }
 
@@ -419,49 +397,8 @@ export class GeneralMaterialsTab {
   protected openMaterial(m: Material): void {
     if (m.source === MaterialSource.ExternalUrl) {
       window.open(m.url!, '_blank');
-    } else {
-      this.openPreview(m);
-    }
-  }
-
-  private openPreview(m: Material): void {
-    if (!m.storedFileId) return;
-    this.revokePreviewUrl();
-    this.previewTitle.set(m.title);
-    this.previewOpen.set(true);
-    this.previewLoading.set(true);
-    this.previewError.set(null);
-    this.previewUrl.set(null);
-    const requestId = ++this.previewRequestId;
-
-    this.filesService.preview(m.storedFileId).subscribe({
-      next: blob => {
-        if (requestId !== this.previewRequestId || !this.previewOpen()) return;
-        this.previewObjectUrl = URL.createObjectURL(blob);
-        this.previewUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.previewObjectUrl));
-        this.previewLoading.set(false);
-      },
-      error: async err => {
-        if (requestId !== this.previewRequestId || !this.previewOpen()) return;
-        this.previewLoading.set(false);
-        this.previewError.set(await this.filesService.errorMessage(err, 'Không xem trước được tài liệu này.'));
-      }
-    });
-  }
-
-  protected closePreview(): void {
-    this.previewRequestId++;
-    this.previewOpen.set(false);
-    this.previewLoading.set(false);
-    this.previewError.set(null);
-    this.previewUrl.set(null);
-    this.revokePreviewUrl();
-  }
-
-  private revokePreviewUrl(): void {
-    if (this.previewObjectUrl) {
-      URL.revokeObjectURL(this.previewObjectUrl);
-      this.previewObjectUrl = null;
+    } else if (m.storedFileId) {
+      this.preview().open({ fileId: m.storedFileId, title: m.title, fileName: m.fileName });
     }
   }
 

@@ -58,6 +58,11 @@ export class FilesService {
     });
   }
 
+  /** Lấy blob file gốc (kèm Bearer) — dùng khi cần tự xử lý (vd hiển thị ảnh trong trình xem). */
+  downloadBlob(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}`, { responseType: 'blob' });
+  }
+
   /** Lấy blob PDF xem trước (PDF inline hoặc Word đã convert PDF ở backend). */
   preview(id: string): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/${id}/preview`, { responseType: 'blob' });

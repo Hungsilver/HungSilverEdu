@@ -40,6 +40,7 @@ import {
   FileExcelOutline,
   FileTextOutline,
   FolderOpenOutline,
+  FullscreenOutline,
   GiftOutline,
   HolderOutline,
   IdcardOutline,
@@ -75,6 +76,7 @@ import {
   TrophyOutline,
   UndoOutline,
   UnlockOutline,
+  UpOutline,
   UploadOutline,
   UserAddOutline,
   UserDeleteOutline,
@@ -118,7 +120,9 @@ export const appConfig: ApplicationConfig = {
       CloseCircleOutline, FallOutline, RobotOutline, CheckCircleOutline,
       ClockCircleOutline, FileSearchOutline, FormOutline, SendOutline,
       // Ngân hàng câu hỏi + ảnh bìa tài liệu + bộ tài liệu:
-      CheckSquareOutline, FileAddOutline, PictureOutline, FolderOpenOutline
+      CheckSquareOutline, FileAddOutline, PictureOutline, FolderOpenOutline,
+      // Section Bài tập buổi học + trình xem tài liệu fullscreen:
+      UpOutline, FullscreenOutline
     ]),
     // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
     provideNzConfig({
