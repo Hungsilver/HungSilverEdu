@@ -17,6 +17,7 @@ import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzSwitchModule } from 'ng-zorro-antd/switch';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { ExamService } from '../../core/exam.service';
 import { EXAM_STATUS_LABELS, ExamGenerationMode, ExamGenerationResult, ExamListItem, GenerateExamRequest } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
@@ -26,17 +27,19 @@ import { PageHeader } from '../../shared/page-header';
   imports: [
     FormsModule, DatePipe, RouterLink,
     NzTableModule, NzButtonModule, NzIconModule, NzTagModule, NzModalModule, NzFormModule, NzInputModule,
-    NzInputNumberModule, NzRadioModule, NzSwitchModule, NzSpinModule, NzAlertModule, NzPopconfirmModule, PageHeader
+    NzInputNumberModule, NzRadioModule, NzSwitchModule, NzSpinModule, NzAlertModule, NzPopconfirmModule,
+    NzUploadModule, PageHeader
   ],
   template: `
     <app-page-header [title]="headerTitle()" subtitle="Bộ đề trắc nghiệm sinh từ tài liệu" icon="file-text">
       <a nz-button routerLink="/materials" [queryParams]="backParams()"><nz-icon nzType="arrow-left" /> Kho tài liệu</a>
+      <button nz-button (click)="openUploadGenerate()"><nz-icon nzType="upload" /> Tạo đề từ file upload</button>
       <button nz-button nzType="primary" (click)="openGenerate()"><nz-icon nzType="robot" /> Tạo đề bằng AI</button>
     </app-page-header>
 
     <nz-table #table [nzData]="exams()" [nzLoading]="loading()" [nzFrontPagination]="false">
       <thead>
-        <tr><th>Tên đề</th><th>Trạng thái</th><th>Số câu</th><th>Thời gian</th><th>Nguồn</th><th>Ngày tạo</th><th nzRight>Thao tác</th></tr>
+        <tr><th>Tên đề</th><th>Trạng thái</th><th>Số câu</th><th>Thời gian</th><th>Nguồn</th><th>Người tạo</th><th>Ngày tạo</th><th nzRight>Thao tác</th></tr>
       </thead>
       <tbody>
         @for (e of table.data; track e.id) {
@@ -46,6 +49,7 @@ import { PageHeader } from '../../shared/page-header';
             <td>{{ e.questionCount }}</td>
             <td>{{ e.durationMinutes }}'</td>
             <td>{{ e.source === 'Extracted' ? 'Trích xuất' : (e.source === 'Generated' ? 'AI sinh mới' : 'Thủ công') }}</td>
+            <td>{{ e.createdByName || '—' }}</td>
             <td>{{ e.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
             <td nzRight (click)="$event.stopPropagation()">
               <button nz-button nzType="link" nzSize="small" (click)="open(e)"><nz-icon nzType="edit" /> Duyệt</button>
@@ -59,7 +63,7 @@ import { PageHeader } from '../../shared/page-header';
       </tbody>
     </nz-table>
     @if (!loading() && exams().length === 0) {
-      <p class="muted">Chưa có đề nào. Bấm <strong>Tạo đề bằng AI</strong> để phân tích tài liệu.</p>
+      <p class="muted">Chưa có đề nào. Bấm <strong>Tạo đề bằng AI</strong> hoặc <strong>Tạo đề từ file upload</strong> để bắt đầu.</p>
     }
 
     <!-- Modal tạo đề -->
@@ -114,6 +118,72 @@ import { PageHeader } from '../../shared/page-header';
         <button nz-button nzType="primary" [nzLoading]="generating()" (click)="generate()">Tạo đề</button>
       </ng-template>
     </nz-modal>
+
+    <!-- Modal upload file mới rồi tạo đề -->
+    <nz-modal [nzVisible]="uploadOpen()" nzTitle="Tạo đề từ file upload" [nzMaskClosable]="false" [nzClosable]="!generating()"
+      [nzFooter]="uploadFooter" (nzOnCancel)="generating() ? null : uploadOpen.set(false)">
+      <ng-container *nzModalContent>
+        @if (generating()) {
+          <div class="gen-loading">
+            <nz-spin nzSimple />
+            <p>{{ generationStatus() }}</p>
+          </div>
+        } @else {
+          <form nz-form nzLayout="vertical">
+            <nz-form-item>
+              <nz-form-label nzRequired>File đề</nz-form-label>
+              <nz-form-control>
+                <nz-upload nzAccept=".pdf,.doc,.docx,.odt,.rtf,.txt" [nzBeforeUpload]="beforeExamUpload" [nzShowUploadList]="false">
+                  <button nz-button type="button"><nz-icon nzType="upload" /> Chọn file</button>
+                </nz-upload>
+                @if (uploadFileName()) { <span class="file-name">{{ uploadFileName() }}</span> }
+              </nz-form-control>
+            </nz-form-item>
+            <nz-form-item>
+              <nz-form-label nzRequired>Tên tài liệu mới</nz-form-label>
+              <nz-form-control><input nz-input [(ngModel)]="uploadMaterialTitle" name="uploadMaterialTitle" placeholder="VD: Unit 4 - Đề luyện tập" /></nz-form-control>
+            </nz-form-item>
+            <nz-form-item>
+              <nz-form-label>Chế độ</nz-form-label>
+              <nz-form-control>
+                <nz-radio-group [(ngModel)]="uploadMode" name="uploadMode">
+                  <label nz-radio-button nzValue="Extract">Trích xuất đề có sẵn</label>
+                  <label nz-radio-button nzValue="Generate">Sinh câu hỏi mới</label>
+                </nz-radio-group>
+              </nz-form-control>
+            </nz-form-item>
+            <nz-form-item>
+              <nz-form-label>Tên đề</nz-form-label>
+              <nz-form-control><input nz-input [(ngModel)]="uploadExamTitle" name="uploadExamTitle" placeholder="Để trống = tự đặt theo tài liệu" /></nz-form-control>
+            </nz-form-item>
+            <nz-form-item>
+              <nz-form-label>Thời gian làm bài (phút)</nz-form-label>
+              <nz-form-control><nz-input-number [(ngModel)]="uploadDurationMinutes" name="uploadDur" [nzMin]="1" [nzMax]="300" /></nz-form-control>
+            </nz-form-item>
+            @if (uploadMode === 'Generate') {
+              <nz-form-item>
+                <nz-form-label>Số câu mong muốn</nz-form-label>
+                <nz-form-control><nz-input-number [(ngModel)]="uploadMaxQuestions" name="uploadMq" [nzMin]="1" [nzMax]="100" /></nz-form-control>
+              </nz-form-item>
+              <nz-form-item>
+                <nz-form-label>Độ khó</nz-form-label>
+                <nz-form-control><input nz-input [(ngModel)]="uploadDifficulty" name="uploadDiff" placeholder="vd: trung bình" /></nz-form-control>
+              </nz-form-item>
+            }
+            <nz-form-item>
+              <nz-form-control>
+                <nz-switch [(ngModel)]="uploadVerify" name="uploadVerify" />
+                <span class="verify-label">Đối chiếu lại với tài liệu gốc bằng AI</span>
+              </nz-form-control>
+            </nz-form-item>
+          </form>
+        }
+      </ng-container>
+      <ng-template #uploadFooter>
+        <button nz-button (click)="uploadOpen.set(false)" [disabled]="generating()">Đóng</button>
+        <button nz-button nzType="primary" [nzLoading]="generating()" (click)="generateFromUpload()">Tạo đề</button>
+      </ng-template>
+    </nz-modal>
   `,
   styles: `
     .row { cursor: pointer; }
@@ -121,6 +191,7 @@ import { PageHeader } from '../../shared/page-header';
     .gen-loading { text-align: center; padding: 24px; }
     .gen-loading p { margin-top: 12px; color: var(--hs-text-muted); }
     .verify-label { color: var(--hs-text-muted); font-size: 13px; margin-left: 8px; }
+    .file-name { margin-left: 8px; color: var(--hs-text-muted); }
   `
 })
 export class ExamListPage implements OnInit, OnDestroy {
@@ -163,6 +234,17 @@ export class ExamListPage implements OnInit, OnDestroy {
   protected difficulty = '';
   protected verify = true;
 
+  protected readonly uploadOpen = signal(false);
+  protected readonly uploadFileName = signal<string | null>(null);
+  private uploadFile: File | null = null;
+  protected uploadMaterialTitle = '';
+  protected uploadExamTitle = '';
+  protected uploadMode: ExamGenerationMode = 'Extract';
+  protected uploadDurationMinutes = 60;
+  protected uploadMaxQuestions = 20;
+  protected uploadDifficulty = '';
+  protected uploadVerify = true;
+
   ngOnInit(): void {
     const t = this.title2();
     if (t) this.headerTitle.set(t);
@@ -198,6 +280,35 @@ export class ExamListPage implements OnInit, OnDestroy {
     this.genOpen.set(true);
   }
 
+  protected openUploadGenerate(): void {
+    this.clearPollTimer();
+    this.uploadFile = null;
+    this.uploadFileName.set(null);
+    this.uploadMaterialTitle = '';
+    this.uploadExamTitle = '';
+    this.uploadMode = 'Extract';
+    this.uploadDurationMinutes = 60;
+    this.uploadMaxQuestions = 20;
+    this.uploadDifficulty = '';
+    this.uploadVerify = true;
+    this.generationStatus.set('Đang gửi yêu cầu sinh đề...');
+    this.uploadOpen.set(true);
+  }
+
+  protected beforeExamUpload = (file: NzUploadFile): false => {
+    const f = file as unknown as File;
+    const ext = this.extensionOf(f.name);
+    if (!['.pdf', '.doc', '.docx', '.odt', '.rtf', '.txt'].includes(ext)) {
+      this.message.warning('Chỉ hỗ trợ file PDF/Word/Text để tạo đề.');
+      return false;
+    }
+    this.uploadFile = f;
+    this.uploadFileName.set(f.name);
+    if (!this.uploadMaterialTitle.trim())
+      this.uploadMaterialTitle = this.fileNameWithoutExtension(f.name);
+    return false;
+  };
+
   protected generate(): void {
     if (this.generating()) return;
     const req: GenerateExamRequest = {
@@ -218,6 +329,34 @@ export class ExamListPage implements OnInit, OnDestroy {
       error: (err: HttpErrorResponse) => {
         this.generating.set(false);
         this.message.error(err.error?.message ?? err.message ?? 'Tạo đề thất bại.');
+      }
+    });
+  }
+
+  protected generateFromUpload(): void {
+    if (this.generating()) return;
+    if (!this.uploadFile) { this.message.warning('Chọn file đề.'); return; }
+    if (!this.uploadMaterialTitle.trim()) { this.message.warning('Nhập tên tài liệu mới.'); return; }
+
+    const form = new FormData();
+    form.append('file', this.uploadFile);
+    form.append('materialTitle', this.uploadMaterialTitle.trim());
+    form.append('mode', this.uploadMode);
+    if (this.uploadExamTitle.trim()) form.append('examTitle', this.uploadExamTitle.trim());
+    form.append('durationMinutes', String(this.uploadDurationMinutes));
+    if (this.uploadMode === 'Generate') {
+      form.append('maxQuestions', String(this.uploadMaxQuestions));
+      if (this.uploadDifficulty.trim()) form.append('difficulty', this.uploadDifficulty.trim());
+    }
+    form.append('verify', String(this.uploadVerify));
+
+    this.generating.set(true);
+    this.generationStatus.set('Đã upload file, đang chờ AI xử lý...');
+    this.examService.startGenerationFromUpload(this.materialId(), form).subscribe({
+      next: job => this.schedulePoll(job.jobId, job.pollAfterSeconds),
+      error: (err: HttpErrorResponse) => {
+        this.generating.set(false);
+        this.message.error(err.error?.message ?? err.message ?? 'Tạo đề từ file upload thất bại.');
       }
     });
   }
@@ -247,6 +386,7 @@ export class ExamListPage implements OnInit, OnDestroy {
         this.clearPollTimer();
         if (job.status === 'Succeeded' && job.result) {
           this.genOpen.set(false);
+          this.uploadOpen.set(false);
           this.reportResult(job.result);
           this.router.navigate(['/exams', job.result.examId]);
           return;
@@ -273,6 +413,16 @@ export class ExamListPage implements OnInit, OnDestroy {
     if (r.droppedCount > 0) msg += ` Bỏ ${r.droppedCount} câu không hợp lệ.`;
     this.message.success(msg);
     for (const w of r.warnings) this.message.warning(w, { nzDuration: 8000 });
+  }
+
+  private extensionOf(fileName: string): string {
+    const i = fileName.lastIndexOf('.');
+    return i >= 0 ? fileName.slice(i).toLowerCase() : '';
+  }
+
+  private fileNameWithoutExtension(fileName: string): string {
+    const dot = fileName.lastIndexOf('.');
+    return (dot > 0 ? fileName.slice(0, dot) : fileName).trim();
   }
 
   protected remove(e: ExamListItem): void {

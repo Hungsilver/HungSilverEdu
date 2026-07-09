@@ -19,6 +19,10 @@ export class ExamService {
     return this.http.post<ExamGenerationJobStartResult>(`${this.apiUrl}/generate/${materialId}`, request);
   }
 
+  startGenerationFromUpload(sourceMaterialId: string, form: FormData): Observable<ExamGenerationJobStartResult> {
+    return this.http.post<ExamGenerationJobStartResult>(`${this.apiUrl}/generate-upload/${sourceMaterialId}`, form);
+  }
+
   getGenerationJob(jobId: string): Observable<ExamGenerationJob> {
     return this.http.get<ExamGenerationJob>(`${this.apiUrl}/generation-jobs/${jobId}`);
   }

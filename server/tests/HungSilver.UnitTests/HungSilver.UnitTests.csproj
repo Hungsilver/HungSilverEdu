@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HungSilver.Infrastructure\HungSilver.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\HungSilver.WebApi\HungSilver.WebApi.csproj" />
   </ItemGroup>
 
 </Project>

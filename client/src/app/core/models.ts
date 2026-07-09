@@ -1257,6 +1257,7 @@ export interface ExamListItem {
   status: ExamStatus;
   source: ExamGenSource;
   questionCount: number;
+  createdByName: string | null;
   createdAt: string;
 }
 
@@ -1295,8 +1296,10 @@ export interface ExamDetail {
   status: ExamStatus;
   source: ExamGenSource;
   sourceFileUrl: string | null;
+  sourceFilePreviewUrl: string | null;
   groups: ExamGroup[];
   questions: ExamQuestion[];
+  createdByName: string | null;
   createdAt: string;
 }
 

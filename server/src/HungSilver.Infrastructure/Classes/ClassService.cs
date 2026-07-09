@@ -214,6 +214,13 @@ public sealed class ClassService(
         if (cls is null)
             return Result.Failure(NotFoundError);
 
+        if (!accessGuard.IsAdmin)
+        {
+            var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+            if (cls.TeacherProfileId != scopeId)
+                return Result.Failure(NotFoundError);
+        }
+
         cls.IsDeleted = false;
         cls.DeletedAt = null;
         await context.SaveChangesAsync(ct);
@@ -589,8 +596,12 @@ public sealed class ClassService(
 
         // Sheet 2 — Danh mục
         var grades = await context.GradeCategories.AsNoTracking().OrderBy(g => g.IndexOrder).Select(g => g.Name).ToListAsync(ct);
-        var teachers = await context.TeacherProfiles.AsNoTracking().OrderBy(t => t.FullName).Select(t => t.FullName).ToListAsync(ct);
-        var classNames = await context.Classes.AsNoTracking().OrderBy(c => c.Name).Select(c => c.Name).ToListAsync(ct);
+        var teachers = accessGuard.IsAdmin
+            ? await context.TeacherProfiles.AsNoTracking().OrderBy(t => t.FullName).Select(t => t.FullName).ToListAsync(ct)
+            : items.Select(c => c.TeacherName).Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n!).Distinct().OrderBy(n => n).ToList();
+        var classNames = accessGuard.IsAdmin
+            ? await context.Classes.AsNoTracking().OrderBy(c => c.Name).Select(c => c.Name).ToListAsync(ct)
+            : items.Select(c => c.Name).Distinct().OrderBy(n => n).ToList();
         var branches = await context.Branches.AsNoTracking().OrderBy(b => b.IndexOrder).Select(b => b.Name).ToListAsync(ct);
         var subjects = await context.Subjects.AsNoTracking().OrderBy(s => s.IndexOrder).Select(s => s.Name).ToListAsync(ct);
 

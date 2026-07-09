@@ -1,11 +1,14 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common.Models;
 using HungSilver.Application.Exams;
+using HungSilver.Application.Files;
+using HungSilver.Application.Materials;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Enums;
 using HungSilver.WebApi.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace HungSilver.WebApi.Controllers;
 
@@ -21,8 +24,14 @@ public class ExamsController(
     IExamAssignmentService assignments,
     IExamReportService reports,
     IExamQuestionBankService questionBank,
+    IMaterialService materialService,
+    IFileService fileService,
     ICurrentUser currentUser) : ControllerBase
 {
+    private const long MaxUploadBytes = 25L * 1024 * 1024;
+    private static readonly HashSet<string> GenerationFileExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".odt", ".rtf", ".txt" };
+
     // ---- Ngân hàng câu hỏi (route literal — không đụng nhóm {id:guid} nhờ ràng buộc :guid) ----
 
     /// <summary>Ngân hàng câu hỏi: mọi câu từ mọi đề, lọc Môn/Khối/Tài liệu/Đề/Loại câu/Trạng thái + search — phân trang.</summary>
@@ -49,6 +58,74 @@ public class ExamsController(
     [HttpPost("generate/{materialId:guid}")]
     public async Task<ActionResult<ExamGenerationJobStartResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct) =>
         (await generationJobs.StartAsync(materialId, request, UserId, ct)).ToActionResult();
+
+    /// <summary>
+    /// Upload một file đề mới, tạo tài liệu ngang hàng với tài liệu nguồn rồi bắt đầu job sinh đề AI từ file vừa upload.
+    /// </summary>
+    [HttpPost("generate-upload/{sourceMaterialId:guid}")]
+    [RequestSizeLimit(MaxUploadBytes)]
+    [EnableRateLimiting("upload")]
+    public async Task<ActionResult<ExamGenerationJobStartResult>> GenerateFromUpload(
+        Guid sourceMaterialId,
+        [FromForm] GenerateExamUploadForm request,
+        CancellationToken ct)
+    {
+        if (request.File is null || request.File.Length == 0)
+            return Error.Validation("Files.Empty", "Chưa chọn file.").ToProblemResult();
+
+        var materialTitle = request.MaterialTitle?.Trim();
+        if (string.IsNullOrWhiteSpace(materialTitle))
+            return Error.Validation("ExamUpload.MaterialTitleRequired", "Nhập tên tài liệu mới.").ToProblemResult();
+
+        var ext = Path.GetExtension(request.File.FileName ?? string.Empty);
+        if (!GenerationFileExtensions.Contains(ext))
+            return Error.Validation("ExamUpload.UnsupportedFile",
+                "Chỉ hỗ trợ file PDF/Word/Text để tạo đề.").ToProblemResult();
+
+        var source = await materialService.GetByIdAsync(sourceMaterialId, ct);
+        if (source.IsFailure)
+            return source.Error.ToProblemResult();
+
+        StoredFileDto uploaded;
+        await using (var stream = request.File.OpenReadStream())
+        {
+            var upload = await fileService.UploadAsync(
+                stream,
+                request.File.FileName!,
+                string.IsNullOrWhiteSpace(request.File.ContentType) ? "application/octet-stream" : request.File.ContentType,
+                request.File.Length,
+                ct: ct);
+            if (upload.IsFailure)
+                return upload.Error.ToProblemResult();
+            uploaded = upload.Value;
+        }
+
+        var s = source.Value;
+        var created = await materialService.CreateAsync(new CreateMaterialRequest(
+            s.FolderId is null ? s.CategoryId : null,
+            s.FolderId is null ? s.SubjectId : null,
+            s.FolderId is null ? s.GradeBand : null,
+            materialTitle,
+            MaterialSource.ServerFile,
+            null,
+            uploaded.Id,
+            null,
+            null,
+            s.FolderId), ct);
+        if (created.IsFailure)
+            return created.Error.ToProblemResult();
+
+        var genRequest = new GenerateExamRequest(
+            request.Mode,
+            string.IsNullOrWhiteSpace(request.ExamTitle) ? null : request.ExamTitle.Trim(),
+            request.DurationMinutes,
+            request.MaxQuestions,
+            string.IsNullOrWhiteSpace(request.Difficulty) ? null : request.Difficulty.Trim(),
+            string.IsNullOrWhiteSpace(request.Instructions) ? null : request.Instructions.Trim(),
+            request.Verify);
+
+        return (await generationJobs.StartAsync(created.Value.Id, genRequest, UserId, ct)).ToActionResult();
+    }
 
     /// <summary>Trạng thái job sinh đề AI; khi Succeeded có ExamGenerationResult để mở đề nháp.</summary>
     [HttpGet("generation-jobs/{jobId:guid}")]
@@ -118,4 +195,17 @@ public class ExamsController(
         (await reports.GetReportAsync(assignmentId, ct)).ToActionResult();
 
     private Guid UserId => currentUser.UserId ?? throw new InvalidOperationException("Thiếu user hiện tại.");
+}
+
+public sealed class GenerateExamUploadForm
+{
+    public IFormFile? File { get; set; }
+    public string? MaterialTitle { get; set; }
+    public ExamGenerationMode Mode { get; set; } = ExamGenerationMode.Extract;
+    public string? ExamTitle { get; set; }
+    public int? DurationMinutes { get; set; }
+    public int? MaxQuestions { get; set; }
+    public string? Difficulty { get; set; }
+    public string? Instructions { get; set; }
+    public bool Verify { get; set; } = true;
 }

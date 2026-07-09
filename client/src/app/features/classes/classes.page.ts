@@ -443,7 +443,8 @@ export class ClassesPage {
     this.classesService.getPaged({
       page: this.page(), pageSize: this.pageSize(), search: this.search,
       branchId: this.branchId ?? undefined, subjectId: this.subjectId ?? undefined,
-      gradeId: this.gradeId ?? undefined, teacherProfileId: this.teacherProfileId ?? undefined
+      gradeId: this.gradeId ?? undefined,
+      teacherProfileId: this.auth.isAdmin() ? (this.teacherProfileId ?? undefined) : undefined
     }).subscribe({
       next: r => { this.classes.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
       error: () => this.loading.set(false)
@@ -469,7 +470,8 @@ export class ClassesPage {
     this.branchesService.getAll().subscribe(x => this.branches.set(x));
     this.subjectsService.getAll().subscribe(x => this.subjects.set(x));
     this.gradesService.getAll().subscribe(x => this.grades.set(x));
-    this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
+    if (this.auth.isAdmin())
+      this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
   }
 
   protected openClassForm(item?: ClassListItem): void {
@@ -503,7 +505,7 @@ export class ClassesPage {
       branchId: this.branchId ?? undefined,
       subjectId: this.subjectId ?? undefined,
       gradeId: this.gradeId ?? undefined,
-      teacherProfileId: this.teacherProfileId ?? undefined
+      teacherProfileId: this.auth.isAdmin() ? (this.teacherProfileId ?? undefined) : undefined
     }).subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);

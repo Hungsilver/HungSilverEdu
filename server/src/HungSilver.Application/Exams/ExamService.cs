@@ -25,6 +25,7 @@ public sealed class ExamService(
     IRepository<ExamQuestion> questions,
     IRepository<LearningMaterial> materials,
     IRepository<ExamAssignment> assignments,
+    IUserDirectory userDirectory,
     IUnitOfWork unitOfWork) : IExamService
 {
     private static readonly Error NotFound = Error.NotFound("Exam.NotFound", "Không tìm thấy đề.");
@@ -191,9 +192,10 @@ public sealed class ExamService(
     {
         var ids = paged.Items.Select(e => e.Id).ToList();
         var counts = await LoadQuestionCountsAsync(ids, ct);
+        var creatorNames = await LoadCreatorNamesAsync(paged.Items, ct);
         return new PagedResult<ExamListItemDto>
         {
-            Items = paged.Items.Select(e => ToListItem(e, counts.GetValueOrDefault(e.Id))).ToList(),
+            Items = paged.Items.Select(e => ToListItem(e, counts.GetValueOrDefault(e.Id), CreatorName(e, creatorNames))).ToList(),
             Page = paged.Page,
             PageSize = paged.PageSize,
             TotalCount = paged.TotalCount
@@ -215,20 +217,35 @@ public sealed class ExamService(
             .Select(ToQuestionDto).ToList();
 
         string? sourceFileUrl = null;
+        string? sourceFilePreviewUrl = null;
         if (exam.MaterialId is not null)
         {
             var material = await materials.GetByIdAsync(exam.MaterialId.Value, ct: ct);
             if (material?.Source == MaterialSource.ServerFile && material.StoredFileId is not null)
+            {
                 sourceFileUrl = $"/api/files/{material.StoredFileId}";
+                sourceFilePreviewUrl = $"/api/files/{material.StoredFileId}/preview";
+            }
         }
+        var creatorNames = await LoadCreatorNamesAsync([exam], ct);
 
         return new ExamDetailDto(exam.Id, exam.MaterialId, exam.SubjectId, exam.SubjectName, exam.Title, exam.Description,
-            exam.GradeBand, exam.DurationMinutes, exam.TotalPoints, exam.Status, exam.Source, sourceFileUrl, grs, qs, exam.CreatedAt);
+            exam.GradeBand, exam.DurationMinutes, exam.TotalPoints, exam.Status, exam.Source, sourceFileUrl, sourceFilePreviewUrl,
+            grs, qs, CreatorName(exam, creatorNames), exam.CreatedAt);
     }
 
-    private static ExamListItemDto ToListItem(Exam e, int questionCount) =>
+    private static ExamListItemDto ToListItem(Exam e, int questionCount, string? createdByName) =>
         new(e.Id, e.MaterialId, e.SubjectId, e.SubjectName, e.Title, e.GradeBand, e.DurationMinutes, e.TotalPoints,
-            e.Status, e.Source, questionCount, e.CreatedAt);
+            e.Status, e.Source, questionCount, createdByName, e.CreatedAt);
+
+    private async Task<Dictionary<Guid, string>> LoadCreatorNamesAsync(IEnumerable<Exam> items, CancellationToken ct)
+    {
+        var ids = items.Where(e => e.CreatedByUserId.HasValue).Select(e => e.CreatedByUserId!.Value).Distinct().ToList();
+        return ids.Count == 0 ? [] : await userDirectory.GetDisplayNamesAsync(ids, ct);
+    }
+
+    private static string? CreatorName(Exam e, Dictionary<Guid, string> names) =>
+        e.CreatedByUserId is { } id && names.TryGetValue(id, out var name) ? name : null;
 
     private static ExamQuestionDto ToQuestionDto(ExamQuestion q) =>
         new(q.Id, q.GroupId, q.OrderNo, q.SourceNumber, q.Type, q.Stem, q.OptionsJson, q.AnswerJson, q.Explanation, q.Points);

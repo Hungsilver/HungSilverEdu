@@ -1,4 +1,5 @@
 using HungSilver.Application.Exams;
+using HungSilver.Application.Abstractions;
 using HungSilver.Domain.Entities;
 using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Persistence;
@@ -37,6 +38,7 @@ public sealed class ExamServiceTests : IDisposable
         new Repository<ExamQuestion>(_context),
         new Repository<LearningMaterial>(_context),
         new Repository<ExamAssignment>(_context),
+        new FakeUserDirectory(),
         new UnitOfWork(_context));
 
     private Exam SeedExam(ExamStatus status = ExamStatus.Draft)
@@ -150,5 +152,54 @@ public sealed class ExamServiceTests : IDisposable
         SeedQuestion(free.Id, 0, 10m);
         Assert.True((await Service().DeleteAsync(free.Id)).IsSuccess);
         Assert.Empty(await _context.Exams.Where(e => e.Id == free.Id).ToListAsync()); // xóa mềm ⇒ query filter ẩn
+    }
+
+    [Fact]
+    public async Task ListAndDetail_ReturnCreatorName_AndPreviewUrl()
+    {
+        var userId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var storedFileId = Guid.NewGuid();
+        var material = new LearningMaterial
+        {
+            Title = "Unit 3",
+            Source = MaterialSource.ServerFile,
+            StoredFileId = storedFileId
+        };
+        _context.LearningMaterials.Add(material);
+        var exam = new Exam
+        {
+            MaterialId = material.Id,
+            Title = "Đề test",
+            Status = ExamStatus.Draft,
+            TotalPoints = 10m,
+            DurationMinutes = 60,
+            CreatedByUserId = userId
+        };
+        _context.Exams.Add(exam);
+        await _context.SaveChangesAsync();
+
+        var list = await Service().GetPagedByMaterialAsync(material.Id, new HungSilver.Application.Common.Models.PagedRequest());
+        Assert.True(list.IsSuccess);
+        Assert.Equal("Cô Hương", list.Value.Items.Single().CreatedByName);
+
+        var detail = await Service().GetDetailAsync(exam.Id);
+        Assert.True(detail.IsSuccess);
+        Assert.Equal("Cô Hương", detail.Value.CreatedByName);
+        Assert.Equal($"/api/files/{storedFileId}", detail.Value.SourceFileUrl);
+        Assert.Equal($"/api/files/{storedFileId}/preview", detail.Value.SourceFilePreviewUrl);
+    }
+
+    private sealed class FakeUserDirectory : IUserDirectory
+    {
+        public Task<bool> ExistsAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<bool> IsInRoleAsync(Guid userId, string role, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<Dictionary<Guid, string>> GetDisplayNamesAsync(IEnumerable<Guid> userIds, CancellationToken ct = default) =>
+            Task.FromResult(userIds.Distinct().ToDictionary(id => id, _ => "Cô Hương"));
+        public Task<Dictionary<Guid, AccountInfo>> GetAccountInfosAsync(IEnumerable<Guid> userIds, CancellationToken ct = default) =>
+            Task.FromResult(new Dictionary<Guid, AccountInfo>());
+        public Task<List<UserSummary>> GetUsersInRoleAsync(string role, CancellationToken ct = default) => Task.FromResult(new List<UserSummary>());
+        public Task<IReadOnlyList<string>> GetRolesAsync(Guid userId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        public Task<Guid?> GetRoleIdAsync(string role, CancellationToken ct = default) => Task.FromResult<Guid?>(null);
     }
 }

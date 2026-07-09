@@ -13,6 +13,7 @@ public interface IMaterialService
 {
     Task<Result<PagedResult<MaterialDto>>> GetPagedAsync(
         MaterialListFilter filter, PagedRequest paging, CancellationToken ct = default);
+    Task<Result<MaterialDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default);
     Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
@@ -56,6 +57,15 @@ public sealed class MaterialService(
         var categoryNames = await LoadCategoryNamesAsync(paged.Items, ct);
         var fileNames = await LoadFileNamesAsync(paged.Items, ct);
         return paged.Map(m => ToDto(m, Lookup(categoryNames, m.CategoryId), Lookup(fileNames, m.StoredFileId)));
+    }
+
+    public async Task<Result<MaterialDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var material = await materials.GetByIdAsync(id, ct: ct);
+        if (material is null)
+            return Result.Failure<MaterialDto>(NotFoundError);
+
+        return ToDto(material, await CategoryNameAsync(material.CategoryId, ct), await FileNameAsync(material.StoredFileId, ct));
     }
 
     public async Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default)

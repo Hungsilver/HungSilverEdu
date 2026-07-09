@@ -4,7 +4,8 @@ namespace HungSilver.Application.Exams;
 
 public sealed record ExamListItemDto(
     Guid Id, Guid? MaterialId, Guid? SubjectId, string? SubjectName, string Title, string? GradeBand,
-    int DurationMinutes, decimal TotalPoints, ExamStatus Status, ExamGenSource Source, int QuestionCount, DateTime CreatedAt);
+    int DurationMinutes, decimal TotalPoints, ExamStatus Status, ExamGenSource Source, int QuestionCount,
+    string? CreatedByName, DateTime CreatedAt);
 
 public sealed record ExamGroupDto(
     Guid Id, int OrderNo, string? Section, string? ExerciseLabel, string? Instruction, string? Passage);
@@ -17,8 +18,8 @@ public sealed record ExamQuestionDto(
 public sealed record ExamDetailDto(
     Guid Id, Guid? MaterialId, Guid? SubjectId, string? SubjectName, string Title, string? Description,
     string? GradeBand, int DurationMinutes, decimal TotalPoints, ExamStatus Status, ExamGenSource Source,
-    string? SourceFileUrl,
-    IReadOnlyList<ExamGroupDto> Groups, IReadOnlyList<ExamQuestionDto> Questions, DateTime CreatedAt);
+    string? SourceFileUrl, string? SourceFilePreviewUrl,
+    IReadOnlyList<ExamGroupDto> Groups, IReadOnlyList<ExamQuestionDto> Questions, string? CreatedByName, DateTime CreatedAt);
 
 public sealed record UpdateExamRequest(string Title, string? Description, string? GradeBand, int DurationMinutes);
 

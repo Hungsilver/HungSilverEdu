@@ -13,6 +13,7 @@ import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule } from 'ng-zorro-antd/table';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { AuthService } from '../../core/auth.service';
 import { BranchesService } from '../../core/branches.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
 import { GradesService } from '../../core/grades.service';
@@ -48,9 +49,11 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
       <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Khối" [(ngModel)]="gradeId">
         @for (g of grades(); track g.id) { <nz-option [nzValue]="g.id" [nzLabel]="g.name" /> }
       </nz-select>
-      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId">
-        @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
-      </nz-select>
+      @if (auth.isAdmin()) {
+        <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Giáo viên" [(ngModel)]="teacherProfileId">
+          @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
+        </nz-select>
+      }
       <input nz-input placeholder="Tên, mã, SĐT" [(ngModel)]="search" (keyup.enter)="applyFilters()" />
       <nz-date-picker [(ngModel)]="periodDate" nzMode="month" />
       <nz-date-picker [(ngModel)]="dueDate" nzPlaceHolder="Hạn đóng" />
@@ -147,6 +150,7 @@ export class TuitionPage {
   private readonly gradesService = inject(GradesService);
   private readonly teachersService = inject(TeachersService);
   private readonly message = inject(NzMessageService);
+  protected readonly auth = inject(AuthService);
 
   protected readonly statusLabels = TUITION_STATUS_LABELS;
   protected readonly statusColors = TUITION_STATUS_COLORS;
@@ -201,7 +205,8 @@ export class TuitionPage {
       periodYear: this.periodDate.getFullYear(), periodMonth: this.periodDate.getMonth() + 1,
       dueDate: toDateOnlyOrNull(this.dueDate),
       branchId: this.branchId ?? undefined, subjectId: this.subjectId ?? undefined,
-      gradeId: this.gradeId ?? undefined, teacherProfileId: this.teacherProfileId ?? undefined
+      gradeId: this.gradeId ?? undefined,
+      teacherProfileId: this.auth.isAdmin() ? (this.teacherProfileId ?? undefined) : undefined
     }).subscribe({
       next: r => { this.items.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
       error: () => this.loading.set(false)
@@ -229,7 +234,8 @@ export class TuitionPage {
     this.branchesService.getAll().subscribe(x => this.branches.set(x));
     this.subjectsService.getAll().subscribe(x => this.subjects.set(x));
     this.gradesService.getAll().subscribe(x => this.grades.set(x));
-    this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
+    if (this.auth.isAdmin())
+      this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
   }
 
   protected openBill(row: TuitionStudentListItem): void {

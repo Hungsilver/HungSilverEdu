@@ -58,6 +58,29 @@ export class FilesService {
     });
   }
 
+  /** Lấy blob PDF xem trước (PDF inline hoặc Word đã convert PDF ở backend). */
+  preview(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/preview`, { responseType: 'blob' });
+  }
+
+  /** Đọc message lỗi khi request blob nhận ProblemDetails/ApiResponse dạng Blob. */
+  async errorMessage(error: unknown, fallback: string): Promise<string> {
+    const err = error as { error?: unknown; message?: string };
+    if (err.error instanceof Blob) {
+      try {
+        const text = await err.error.text();
+        const body = JSON.parse(text) as { message?: string; detail?: string; title?: string };
+        return body.message ?? body.detail ?? body.title ?? fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    return (err.error as { message?: string; detail?: string } | undefined)?.message
+      ?? (err.error as { message?: string; detail?: string } | undefined)?.detail
+      ?? err.message
+      ?? fallback;
+  }
+
   /** Kiểm tra phía client trước khi upload. Trả message lỗi tiếng Việt, hoặc null nếu hợp lệ. */
   validate(file: File): string | null {
     const dot = file.name.lastIndexOf('.');

@@ -111,7 +111,8 @@ export class ClassFormModal {
     this.branchesService.getAll().subscribe(x => this.branches.set(x));
     this.subjectsService.getAll().subscribe(x => this.subjects.set(x));
     this.gradesService.getAll().subscribe(x => this.grades.set(x));
-    this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
+    if (this.auth.isAdmin())
+      this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
   }
 
   private populate(id: string | null): void {

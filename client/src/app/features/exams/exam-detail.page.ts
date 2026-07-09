@@ -296,7 +296,7 @@ export class ExamDetailPage implements OnDestroy {
       this.pdfUrl.set(null);
       return;
     }
-    this.loadPdf(this.detailRaw()?.sourceFileUrl ?? null);
+    this.loadPdf(this.detailRaw()?.sourceFilePreviewUrl ?? null);
   }
 
   /** Download tài liệu gốc về máy (blob kèm token; suy đuôi file từ content-type). */
