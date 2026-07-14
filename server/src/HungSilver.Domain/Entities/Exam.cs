@@ -9,6 +9,9 @@ public class Exam : BaseEntity
     /// <summary>Tài liệu nguồn (kho học liệu) sinh ra đề này. Tùy chọn.</summary>
     public Guid? MaterialId { get; set; }
 
+    /// <summary>File nguồn thực tế đã dùng để sinh đề (StoredFile, không FK). Null với đề thủ công/đề cũ.</summary>
+    public Guid? SourceStoredFileId { get; set; }
+
     /// <summary>Môn học của đề (Guid + snapshot tên, không FK).</summary>
     public Guid? SubjectId { get; set; }
     public string? SubjectName { get; set; }

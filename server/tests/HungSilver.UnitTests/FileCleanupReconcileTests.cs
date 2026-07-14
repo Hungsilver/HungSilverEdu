@@ -146,6 +146,24 @@ public sealed class FileCleanupReconcileTests : IDisposable
     }
 
     [Fact]
+    public async Task ReferencedByExamSourceFile_IsKept()
+    {
+        // Luồng "Tạo đề từ file upload": file chỉ được Exam.SourceStoredFileId tham chiếu (không có LearningMaterial).
+        var file = await AddFileAsync(ageHours: 48);
+        _context.Exams.Add(new Exam
+        {
+            Title = "Đề upload",
+            SourceStoredFileId = file.Id
+        });
+        await _context.SaveChangesAsync();
+
+        var marked = await FileCleanupService.ReconcileOrphansCoreAsync(_context, GraceHours);
+
+        Assert.Equal(0, marked);
+        Assert.False(await IsSoftDeletedAsync(file.Id));
+    }
+
+    [Fact]
     public async Task ReferencedByAvatarUrl_IsKept()
     {
         var file = await AddFileAsync(ageHours: 48);

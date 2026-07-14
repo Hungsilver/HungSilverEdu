@@ -27,19 +27,28 @@ public sealed class ExamGenerationService(
     private static readonly JsonSerializerOptions ParseOpts = new() { PropertyNameCaseInsensitive = true };
 
     public async Task<Result<ExamGenerationResult>> GenerateFromMaterialAsync(
-        Guid materialId, GenerateExamRequest request, Guid userId, CancellationToken ct = default)
+        Guid materialId, GenerateExamRequest request, Guid userId,
+        Guid? sourceStoredFileId = null, CancellationToken ct = default)
     {
         var material = await materials.GetByIdAsync(materialId, ct: ct);
         if (material is null)
             return Result.Failure<ExamGenerationResult>(Error.NotFound("Exam.MaterialNotFound", "Không tìm thấy tài liệu."));
-        if (material.Source != MaterialSource.ServerFile || material.StoredFileId is null)
-            return Result.Failure<ExamGenerationResult>(Error.Validation("Exam.NoFile", "Tài liệu cần là file upload (PDF/Word) để phân tích."));
+
+        // File hiệu dụng: ưu tiên file upload trực tiếp (luồng generate-upload) — khi đó KHÔNG yêu cầu
+        // tài liệu nguồn phải là ServerFile (tài liệu chỉ cho ngữ cảnh Môn/Khối và nơi neo đề).
+        var effectiveFileId = sourceStoredFileId;
+        if (effectiveFileId is null)
+        {
+            if (material.Source != MaterialSource.ServerFile || material.StoredFileId is null)
+                return Result.Failure<ExamGenerationResult>(Error.Validation("Exam.NoFile", "Tài liệu cần là file upload (PDF/Word) để phân tích."));
+            effectiveFileId = material.StoredFileId;
+        }
 
         var credResult = await resolver.ResolveForUserAsync(userId, ct);
         if (credResult.IsFailure) return Result.Failure<ExamGenerationResult>(credResult.Error);
         var cred = credResult.Value;
 
-        var partResult = await sourceProvider.GetPdfPartAsync(material.StoredFileId.Value, ct);
+        var partResult = await sourceProvider.GetPdfPartAsync(effectiveFileId.Value, ct);
         if (partResult.IsFailure) return Result.Failure<ExamGenerationResult>(partResult.Error);
         var docPart = partResult.Value;
 
@@ -78,6 +87,7 @@ public sealed class ExamGenerationService(
         var exam = new Exam
         {
             MaterialId = material.Id,
+            SourceStoredFileId = effectiveFileId, // snapshot file thực dùng — preview đề không phụ thuộc tài liệu
             SubjectId = material.SubjectId,
             SubjectName = material.SubjectName,
             Title = string.IsNullOrWhiteSpace(request.Title) ? $"{material.Title} — Đề trắc nghiệm" : request.Title!.Trim(),

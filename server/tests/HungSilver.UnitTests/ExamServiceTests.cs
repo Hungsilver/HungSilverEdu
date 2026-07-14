@@ -189,6 +189,38 @@ public sealed class ExamServiceTests : IDisposable
         Assert.Equal($"/api/files/{storedFileId}/preview", detail.Value.SourceFilePreviewUrl);
     }
 
+    [Fact]
+    public async Task Detail_PrefersExamSourceStoredFileId_OverMaterialFile()
+    {
+        // Đề từ luồng generate-upload: file snapshot trên đề khác file của tài liệu nguồn — phải ưu tiên snapshot.
+        var materialFileId = Guid.NewGuid();
+        var uploadedFileId = Guid.NewGuid();
+        var material = new LearningMaterial
+        {
+            Title = "Unit 3",
+            Source = MaterialSource.ServerFile,
+            StoredFileId = materialFileId
+        };
+        _context.LearningMaterials.Add(material);
+        var exam = new Exam
+        {
+            MaterialId = material.Id,
+            SourceStoredFileId = uploadedFileId,
+            Title = "Đề upload",
+            Status = ExamStatus.Draft,
+            TotalPoints = 10m,
+            DurationMinutes = 60
+        };
+        _context.Exams.Add(exam);
+        await _context.SaveChangesAsync();
+
+        var detail = await Service().GetDetailAsync(exam.Id);
+
+        Assert.True(detail.IsSuccess);
+        Assert.Equal($"/api/files/{uploadedFileId}", detail.Value.SourceFileUrl);
+        Assert.Equal($"/api/files/{uploadedFileId}/preview", detail.Value.SourceFilePreviewUrl);
+    }
+
     private sealed class FakeUserDirectory : IUserDirectory
     {
         public Task<bool> ExistsAsync(Guid userId, CancellationToken ct = default) => Task.FromResult(true);

@@ -140,10 +140,6 @@ import { PageHeader } from '../../shared/page-header';
               </nz-form-control>
             </nz-form-item>
             <nz-form-item>
-              <nz-form-label nzRequired>Tên tài liệu mới</nz-form-label>
-              <nz-form-control><input nz-input [(ngModel)]="uploadMaterialTitle" name="uploadMaterialTitle" placeholder="VD: Unit 4 - Đề luyện tập" /></nz-form-control>
-            </nz-form-item>
-            <nz-form-item>
               <nz-form-label>Chế độ</nz-form-label>
               <nz-form-control>
                 <nz-radio-group [(ngModel)]="uploadMode" name="uploadMode">
@@ -154,7 +150,7 @@ import { PageHeader } from '../../shared/page-header';
             </nz-form-item>
             <nz-form-item>
               <nz-form-label>Tên đề</nz-form-label>
-              <nz-form-control><input nz-input [(ngModel)]="uploadExamTitle" name="uploadExamTitle" placeholder="Để trống = tự đặt theo tài liệu" /></nz-form-control>
+              <nz-form-control><input nz-input [(ngModel)]="uploadExamTitle" name="uploadExamTitle" placeholder="Để trống = tự đặt theo tên file" /></nz-form-control>
             </nz-form-item>
             <nz-form-item>
               <nz-form-label>Thời gian làm bài (phút)</nz-form-label>
@@ -237,7 +233,6 @@ export class ExamListPage implements OnInit, OnDestroy {
   protected readonly uploadOpen = signal(false);
   protected readonly uploadFileName = signal<string | null>(null);
   private uploadFile: File | null = null;
-  protected uploadMaterialTitle = '';
   protected uploadExamTitle = '';
   protected uploadMode: ExamGenerationMode = 'Extract';
   protected uploadDurationMinutes = 60;
@@ -284,7 +279,6 @@ export class ExamListPage implements OnInit, OnDestroy {
     this.clearPollTimer();
     this.uploadFile = null;
     this.uploadFileName.set(null);
-    this.uploadMaterialTitle = '';
     this.uploadExamTitle = '';
     this.uploadMode = 'Extract';
     this.uploadDurationMinutes = 60;
@@ -304,8 +298,8 @@ export class ExamListPage implements OnInit, OnDestroy {
     }
     this.uploadFile = f;
     this.uploadFileName.set(f.name);
-    if (!this.uploadMaterialTitle.trim())
-      this.uploadMaterialTitle = this.fileNameWithoutExtension(f.name);
+    if (!this.uploadExamTitle.trim())
+      this.uploadExamTitle = this.fileNameWithoutExtension(f.name);
     return false;
   };
 
@@ -336,11 +330,9 @@ export class ExamListPage implements OnInit, OnDestroy {
   protected generateFromUpload(): void {
     if (this.generating()) return;
     if (!this.uploadFile) { this.message.warning('Chọn file đề.'); return; }
-    if (!this.uploadMaterialTitle.trim()) { this.message.warning('Nhập tên tài liệu mới.'); return; }
 
     const form = new FormData();
     form.append('file', this.uploadFile);
-    form.append('materialTitle', this.uploadMaterialTitle.trim());
     form.append('mode', this.uploadMode);
     if (this.uploadExamTitle.trim()) form.append('examTitle', this.uploadExamTitle.trim());
     form.append('durationMinutes', String(this.uploadDurationMinutes));

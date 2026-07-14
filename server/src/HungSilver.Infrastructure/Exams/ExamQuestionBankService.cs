@@ -168,6 +168,7 @@ public sealed class ExamQuestionBankService(AppDbContext context, IUnitOfWork un
         var copy = new Exam
         {
             MaterialId = source.MaterialId,
+            SourceStoredFileId = source.SourceStoredFileId,
             SubjectId = source.SubjectId,
             SubjectName = source.SubjectName,
             Title = source.Title + " (bản sao)",

@@ -216,16 +216,20 @@ public sealed class ExamService(
         var qs = (await questions.FindAsync(q => q.ExamId == exam.Id, ct)).OrderBy(q => q.OrderNo)
             .Select(ToQuestionDto).ToList();
 
+        // Ưu tiên file snapshot trên đề (đề mới); fallback tra tài liệu cho đề cũ trước migration.
         string? sourceFileUrl = null;
         string? sourceFilePreviewUrl = null;
-        if (exam.MaterialId is not null)
+        var fileId = exam.SourceStoredFileId;
+        if (fileId is null && exam.MaterialId is not null)
         {
             var material = await materials.GetByIdAsync(exam.MaterialId.Value, ct: ct);
             if (material?.Source == MaterialSource.ServerFile && material.StoredFileId is not null)
-            {
-                sourceFileUrl = $"/api/files/{material.StoredFileId}";
-                sourceFilePreviewUrl = $"/api/files/{material.StoredFileId}/preview";
-            }
+                fileId = material.StoredFileId;
+        }
+        if (fileId is not null)
+        {
+            sourceFileUrl = $"/api/files/{fileId}";
+            sourceFilePreviewUrl = $"/api/files/{fileId}/preview";
         }
         var creatorNames = await LoadCreatorNamesAsync([exam], ct);
 

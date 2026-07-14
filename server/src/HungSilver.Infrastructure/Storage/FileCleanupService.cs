@@ -113,6 +113,14 @@ public sealed class FileCleanupService(
             .Select(f => f.CoverFileId!.Value)
             .ToListAsync(ct));
 
+        // File nguồn sinh đề (Exam.SourceStoredFileId — luồng "Tạo đề từ file upload" không còn
+        // LearningMaterial tham chiếu) — thiếu dòng này file của đề sẽ bị dọn nhầm sau hạn ân hạn.
+        referenced.UnionWith(await db.Exams
+            .IgnoreQueryFilters()
+            .Where(e => e.SourceStoredFileId != null)
+            .Select(e => e.SourceStoredFileId!.Value)
+            .ToListAsync(ct));
+
         var avatarUrls = await db.Users
             .IgnoreQueryFilters()
             .Where(u => u.AvatarUrl != null)

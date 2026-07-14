@@ -57,10 +57,11 @@ public class ExamsController(
     /// <summary>Bắt đầu job sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả jobId ngay để client polling, tránh timeout proxy.</summary>
     [HttpPost("generate/{materialId:guid}")]
     public async Task<ActionResult<ExamGenerationJobStartResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct) =>
-        (await generationJobs.StartAsync(materialId, request, UserId, ct)).ToActionResult();
+        (await generationJobs.StartAsync(materialId, request, UserId, ct: ct)).ToActionResult();
 
     /// <summary>
-    /// Upload một file đề mới, tạo tài liệu ngang hàng với tài liệu nguồn rồi bắt đầu job sinh đề AI từ file vừa upload.
+    /// Upload một file đề rồi bắt đầu job sinh đề AI từ file đó — đề gắn thẳng vào tài liệu nguồn,
+    /// KHÔNG tạo tài liệu mới trong Kho (file chỉ lưu snapshot trên đề: Exam.SourceStoredFileId).
     /// </summary>
     [HttpPost("generate-upload/{sourceMaterialId:guid}")]
     [RequestSizeLimit(MaxUploadBytes)]
@@ -72,10 +73,6 @@ public class ExamsController(
     {
         if (request.File is null || request.File.Length == 0)
             return Error.Validation("Files.Empty", "Chưa chọn file.").ToProblemResult();
-
-        var materialTitle = request.MaterialTitle?.Trim();
-        if (string.IsNullOrWhiteSpace(materialTitle))
-            return Error.Validation("ExamUpload.MaterialTitleRequired", "Nhập tên tài liệu mới.").ToProblemResult();
 
         var ext = Path.GetExtension(request.File.FileName ?? string.Empty);
         if (!GenerationFileExtensions.Contains(ext))
@@ -100,31 +97,23 @@ public class ExamsController(
             uploaded = upload.Value;
         }
 
-        var s = source.Value;
-        var created = await materialService.CreateAsync(new CreateMaterialRequest(
-            s.FolderId is null ? s.CategoryId : null,
-            s.FolderId is null ? s.SubjectId : null,
-            s.FolderId is null ? s.GradeBand : null,
-            materialTitle,
-            MaterialSource.ServerFile,
-            null,
-            uploaded.Id,
-            null,
-            null,
-            s.FolderId), ct);
-        if (created.IsFailure)
-            return created.Error.ToProblemResult();
+        // Tên đề mặc định: theo tên file upload (bỏ đuôi) — KHÔNG theo tên tài liệu nguồn
+        // (file upload là một đề khác, lấy tên tài liệu nguồn dễ gây hiểu nhầm). Cắt 300 ký tự khớp maxlength.
+        var examTitle = string.IsNullOrWhiteSpace(request.ExamTitle)
+            ? Path.GetFileNameWithoutExtension(request.File.FileName ?? string.Empty).Trim()
+            : request.ExamTitle.Trim();
+        if (examTitle.Length > 300) examTitle = examTitle[..300];
 
         var genRequest = new GenerateExamRequest(
             request.Mode,
-            string.IsNullOrWhiteSpace(request.ExamTitle) ? null : request.ExamTitle.Trim(),
+            string.IsNullOrWhiteSpace(examTitle) ? null : examTitle,
             request.DurationMinutes,
             request.MaxQuestions,
             string.IsNullOrWhiteSpace(request.Difficulty) ? null : request.Difficulty.Trim(),
             string.IsNullOrWhiteSpace(request.Instructions) ? null : request.Instructions.Trim(),
             request.Verify);
 
-        return (await generationJobs.StartAsync(created.Value.Id, genRequest, UserId, ct)).ToActionResult();
+        return (await generationJobs.StartAsync(sourceMaterialId, genRequest, UserId, uploaded.Id, ct)).ToActionResult();
     }
 
     /// <summary>Trạng thái job sinh đề AI; khi Succeeded có ExamGenerationResult để mở đề nháp.</summary>
@@ -210,7 +199,6 @@ public class ExamsController(
 public sealed class GenerateExamUploadForm
 {
     public IFormFile? File { get; set; }
-    public string? MaterialTitle { get; set; }
     public ExamGenerationMode Mode { get; set; } = ExamGenerationMode.Extract;
     public string? ExamTitle { get; set; }
     public int? DurationMinutes { get; set; }

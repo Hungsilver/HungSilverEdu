@@ -23,7 +23,9 @@ public sealed class ExamGenerationServiceTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly AppDbContext _context;
     private readonly FakeGemini _gemini = new();
+    private readonly FakeSource _source = new();
     private readonly Guid _materialId;
+    private readonly Guid _materialFileId;
 
     public ExamGenerationServiceTests()
     {
@@ -47,6 +49,7 @@ public sealed class ExamGenerationServiceTests : IDisposable
         _context.LearningMaterials.Add(material);
         _context.SaveChanges();
         _materialId = material.Id;
+        _materialFileId = material.StoredFileId!.Value;
     }
 
     public void Dispose()
@@ -63,7 +66,7 @@ public sealed class ExamGenerationServiceTests : IDisposable
         new UnitOfWork(_context),
         new FakeResolver(),
         _gemini,
-        new FakeSource());
+        _source);
 
     private static GenerateExamRequest ExtractReq() =>
         new(ExamGenerationMode.Extract, Title: "Đề 1", DurationMinutes: 45, MaxQuestions: null, Difficulty: null, Instructions: null, Verify: false);
@@ -88,6 +91,7 @@ public sealed class ExamGenerationServiceTests : IDisposable
         Assert.Equal(ExamStatus.Draft, exam.Status);
         Assert.Equal("Đề 1", exam.Title);
         Assert.Equal(45, exam.DurationMinutes);
+        Assert.Equal(_materialFileId, exam.SourceStoredFileId); // luồng thường: snapshot file của tài liệu
 
         var qs = await _context.ExamQuestions.ToListAsync();
         Assert.Single(qs);
@@ -171,6 +175,39 @@ public sealed class ExamGenerationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UploadOverride_UsesProvidedFile_EvenForExternalUrlMaterial()
+    {
+        // Luồng generate-upload: tài liệu nguồn KHÔNG cần là ServerFile — file upload truyền trực tiếp.
+        var external = new LearningMaterial
+        {
+            Code = "TL0002", // tránh đụng unique index Code với material seed ở ctor
+            Title = "Link ngoài",
+            Source = MaterialSource.ExternalUrl,
+            Url = "https://example.com/tai-lieu",
+            SubjectId = Guid.NewGuid(),
+            SubjectName = "Tiếng Anh"
+        };
+        _context.LearningMaterials.Add(external);
+        await _context.SaveChangesAsync();
+
+        _gemini.NextJson = """
+        {"groups":[{"questions":[
+          {"number":1,"type":"TrueFalse","stem":"ok","answerKey":"true","explanation":"e"}
+        ]}]}
+        """;
+        var uploadedFileId = Guid.NewGuid();
+
+        var result = await NewService().GenerateFromMaterialAsync(
+            external.Id, ExtractReq(), Guid.NewGuid(), sourceStoredFileId: uploadedFileId);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(uploadedFileId, _source.RequestedFileId); // đọc đúng file upload, không phải file tài liệu
+        var exam = await _context.Exams.SingleAsync();
+        Assert.Equal(external.Id, exam.MaterialId); // đề neo vào tài liệu nguồn
+        Assert.Equal(uploadedFileId, exam.SourceStoredFileId); // snapshot file upload trên đề
+    }
+
+    [Fact]
     public async Task NoKey_ReturnsKeyMissing()
     {
         _gemini.NextJson = "{\"groups\":[]}";
@@ -200,8 +237,13 @@ public sealed class ExamGenerationServiceTests : IDisposable
 
     private sealed class FakeSource : IExamSourceProvider
     {
-        public Task<Result<GeminiInlineDoc>> GetPdfPartAsync(Guid storedFileId, CancellationToken ct = default) =>
-            Task.FromResult(Result.Success(new GeminiInlineDoc("application/pdf", new byte[] { 1, 2, 3 })));
+        public Guid? RequestedFileId { get; private set; }
+
+        public Task<Result<GeminiInlineDoc>> GetPdfPartAsync(Guid storedFileId, CancellationToken ct = default)
+        {
+            RequestedFileId = storedFileId;
+            return Task.FromResult(Result.Success(new GeminiInlineDoc("application/pdf", new byte[] { 1, 2, 3 })));
+        }
     }
 
     private sealed class FakeGemini : IGeminiClient

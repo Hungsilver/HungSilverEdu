@@ -13,22 +13,19 @@ using Xunit;
 namespace HungSilver.UnitTests;
 
 /// <summary>
-/// Kiểm thử endpoint upload file tạo đề: tạo tài liệu mới ngang hàng với tài liệu nguồn,
-/// enqueue job sinh đề và chặn loại file chưa hỗ trợ.
+/// Kiểm thử endpoint upload file tạo đề: KHÔNG tạo tài liệu mới trong Kho — đề gắn thẳng vào
+/// tài liệu nguồn, file upload truyền qua job (Exam.SourceStoredFileId); chặn loại file chưa hỗ trợ.
 /// </summary>
 public sealed class ExamsControllerUploadTests
 {
     [Fact]
-    public async Task GenerateFromUpload_InFolder_CreatesSiblingMaterial_AndStartsJob()
+    public async Task GenerateFromUpload_StartsJob_OnSourceMaterial_WithUploadedFile()
     {
         var sourceMaterialId = Guid.NewGuid();
-        var folderId = Guid.NewGuid();
-        var newMaterialId = Guid.NewGuid();
         var materialService = new FakeMaterialService(new MaterialDto(
-            sourceMaterialId, "TL0001", null, folderId, null, null,
+            sourceMaterialId, "TL0001", null, Guid.NewGuid(), null, null,
             Guid.NewGuid(), "Tiếng Anh", "10", "Unit 3",
-            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.docx", null, null, "/api/files/x", DateTime.Now),
-            newMaterialId);
+            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.docx", null, null, "/api/files/x", DateTime.Now));
         var files = new FakeFileService(Guid.NewGuid());
         var jobs = new FakeJobService();
         var controller = NewController(materialService, files, jobs);
@@ -36,7 +33,6 @@ public sealed class ExamsControllerUploadTests
         var result = await controller.GenerateFromUpload(sourceMaterialId, new GenerateExamUploadForm
         {
             File = FormFile("uploaded.docx"),
-            MaterialTitle = "Unit 4",
             Mode = ExamGenerationMode.Extract,
             ExamTitle = "Đề Unit 4",
             DurationMinutes = 45,
@@ -45,52 +41,43 @@ public sealed class ExamsControllerUploadTests
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         Assert.IsType<ExamGenerationJobStartResult>(ok.Value);
-        Assert.Equal(folderId, materialService.CreatedRequest!.FolderId);
-        Assert.Null(materialService.CreatedRequest.SubjectId);
-        Assert.Null(materialService.CreatedRequest.CategoryId);
-        Assert.Equal("Unit 4", materialService.CreatedRequest.Title);
-        Assert.Equal(files.StoredFileId, materialService.CreatedRequest.StoredFileId);
-        Assert.Equal(newMaterialId, jobs.StartedMaterialId);
+        Assert.Null(materialService.CreatedRequest); // KHÔNG tạo tài liệu mới trong Kho
+        Assert.Equal(sourceMaterialId, jobs.StartedMaterialId); // đề neo vào tài liệu nguồn
+        Assert.Equal(files.StoredFileId, jobs.StartedSourceStoredFileId); // file upload truyền qua job
         Assert.Equal("Đề Unit 4", jobs.StartedRequest!.Title);
     }
 
     [Fact]
-    public async Task GenerateFromUpload_GeneralMaterial_CopiesCategorySubjectGrade()
+    public async Task GenerateFromUpload_EmptyExamTitle_DefaultsToFileName()
     {
         var sourceMaterialId = Guid.NewGuid();
-        var categoryId = Guid.NewGuid();
-        var subjectId = Guid.NewGuid();
         var materialService = new FakeMaterialService(new MaterialDto(
-            sourceMaterialId, "TL0002", null, null, categoryId, "Đề kiểm tra",
-            subjectId, "Tiếng Anh", "9", "Tài liệu chung",
-            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.pdf", null, null, "/api/files/x", DateTime.Now),
-            Guid.NewGuid());
-        var controller = NewController(materialService, new FakeFileService(Guid.NewGuid()), new FakeJobService());
+            sourceMaterialId, "TL0002", null, null, Guid.NewGuid(), "Đề kiểm tra",
+            Guid.NewGuid(), "Tiếng Anh", "9", "Tài liệu chung",
+            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.pdf", null, null, "/api/files/x", DateTime.Now));
+        var jobs = new FakeJobService();
+        var controller = NewController(materialService, new FakeFileService(Guid.NewGuid()), jobs);
 
         await controller.GenerateFromUpload(sourceMaterialId, new GenerateExamUploadForm
         {
-            File = FormFile("uploaded.pdf"),
-            MaterialTitle = "Đề giữa kỳ"
+            File = FormFile("de-giua-ky.pdf")
         }, CancellationToken.None);
 
-        Assert.Null(materialService.CreatedRequest!.FolderId);
-        Assert.Equal(categoryId, materialService.CreatedRequest.CategoryId);
-        Assert.Equal(subjectId, materialService.CreatedRequest.SubjectId);
-        Assert.Equal("9", materialService.CreatedRequest.GradeBand);
+        Assert.Equal("de-giua-ky", jobs.StartedRequest!.Title); // tên đề mặc định = tên file bỏ đuôi
+        Assert.Null(materialService.CreatedRequest);
     }
 
     [Fact]
     public async Task GenerateFromUpload_UnsupportedFile_ReturnsValidation()
     {
         var controller = NewController(
-            new FakeMaterialService(defaultMaterial: null, Guid.NewGuid()),
+            new FakeMaterialService(defaultMaterial: null),
             new FakeFileService(Guid.NewGuid()),
             new FakeJobService());
 
         var result = await controller.GenerateFromUpload(Guid.NewGuid(), new GenerateExamUploadForm
         {
-            File = FormFile("bad.zip"),
-            MaterialTitle = "Tài liệu zip"
+            File = FormFile("bad.zip")
         }, CancellationToken.None);
 
         var error = Assert.IsType<ObjectResult>(result.Result);
@@ -127,7 +114,7 @@ public sealed class ExamsControllerUploadTests
         };
     }
 
-    private sealed class FakeMaterialService(MaterialDto? defaultMaterial, Guid newMaterialId) : IMaterialService
+    private sealed class FakeMaterialService(MaterialDto? defaultMaterial) : IMaterialService
     {
         public CreateMaterialRequest? CreatedRequest { get; private set; }
 
@@ -142,10 +129,7 @@ public sealed class ExamsControllerUploadTests
         public Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default)
         {
             CreatedRequest = request;
-            return Task.FromResult<Result<MaterialDto>>(new MaterialDto(
-                newMaterialId, "TL9999", null, request.FolderId, request.CategoryId, null, request.SubjectId, null,
-                request.GradeBand, request.Title, request.Source, request.Url, request.StoredFileId, "uploaded.pdf",
-                request.CoverFileId, request.Description, "/api/files/new", DateTime.Now));
+            return Task.FromResult(Result.Failure<MaterialDto>(Error.Failure("Test.NotUsed", "Luồng upload không được tạo tài liệu.")));
         }
 
         public Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default) =>
@@ -176,11 +160,15 @@ public sealed class ExamsControllerUploadTests
     private sealed class FakeJobService : IExamGenerationJobService
     {
         public Guid StartedMaterialId { get; private set; }
+        public Guid? StartedSourceStoredFileId { get; private set; }
         public GenerateExamRequest? StartedRequest { get; private set; }
 
-        public Task<Result<ExamGenerationJobStartResult>> StartAsync(Guid materialId, GenerateExamRequest request, Guid userId, CancellationToken ct = default)
+        public Task<Result<ExamGenerationJobStartResult>> StartAsync(
+            Guid materialId, GenerateExamRequest request, Guid userId,
+            Guid? sourceStoredFileId = null, CancellationToken ct = default)
         {
             StartedMaterialId = materialId;
+            StartedSourceStoredFileId = sourceStoredFileId;
             StartedRequest = request;
             return Task.FromResult<Result<ExamGenerationJobStartResult>>(
                 new ExamGenerationJobStartResult(Guid.NewGuid(), ExamGenerationJobStatus.Queued, DateTime.Now, 2));

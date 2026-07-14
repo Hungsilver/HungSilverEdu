@@ -22,7 +22,8 @@ public sealed class ExamGenerationJobService(
     private readonly ConcurrentDictionary<Guid, JobState> jobs = new();
 
     public async Task<Result<ExamGenerationJobStartResult>> StartAsync(
-        Guid materialId, GenerateExamRequest request, Guid userId, CancellationToken ct = default)
+        Guid materialId, GenerateExamRequest request, Guid userId,
+        Guid? sourceStoredFileId = null, CancellationToken ct = default)
     {
         CleanupOldJobs();
 
@@ -30,6 +31,7 @@ public sealed class ExamGenerationJobService(
         {
             JobId = Guid.NewGuid(),
             MaterialId = materialId,
+            SourceStoredFileId = sourceStoredFileId,
             Request = request,
             UserId = userId,
             CreatedAt = DateTime.Now,
@@ -76,7 +78,8 @@ public sealed class ExamGenerationJobService(
         {
             using var scope = scopeFactory.CreateScope();
             var generation = scope.ServiceProvider.GetRequiredService<IExamGenerationService>();
-            var result = await generation.GenerateFromMaterialAsync(job.MaterialId, job.Request, job.UserId, stoppingToken);
+            var result = await generation.GenerateFromMaterialAsync(
+                job.MaterialId, job.Request, job.UserId, job.SourceStoredFileId, stoppingToken);
 
             lock (job)
             {
@@ -138,6 +141,7 @@ public sealed class ExamGenerationJobService(
     {
         public Guid JobId { get; init; }
         public Guid MaterialId { get; init; }
+        public Guid? SourceStoredFileId { get; init; }
         public required GenerateExamRequest Request { get; init; }
         public Guid UserId { get; init; }
         public DateTime CreatedAt { get; init; }

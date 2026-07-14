@@ -25,7 +25,8 @@ public sealed class ExamGenerationJobServiceTests
         try
         {
             var userId = Guid.NewGuid();
-            var start = await service.StartAsync(Guid.NewGuid(), Request(), userId);
+            var sourceStoredFileId = Guid.NewGuid();
+            var start = await service.StartAsync(Guid.NewGuid(), Request(), userId, sourceStoredFileId);
 
             Assert.True(start.IsSuccess);
             Assert.Equal(ExamGenerationJobStatus.Queued, start.Value.Status);
@@ -46,6 +47,8 @@ public sealed class ExamGenerationJobServiceTests
             Assert.NotNull(completed);
             Assert.Equal(FakeGenerationService.ExamId, completed!.Result!.ExamId);
             Assert.Equal(3, completed.Result.QuestionCount);
+            // Worker phải truyền nguyên vẹn file upload trực tiếp xuống service sinh đề.
+            Assert.Equal(sourceStoredFileId, FakeGenerationService.ReceivedSourceStoredFileId);
         }
         finally
         {
@@ -59,10 +62,13 @@ public sealed class ExamGenerationJobServiceTests
     private sealed class FakeGenerationService : IExamGenerationService
     {
         public static readonly Guid ExamId = Guid.NewGuid();
+        public static Guid? ReceivedSourceStoredFileId { get; private set; }
 
         public async Task<Result<ExamGenerationResult>> GenerateFromMaterialAsync(
-            Guid materialId, GenerateExamRequest request, Guid userId, CancellationToken ct = default)
+            Guid materialId, GenerateExamRequest request, Guid userId,
+            Guid? sourceStoredFileId = null, CancellationToken ct = default)
         {
+            ReceivedSourceStoredFileId = sourceStoredFileId;
             await Task.Delay(20, ct);
             return new ExamGenerationResult(ExamId, 3, 0, Array.Empty<string>());
         }
