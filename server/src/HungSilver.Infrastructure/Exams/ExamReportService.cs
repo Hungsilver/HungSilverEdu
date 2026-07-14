@@ -21,15 +21,28 @@ public sealed class ExamReportService(AppDbContext context, IClassAccessGuard ac
         var className = await context.Classes.Where(c => c.Id == assignment.ClassId).Select(c => c.Name).FirstOrDefaultAsync(ct) ?? "";
 
         // Học viên đang học trong lớp.
-        var students = await (from e in context.Enrollments.AsNoTracking()
-                              join s in context.Students.AsNoTracking() on e.StudentId equals s.Id
-                              where e.ClassId == assignment.ClassId && e.IsActive
-                              select new { s.Id, s.FullName })
+        var activeStudents = await (from e in context.Enrollments.AsNoTracking()
+                                    join s in context.Students.AsNoTracking() on e.StudentId equals s.Id
+                                    where e.ClassId == assignment.ClassId && e.IsActive
+                                    select new { s.Id, s.FullName })
             .Distinct().ToListAsync(ct);
 
         var attempts = await context.ExamAttempts.AsNoTracking()
             .Where(t => t.ExamAssignmentId == assignmentId).ToListAsync(ct);
         var attemptByStudent = attempts.GroupBy(t => t.StudentId).ToDictionary(g => g.Key, g => g.First());
+
+        // HS đã rời lớp nhưng có bài làm: vẫn đưa vào báo cáo (gắn IsActive=false)
+        // để đã-nộp/sĩ số/điểm TB/phân bố nhất quán với bảng kết quả.
+        var activeIds = activeStudents.Select(s => s.Id).ToHashSet();
+        var formerIds = attempts.Select(t => t.StudentId).Where(id => !activeIds.Contains(id)).Distinct().ToList();
+        var formerStudents = await context.Students.AsNoTracking()
+            .Where(s => formerIds.Contains(s.Id))
+            .Select(s => new { s.Id, s.FullName })
+            .ToListAsync(ct);
+
+        var students = activeStudents.Select(s => (s.Id, s.FullName, IsActive: true))
+            .Concat(formerStudents.Select(s => (s.Id, s.FullName, IsActive: false)))
+            .ToList();
         var submitted = attempts.Where(t => t.Status != ExamAttemptStatus.InProgress).ToList();
 
         var questions = await context.ExamQuestions.AsNoTracking()
@@ -65,7 +78,7 @@ public sealed class ExamReportService(AppDbContext context, IClassAccessGuard ac
             .Select(s =>
             {
                 attemptByStudent.TryGetValue(s.Id, out var at);
-                return new ExamStudentResultDto(s.Id, s.FullName, at?.Id, at?.Status, at?.Score, at?.SubmittedAt);
+                return new ExamStudentResultDto(s.Id, s.FullName, at?.Id, at?.Status, at?.Score, at?.SubmittedAt, s.IsActive);
             })
             .OrderByDescending(r => r.Score ?? -1m)
             .ThenBy(r => r.FullName)

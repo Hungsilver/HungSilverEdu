@@ -19,5 +19,8 @@ public interface IClassAccessGuard
     /// <summary>Scope Id để filter theo giáo viên; null = không scope (Admin/Teacher đều null hiện tại).</summary>
     Task<Guid?> GetTeacherScopeIdAsync(CancellationToken ct = default);
 
+    /// <summary>Id các lớp GV hiện tại phụ trách — dùng để lọc danh sách. Admin trả rỗng (không dùng đường này).</summary>
+    Task<List<Guid>> GetOwnedClassIdsAsync(CancellationToken ct = default);
+
     bool IsAdmin { get; }
 }

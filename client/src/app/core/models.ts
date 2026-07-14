@@ -1579,6 +1579,8 @@ export interface ExamStudentResult {
   status: ExamAttemptStatus | null;
   score: number | null;
   submittedAt: string | null;
+  /** false: HS đã rời lớp sau khi có bài làm — vẫn hiện để số liệu báo cáo khớp bảng. */
+  isActive: boolean;
 }
 
 /** GV xem bài làm một học viên (bọc PortalReview + định danh HS). */

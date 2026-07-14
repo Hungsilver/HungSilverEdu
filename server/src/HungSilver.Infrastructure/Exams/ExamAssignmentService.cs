@@ -25,6 +25,21 @@ public sealed class ExamAssignmentService(
         if (exam.Status != ExamStatus.Published)
             return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.NotPublished", "Chỉ giao được đề đã phát hành."));
 
+        // Đề Published vẫn có thể về 0 câu (xóa câu chỉ bị khóa khi đề ĐÃ giao) — chặn giao đề rỗng.
+        if (!await context.ExamQuestions.AnyAsync(q => q.ExamId == examId, ct))
+            return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.NoQuestions", "Đề chưa có câu hỏi nào — không thể giao."));
+
+        // Chặn giao trùng: còn lượt giao đang mở (chưa đóng, chưa quá hạn nộp) cùng đề + lớp.
+        // Lượt Open nhưng đã quá hạn thì coi như xong — cho giao lại mà không bắt đóng tay.
+        var now = DateTime.Now;
+        var hasOpen = await context.ExamAssignments.AnyAsync(
+            a => a.ExamId == examId && a.ClassId == request.ClassId
+                 && a.Status == ExamAssignmentStatus.Open
+                 && (a.CloseAt == null || a.CloseAt > now), ct);
+        if (hasOpen)
+            return Result.Failure<ExamAssignmentDto>(Error.Validation("Exam.AlreadyAssigned",
+                "Đề này đã được giao cho lớp và đang mở — đóng lượt cũ trước khi giao lại."));
+
         if (request.ClassSessionId is not null)
         {
             var session = await context.ClassSessions.FirstOrDefaultAsync(s => s.Id == request.ClassSessionId, ct);
@@ -67,8 +82,16 @@ public sealed class ExamAssignmentService(
 
     public async Task<Result<List<ExamAssignmentDto>>> ListByExamAsync(Guid examId, CancellationToken ct = default)
     {
-        var assignments = await context.ExamAssignments.AsNoTracking()
-            .Where(a => a.ExamId == examId).OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
+        var query = context.ExamAssignments.AsNoTracking().Where(a => a.ExamId == examId);
+
+        // Đề là kho dùng chung: GV chỉ thấy lượt giao cho lớp mình phụ trách, Admin thấy tất cả.
+        if (!accessGuard.IsAdmin)
+        {
+            var ownedClassIds = await accessGuard.GetOwnedClassIdsAsync(ct);
+            query = query.Where(a => ownedClassIds.Contains(a.ClassId));
+        }
+
+        var assignments = await query.OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
         return await ToDtosAsync(assignments, ct);
     }
 

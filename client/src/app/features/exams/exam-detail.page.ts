@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
@@ -40,7 +41,7 @@ interface Section {
   selector: 'app-exam-detail-page',
   imports: [
     FormsModule,
-    NzCardModule, NzButtonModule, NzIconModule, NzTagModule, NzModalModule, NzFormModule, NzInputModule,
+    NzCardModule, NzButtonModule, NzCheckboxModule, NzIconModule, NzTagModule, NzModalModule, NzFormModule, NzInputModule,
     NzInputNumberModule, NzRadioModule, NzSelectModule, NzDatePickerModule, NzSpinModule, NzAlertModule, NzPopconfirmModule,
     DocumentPreview, PageHeader, QuestionEditorForm
   ],
@@ -178,11 +179,18 @@ interface Section {
                 <label nz-radio-button nzValue="InClass">Trên lớp</label>
                 <label nz-radio-button nzValue="Homework">Về nhà</label>
               </nz-radio-group></nz-form-control></nz-form-item>
-            <nz-form-item><nz-form-label>Thời gian làm (phút)</nz-form-label>
-              <nz-form-control><nz-input-number [(ngModel)]="asgDuration" name="dur" [nzMin]="1" [nzMax]="300" /></nz-form-control></nz-form-item>
+            @if (asgMode === 'Homework') {
+              <nz-form-item><nz-form-control>
+                <label nz-checkbox [(ngModel)]="asgNoTimeLimit" name="nolimit">Không giới hạn thời gian làm bài</label>
+              </nz-form-control></nz-form-item>
+            }
+            @if (asgMode === 'InClass' || !asgNoTimeLimit) {
+              <nz-form-item><nz-form-label>Thời gian làm (phút)</nz-form-label>
+                <nz-form-control><nz-input-number [(ngModel)]="asgDuration" name="dur" [nzMin]="1" [nzMax]="300" /></nz-form-control></nz-form-item>
+            }
             <nz-form-item><nz-form-label nzRequired>Mở lúc</nz-form-label>
               <nz-form-control><nz-date-picker class="full" [(ngModel)]="asgOpenAt" name="open" nzShowTime nzFormat="dd/MM/yyyy HH:mm" /></nz-form-control></nz-form-item>
-            <nz-form-item><nz-form-label>Hạn nộp (tùy chọn)</nz-form-label>
+            <nz-form-item><nz-form-label [nzRequired]="asgMode === 'Homework' && asgNoTimeLimit">Hạn nộp {{ asgMode === 'Homework' && asgNoTimeLimit ? '' : '(tùy chọn)' }}</nz-form-label>
               <nz-form-control><nz-date-picker class="full" [(ngModel)]="asgCloseAt" name="close" nzShowTime nzFormat="dd/MM/yyyy HH:mm" /></nz-form-control></nz-form-item>
           </form>
         </ng-container>
@@ -272,6 +280,7 @@ export class ExamDetailPage implements OnDestroy {
   protected asgDuration = 60;
   protected asgOpenAt: Date | null = null;
   protected asgCloseAt: Date | null = null;
+  protected asgNoTimeLimit = false;
 
   constructor() {
     // Nạp theo id — effect thay ngOnInit để tự nạp lại khi id đổi trên CÙNG route
@@ -474,6 +483,7 @@ export class ExamDetailPage implements OnDestroy {
     this.asgDuration = this.detailRaw()?.durationMinutes ?? 60;
     this.asgOpenAt = new Date();
     this.asgCloseAt = null;
+    this.asgNoTimeLimit = false;
     if (this.classes().length === 0)
       this.classesService.getPaged({ page: 1, pageSize: 200 }).subscribe(r => this.classes.set(r.items));
     this.assignOpen.set(true);
@@ -482,14 +492,17 @@ export class ExamDetailPage implements OnDestroy {
   protected doAssign(): void {
     if (!this.asgClassId) { this.message.warning('Chọn lớp.'); return; }
     if (!this.asgOpenAt) { this.message.warning('Chọn thời gian mở.'); return; }
+    const unlimited = this.asgMode === 'Homework' && this.asgNoTimeLimit;
+    if (unlimited && !this.asgCloseAt) { this.message.warning('Bài không giới hạn thời gian bắt buộc phải có hạn nộp.'); return; }
+    if (this.asgCloseAt && this.asgCloseAt <= this.asgOpenAt) { this.message.warning('Hạn nộp phải sau thời điểm mở.'); return; }
     const req: AssignExamRequest = {
       classId: this.asgClassId,
       classSessionId: null,
       mode: this.asgMode,
-      durationMinutes: this.asgDuration,
+      durationMinutes: unlimited ? null : this.asgDuration,
       openAt: this.asgOpenAt.toISOString(),
       closeAt: this.asgCloseAt ? this.asgCloseAt.toISOString() : null,
-      noTimeLimit: false
+      noTimeLimit: unlimited
     };
     this.assigning.set(true);
     this.examService.assign(this.id(), req).subscribe({

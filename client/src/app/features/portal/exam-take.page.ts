@@ -14,6 +14,7 @@ import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzTagModule } from 'ng-zorro-antd/tag';
+import { Observable, Subject, catchError, debounceTime, forkJoin, of, switchMap } from 'rxjs';
 import { PortalService } from '../../core/portal.service';
 import { EXAM_TYPE_LABELS, PortalAttempt, PortalQuestion } from '../../core/models';
 import { PageHeader } from '../../shared/page-header';
@@ -161,6 +162,10 @@ export class ExamTakePage implements OnInit, OnDestroy {
   protected answers: Record<string, any> = {};
   private timer?: ReturnType<typeof setInterval>;
   private submitting = false;
+  /** Câu đã sửa nhưng chưa lưu xong — flush theo debounce và bắt buộc trước khi nộp. */
+  private readonly dirty = new Map<string, PortalQuestion>();
+  private readonly saveTrigger = new Subject<void>();
+  private readonly saveSub = this.saveTrigger.pipe(debounceTime(500)).subscribe(() => this.flushDirty());
 
   ngOnInit(): void {
     this.portal.startExam(this.assignmentId()).subscribe({
@@ -177,6 +182,7 @@ export class ExamTakePage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    this.saveSub.unsubscribe();
   }
 
   protected blanks(n: number): number[] {
@@ -294,8 +300,18 @@ export class ExamTakePage implements OnInit, OnDestroy {
   }
 
   protected onAnswer(q: PortalQuestion): void {
-    const json = this.buildResponse(q);
-    this.portal.saveExamAnswer(this.attempt()!.attemptId, { questionId: q.id, responseJson: json }).subscribe({ error: () => { /* im lặng; sẽ chấm phần đã lưu */ } });
+    // Gom thay đổi rồi lưu sau 500ms yên — FillBlank gõ từng ký tự không bắn request liên tục.
+    this.dirty.set(q.id, q);
+    this.saveTrigger.next();
+  }
+
+  private flushDirty(): void {
+    if (this.submitting) return;
+    for (const q of [...this.dirty.values()]) {
+      this.dirty.delete(q.id);
+      this.portal.saveExamAnswer(this.attempt()!.attemptId, { questionId: q.id, responseJson: this.buildResponse(q) })
+        .subscribe({ error: () => this.dirty.set(q.id, q) }); // lưu hỏng → giữ lại, gửi lần flush sau hoặc khi nộp
+    }
   }
 
   private buildResponse(q: PortalQuestion): string {
@@ -323,7 +339,17 @@ export class ExamTakePage implements OnInit, OnDestroy {
     if (this.submitting) return;
     this.submitting = true;
     const attemptId = this.attempt()!.attemptId;
-    this.portal.submitExam(attemptId).subscribe({
+
+    // Chốt các đáp án còn chờ debounce/lưu hỏng TRƯỚC khi nộp — tránh mất đáp án gõ cuối.
+    const pending = [...this.dirty.values()].map(q =>
+      this.portal.saveExamAnswer(attemptId, { questionId: q.id, responseJson: this.buildResponse(q) })
+        .pipe(catchError(() => of(null))));
+    this.dirty.clear();
+
+    const flush$: Observable<unknown> = pending.length ? forkJoin(pending) : of(null);
+    flush$.pipe(
+      switchMap(() => this.portal.submitExam(attemptId))
+    ).subscribe({
       next: () => this.router.navigate(['/portal/attempts', attemptId, 'review']),
       error: (e: HttpErrorResponse) => {
         this.submitting = false;

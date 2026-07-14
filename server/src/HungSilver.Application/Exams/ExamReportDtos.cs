@@ -10,9 +10,11 @@ public sealed record ExamItemStatDto(
     Guid QuestionId, int OrderNo, int? SourceNumber, ExamQuestionType Type,
     int CorrectCount, int AnsweredCount, double CorrectPercent);
 
-/// <summary>Kết quả của một học viên trong lượt giao đề. AttemptId dùng để GV mở trang xem bài làm.</summary>
+/// <summary>Kết quả của một học viên trong lượt giao đề. AttemptId dùng để GV mở trang xem bài làm.
+/// IsActive=false: HS đã rời lớp sau khi có bài làm — vẫn hiện để số liệu báo cáo khớp bảng.</summary>
 public sealed record ExamStudentResultDto(
-    Guid StudentId, string FullName, Guid? AttemptId, ExamAttemptStatus? Status, decimal? Score, DateTime? SubmittedAt);
+    Guid StudentId, string FullName, Guid? AttemptId, ExamAttemptStatus? Status, decimal? Score, DateTime? SubmittedAt,
+    bool IsActive);
 
 /// <summary>GV xem bài làm một học viên: bọc PortalReviewDto (đáp án + bài làm + điểm từng câu) kèm định danh HS.</summary>
 public sealed record TeacherAttemptReviewDto(

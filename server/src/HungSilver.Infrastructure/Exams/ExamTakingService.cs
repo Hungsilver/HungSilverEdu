@@ -199,9 +199,20 @@ public sealed class ExamTakingService(AppDbContext context, ICurrentUser current
         var deadline = EffectiveDeadline(attempt, assignment);
         var finalStatus = deadline is DateTime dl && DateTime.Now > dl.AddSeconds(GraceSeconds)
             ? ExamAttemptStatus.AutoSubmitted : ExamAttemptStatus.Submitted;
-        await GradeAndFinalizeAsync(context, attempt, assignment, finalStatus, ct);
+        try
+        {
+            await GradeAndFinalizeAsync(context, attempt, assignment, finalStatus, ct);
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Đua chốt bài (nộp kép / trùng lúc service nền chốt / autosave chen giữa) — nạp lại bản đã chốt.
+            context.ChangeTracker.Clear();
+            attempt = await context.ExamAttempts.AsNoTracking().FirstAsync(t => t.Id == attemptId, ct);
+            if (attempt.Status == ExamAttemptStatus.InProgress)
+                return Result.Failure<ExamAttemptResultDto>(Error.Validation("Exam.SubmitConflict", "Nộp bài bị trùng thao tác — vui lòng nộp lại."));
+        }
 
-        await context.SaveChangesAsync(ct);
         return new ExamAttemptResultDto(attempt.Score ?? 0, assignment.TotalPoints, attempt.CorrectCount ?? 0, attempt.TotalCount ?? 0, attempt.Status);
     }
 

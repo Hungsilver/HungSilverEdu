@@ -95,7 +95,7 @@ public sealed class ClassAccessGuard(
             : Result.Failure(Error.NotFound("Student.NotFound", "Không tìm thấy học sinh."));
     }
 
-    private async Task<List<Guid>> GetOwnedClassIdsAsync(CancellationToken ct)
+    public async Task<List<Guid>> GetOwnedClassIdsAsync(CancellationToken ct = default)
     {
         if (_ownedClassIds is not null)
             return _ownedClassIds;

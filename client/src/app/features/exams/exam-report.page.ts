@@ -60,7 +60,7 @@ import { PageHeader } from '../../shared/page-header';
           <tbody>
             @for (s of t.data; track s.studentId) {
               <tr>
-                <td>{{ s.fullName }}</td>
+                <td>{{ s.fullName }} @if (!s.isActive) { <nz-tag nzColor="default">Đã rời lớp</nz-tag> }</td>
                 <td>
                   @if (s.status === 'Submitted' || s.status === 'AutoSubmitted') { <nz-tag nzColor="success">{{ statusLabels[s.status] }}</nz-tag> }
                   @else if (s.status === 'InProgress') { <nz-tag nzColor="processing">Đang làm</nz-tag> }
