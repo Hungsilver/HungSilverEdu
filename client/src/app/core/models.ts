@@ -1129,74 +1129,53 @@ export interface MaterialCategoryRequest {
   sortOrder: number;
 }
 
-// ----------------- Bài tập & nộp bài (Đợt 4) -----------------
+// ----------------- Giao tài liệu cho lớp + theo dõi đã xem (2026-07-16) -----------------
 
-export enum SubmissionStatus {
-  NotSubmitted = 'NotSubmitted',
-  Submitted = 'Submitted',
-  Late = 'Late'
-}
-
-export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
-  [SubmissionStatus.NotSubmitted]: 'Chưa nộp',
-  [SubmissionStatus.Submitted]: 'Đã nộp',
-  [SubmissionStatus.Late]: 'Muộn'
-};
-
-export const SUBMISSION_STATUS_COLORS: Record<SubmissionStatus, string> = {
-  [SubmissionStatus.NotSubmitted]: 'default',
-  [SubmissionStatus.Submitted]: 'green',
-  [SubmissionStatus.Late]: 'red'
-};
-
-export interface Assignment {
+/** Lượt giao tài liệu cho lớp (phía GV). Nguồn/tên resolve live; tài liệu đã xóa khỏi Kho ⇒ materialDeleted. */
+export interface MaterialAssignment {
   id: string;
+  materialId: string;
+  materialTitle: string;
+  materialDeleted: boolean;
   classId: string;
+  className: string;
   classSessionId: string | null;
-  materialId: string | null;
-  materialTitle: string | null;
-  title: string;
-  instructions: string | null;
-  dueDate: string | null;
-  submittedCount: number;
-  totalCount: number;
+  note: string | null;
+  source: MaterialSource;
+  url: string | null;
+  storedFileId: string | null;
+  fileName: string | null;
+  viewedCount: number;
+  totalStudents: number;
   createdAt: string;
 }
 
-export interface CreateAssignmentRequest {
+export interface AssignMaterialRequest {
   classId: string;
   classSessionId: string | null;
-  materialId: string | null;
-  title: string;
-  instructions: string | null;
-  dueDate: string | null;
+  note: string | null;
 }
 
-export interface SubmissionStatusInfo {
+export interface MaterialAssignmentViewer {
   studentId: string;
   fullName: string;
-  status: SubmissionStatus;
-  submittedOn: string | null;
-  link: string | null;
-  note: string | null;
+  viewedAt: string | null;
+  isActive: boolean;
 }
 
-export interface PortalAssignment {
-  id: string;
-  className: string;
+/** Tài liệu được giao — góc nhìn học viên (Portal). */
+export interface PortalMaterial {
+  assignmentId: string;
+  materialId: string;
   title: string;
-  instructions: string | null;
-  materialTitle: string | null;
-  materialUrl: string | null;
-  dueDate: string | null;
-  status: SubmissionStatus;
-  submittedOn: string | null;
-  link: string | null;
-}
-
-export interface SubmitAssignmentRequest {
-  link: string | null;
+  className: string;
   note: string | null;
+  source: MaterialSource;
+  url: string | null;
+  storedFileId: string | null;
+  fileName: string | null;
+  viewed: boolean;
+  assignedAt: string;
 }
 
 // ----------------- Import Excel học viên (Đợt 6) -----------------

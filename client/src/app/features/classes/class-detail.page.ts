@@ -1,10 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Subject as RxSubject } from 'rxjs';
-import { debounceTime, switchMap } from 'rxjs/operators';
 import { Router, RouterLink } from '@angular/router';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -30,12 +27,9 @@ import { NzUploadModule, NzUploadFile } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { ClassesService } from '../../core/classes.service';
 import {
-  Assignment, CalendarSession, ClassDetail, ClassStudentOverview, CreateAssignmentRequest, Material,
-  RosterItem, ScheduleSlot, Student, StudentImportPreview, StudentImportResult, SubmissionStatus,
-  SubmissionStatusInfo, SUBMISSION_STATUS_LABELS, TuitionInvoice, Warnings, WEEKDAY_LABELS
+  CalendarSession, ClassDetail, ClassStudentOverview, RosterItem, ScheduleSlot, Student,
+  StudentImportPreview, StudentImportResult, TuitionInvoice, Warnings, WEEKDAY_LABELS
 } from '../../core/models';
-import { AssignmentsService } from '../../core/assignments.service';
-import { MaterialsService } from '../../core/materials.service';
 import { ScheduleService } from '../../core/schedule.service';
 import { toDateOnly, toTimeOnly } from '../../core/date-util';
 import { StudentsService } from '../../core/students.service';
@@ -44,6 +38,8 @@ import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
 import { ClassFormModal } from './class-form-modal';
 import { PageHeader } from '../../shared/page-header';
+import { SessionExams } from '../sessions/session-exams';
+import { SessionMaterials } from '../sessions/session-materials';
 
 @Component({
   selector: 'app-class-detail-page',
@@ -52,7 +48,8 @@ import { PageHeader } from '../../shared/page-header';
     NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzButtonModule, NzIconModule,
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
     NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule,
-    NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader, ClassFormModal
+    NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader, ClassFormModal,
+    SessionExams, SessionMaterials
   ],
   template: `
     <a routerLink="/classes" class="back"><nz-icon nzType="arrow-left" /> Danh sách lớp</a>
@@ -176,46 +173,12 @@ import { PageHeader } from '../../shared/page-header';
             } @empty { <p class="muted">Chưa có buổi học.</p> }
           </nz-card>
 
-          <nz-card nzTitle="Bài tập" class="mt">
-            <button nz-button nzType="primary" class="mb" (click)="openAssignment()"><nz-icon nzType="plus" /> Giao bài</button>
-            @if (screen.isMobile()) {
-              <div class="mobile-card-list">
-                @for (a of assignments(); track a.id) {
-                  <nz-card>
-                    <div class="card-header">
-                      <span class="card-title">{{ a.title }}</span>
-                      <span>{{ a.submittedCount }}/{{ a.totalCount }}</span>
-                    </div>
-                    <div class="card-field"><span class="label">Học liệu</span><span>{{ a.materialTitle || '—' }}</span></div>
-                    <div class="card-field"><span class="label">Hạn nộp</span><span>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</span></div>
-                    <div class="card-actions">
-                      <button nz-button nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                      <button nz-button nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa bài tập" aria-label="Xóa bài tập" nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
-                    </div>
-                  </nz-card>
-                } @empty { <span class="muted">Chưa giao bài nào.</span> }
-              </div>
-            } @else {
-              <nz-table #at [nzData]="assignments()" [nzFrontPagination]="false" nzSize="small" [nzScroll]="{ x: '560px' }">
-                <thead><tr><th nzLeft>Tiêu đề</th><th>Học liệu</th><th>Hạn nộp</th><th>Đã nộp</th><th nzRight></th></tr></thead>
-                <tbody>
-                  @for (a of at.data; track a.id) {
-                    <tr>
-                      <td nzLeft>{{ a.title }}</td>
-                      <td>{{ a.materialTitle || '—' }}</td>
-                      <td>{{ a.dueDate ? (a.dueDate | date: 'dd/MM/yyyy') : '—' }}</td>
-                      <td>{{ a.submittedCount }}/{{ a.totalCount }}</td>
-                      <td nzRight>
-                        <button nz-button nzType="link" nzSize="small" (click)="openSubmissions(a)">Xem nộp</button>
-                        <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa bài tập" aria-label="Xóa bài tập"
-                                nz-popconfirm nzPopconfirmTitle="Xóa bài tập?" (nzOnConfirm)="deleteAssignment(a)"><nz-icon nzType="delete" /></button>
-                      </td>
-                    </tr>
-                  } @empty { <tr><td colspan="5"><span class="muted">Chưa giao bài nào.</span></td></tr> }
-                </tbody>
-              </nz-table>
-            }
-          </nz-card>
+          <!-- Bài tập = ĐỀ tương tác (HS làm trực tiếp, tự chấm) + Tài liệu giao cho lớp — dùng chung component với màn buổi học. -->
+          <app-session-exams [classId]="id()" [subjectId]="c.subjectId" [subjectName]="c.subjectName"
+            cardTitle="Bài tập (đề đã giao)" emptyText="Lớp này chưa được giao đề nào" />
+
+          <app-session-materials [classId]="id()" [subjectId]="c.subjectId" [subjectName]="c.subjectName"
+            cardTitle="Tài liệu đã giao" emptyText="Lớp này chưa được giao tài liệu nào" />
         </nz-tab>
 
         <!-- Tab 4: Học viên -->
@@ -371,58 +334,6 @@ import { PageHeader } from '../../shared/page-header';
             </nz-tab>
           </nz-tabs>
         }
-      </ng-container>
-    </nz-modal>
-
-    <!-- Giao bài tập -->
-    <nz-modal [nzVisible]="assignOpen()" nzTitle="Giao bài tập" [nzOkLoading]="assignBusy()"
-      (nzOnOk)="createAssignment()" (nzOnCancel)="assignOpen.set(false)">
-      <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical">
-          <nz-form-item><nz-form-label nzRequired>Tiêu đề</nz-form-label>
-            <nz-form-control><input nz-input [(ngModel)]="aTitle" name="t" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Học liệu (nguồn bài)</nz-form-label>
-            <nz-form-control>
-              <!-- Kho tài liệu phân trang server-side ⇒ tìm học liệu qua server-search (gõ mã/tên) -->
-              <nz-select [(ngModel)]="aMaterialId" name="m" nzAllowClear nzShowSearch nzServerSearch
-                (nzOnSearch)="searchMaterials($event)" nzPlaceHolder="Gõ mã/tên để tìm học liệu" class="full">
-                @for (m of materials(); track m.id) { <nz-option [nzValue]="m.id" [nzLabel]="m.code + ' — ' + m.title" /> }
-              </nz-select>
-            </nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Buổi học (tùy chọn)</nz-form-label>
-            <nz-form-control>
-              <nz-select [(ngModel)]="aSessionId" name="s" nzAllowClear nzPlaceHolder="Gắn buổi học" class="full">
-                @for (s of sessions(); track s.id) { <nz-option [nzValue]="s.id" [nzLabel]="'Buổi ' + s.sessionNumber" /> }
-              </nz-select>
-            </nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Hạn nộp</nz-form-label>
-            <nz-form-control><nz-date-picker [(ngModel)]="aDueDate" name="d" nzFormat="dd/MM/yyyy" class="full" /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Hướng dẫn</nz-form-label>
-            <nz-form-control><textarea nz-input [(ngModel)]="aInstructions" name="i" rows="2"></textarea></nz-form-control></nz-form-item>
-        </form>
-      </ng-container>
-    </nz-modal>
-
-    <!-- Tình hình nộp bài -->
-    <nz-modal [nzVisible]="subsOpen()" [nzTitle]="'Tình hình nộp: ' + (currentAssignment()?.title || '')"
-      [nzFooter]="null" (nzOnCancel)="subsOpen.set(false)" [nzWidth]="560">
-      <ng-container *nzModalContent>
-        <nz-table [nzData]="submissions()" [nzFrontPagination]="false" nzSize="small">
-          <thead><tr><th>Học sinh</th><th>Trạng thái</th><th>Ngày nộp</th></tr></thead>
-          <tbody>
-            @for (s of submissions(); track s.studentId) {
-              <tr>
-                <td>{{ s.fullName }} @if (s.link) { <a [href]="s.link" target="_blank" class="muted">(link)</a> }</td>
-                <td>
-                  <nz-select [ngModel]="s.status" (ngModelChange)="setStatus(s, $event)" nzSize="small" class="st">
-                    @for (st of statuses; track st) { <nz-option [nzValue]="st" [nzLabel]="statusLabels[st]" /> }
-                  </nz-select>
-                </td>
-                <td>{{ s.submittedOn ? (s.submittedOn | date: 'dd/MM') : '—' }}</td>
-              </tr>
-            }
-          </tbody>
-        </nz-table>
       </ng-container>
     </nz-modal>
 
@@ -584,8 +495,6 @@ export class ClassDetailPage implements OnInit {
   private readonly classesService = inject(ClassesService);
   private readonly scheduleService = inject(ScheduleService);
   private readonly studentsService = inject(StudentsService);
-  private readonly assignmentsService = inject(AssignmentsService);
-  private readonly materialsService = inject(MaterialsService);
   private readonly warningsService = inject(WarningsService);
   private readonly tuitionService = inject(TuitionService);
   private readonly message = inject(NzMessageService);
@@ -596,8 +505,6 @@ export class ClassDetailPage implements OnInit {
   protected readonly classEditOpen = signal(false);
 
   protected readonly weekdays = WEEKDAY_LABELS;
-  protected readonly statuses = [SubmissionStatus.NotSubmitted, SubmissionStatus.Submitted, SubmissionStatus.Late];
-  protected readonly statusLabels = SUBMISSION_STATUS_LABELS;
 
   protected readonly detail = signal<ClassDetail | null>(null);
   protected readonly roster = signal<RosterItem[]>([]);
@@ -625,22 +532,6 @@ export class ClassDetailPage implements OnInit {
   protected ov(studentId: string): ClassStudentOverview | undefined {
     return this.overviewMap().get(studentId);
   }
-
-  // Bài tập & nộp bài
-  protected readonly assignments = signal<Assignment[]>([]);
-  protected readonly materials = signal<Material[]>([]);
-  /** Server-search học liệu cho modal Giao bài tập (debounce, hủy theo vòng đời component). */
-  private readonly materialSearch$ = new RxSubject<string>();
-  protected readonly submissions = signal<SubmissionStatusInfo[]>([]);
-  protected readonly currentAssignment = signal<Assignment | null>(null);
-  protected readonly assignOpen = signal(false);
-  protected readonly assignBusy = signal(false);
-  protected readonly subsOpen = signal(false);
-  protected aTitle = '';
-  protected aMaterialId: string | null = null;
-  protected aSessionId: string | null = null;
-  protected aDueDate: Date | null = null;
-  protected aInstructions = '';
 
   // Import Excel học viên
   protected readonly importOpen = signal(false);
@@ -690,14 +581,6 @@ export class ClassDetailPage implements OnInit {
   protected slotStart: Date | null = null;
   protected slotEnd: Date | null = null;
 
-  constructor() {
-    this.materialSearch$.pipe(
-      debounceTime(300),
-      switchMap(term => this.materialsService.getPaged({ search: term, page: 1, pageSize: 50 })),
-      takeUntilDestroyed()
-    ).subscribe(r => this.materials.set(r.items));
-  }
-
   ngOnInit(): void {
     this.reload();
     if (this.canManage()) {
@@ -720,16 +603,6 @@ export class ClassDetailPage implements OnInit {
     this.scheduleService.getRange(toDateOnly(from), toDateOnly(to), id).subscribe(s => this.sessions.set(s));
     if (this.canManage()) this.scheduleService.getSlots(id).subscribe(s => this.slots.set(s));
     this.warningsService.getWarnings(id).subscribe(w => this.warnings.set(w));
-    this.loadAssignments();
-  }
-
-  private loadAssignments(): void {
-    this.assignmentsService.getByClass(this.id()).subscribe(a => this.assignments.set(a));
-  }
-
-  /** Tìm học liệu theo mã/tên qua kho tài liệu phân trang (debounce ở materialSearch$). */
-  protected searchMaterials(term: string): void {
-    this.materialSearch$.next(term);
   }
 
   // ---- Popup chi tiết học viên ----
@@ -742,60 +615,6 @@ export class ClassDetailPage implements OnInit {
     const classId = this.id();
     this.tuitionService.getByStudent(r.studentId).subscribe(invs => {
       this.studentTuition.set(invs.filter(inv => inv.classId === classId));
-    });
-  }
-
-  // ---- Bài tập ----
-  protected openAssignment(): void {
-    this.aTitle = '';
-    this.aMaterialId = null;
-    this.aSessionId = null;
-    this.aDueDate = null;
-    this.aInstructions = '';
-    this.searchMaterials(''); // nạp trang đầu danh sách học liệu
-    this.assignOpen.set(true);
-  }
-
-  protected createAssignment(): void {
-    if (!this.aTitle.trim()) { this.message.warning('Nhập tiêu đề bài tập.'); return; }
-    const request: CreateAssignmentRequest = {
-      classId: this.id(),
-      classSessionId: this.aSessionId,
-      materialId: this.aMaterialId,
-      title: this.aTitle.trim(),
-      instructions: this.aInstructions || null,
-      dueDate: this.aDueDate ? toDateOnly(this.aDueDate) : null
-    };
-    this.assignBusy.set(true);
-    this.assignmentsService.create(request).subscribe({
-      next: () => { this.assignBusy.set(false); this.assignOpen.set(false); this.message.success('Đã giao bài.'); this.loadAssignments(); },
-      error: (e: HttpErrorResponse) => { this.assignBusy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Giao bài thất bại.'); }
-    });
-  }
-
-  protected deleteAssignment(a: Assignment): void {
-    this.assignmentsService.delete(a.id).subscribe({
-      next: () => { this.message.success('Đã xóa bài tập.'); this.loadAssignments(); },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Xóa thất bại.')
-    });
-  }
-
-  protected openSubmissions(a: Assignment): void {
-    this.currentAssignment.set(a);
-    this.submissions.set([]);
-    this.assignmentsService.getSubmissions(a.id).subscribe(s => this.submissions.set(s));
-    this.subsOpen.set(true);
-  }
-
-  protected setStatus(s: SubmissionStatusInfo, status: SubmissionStatus): void {
-    const a = this.currentAssignment();
-    if (!a) return;
-    this.assignmentsService.setStatus(a.id, s.studentId, status).subscribe({
-      next: () => {
-        this.submissions.set(this.submissions().map(x => x.studentId === s.studentId ? { ...x, status } : x));
-        this.loadAssignments();
-      },
-      error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Cập nhật thất bại.')
     });
   }
 

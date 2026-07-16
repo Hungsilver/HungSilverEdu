@@ -1,28 +1,23 @@
 import { DatePipe } from '@angular/common';
-import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { EMPTY, catchError, switchMap, tap } from 'rxjs';
+import { EMPTY, catchError } from 'rxjs';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
-import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzGridModule } from 'ng-zorro-antd/grid';
 import { NzIconModule } from 'ng-zorro-antd/icon';
-import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
-import { NzModalModule } from 'ng-zorro-antd/modal';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
 import { NzStatisticModule } from 'ng-zorro-antd/statistic';
 import { NzTagModule } from 'ng-zorro-antd/tag';
-import {
-  CalendarSession, PortalAssignment, PortalExam, PortalProfile, SUBMISSION_STATUS_COLORS, SUBMISSION_STATUS_LABELS, WEEKDAY_LABELS
-} from '../../core/models';
+import { CalendarSession, PortalExam, PortalMaterial, PortalProfile, WEEKDAY_LABELS } from '../../core/models';
 import { PortalService } from '../../core/portal.service';
 import { toDateOnly } from '../../core/date-util';
+import { DocumentPreview } from '../../shared/document-preview';
 import { PageHeader } from '../../shared/page-header';
 
 /** Một ngày trong "Lịch của tôi" của học sinh (đã gom buổi theo ngày, kèm nhãn Ca). */
@@ -33,7 +28,7 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
   imports: [
     DatePipe, FormsModule,
     NzCardModule, NzGridModule, NzStatisticModule, NzTagModule, NzAlertModule, NzEmptyModule,
-    NzButtonModule, NzModalModule, NzInputModule, NzFormModule, NzIconModule, NzRadioModule, NzDatePickerModule, RouterLink, PageHeader
+    NzButtonModule, NzIconModule, NzRadioModule, NzDatePickerModule, RouterLink, DocumentPreview, PageHeader
   ],
   template: `
     <app-page-header title="Trang của tôi" subtitle="Tiến độ & lịch học của bạn" icon="solution" />
@@ -54,20 +49,6 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
       </nz-row>
 
       <nz-card nzTitle="Bài tập của tôi" class="mt">
-        @for (a of assignments(); track a.id) {
-          <div class="asg">
-            <div class="asg-main">
-              <strong>{{ a.title }}</strong>
-              <span class="muted">{{ a.className }}@if (a.dueDate) { · Hạn: {{ a.dueDate | date: 'dd/MM/yyyy' }} }</span>
-              @if (a.materialUrl) { <a [href]="a.materialUrl" target="_blank" class="muted">· Tài liệu</a> }
-            </div>
-            <nz-tag [nzColor]="statusColors[a.status]">{{ statusLabels[a.status] }}</nz-tag>
-            <button nz-button nzSize="small" (click)="openSubmit(a)"><nz-icon nzType="check" /> Nộp</button>
-          </div>
-        } @empty { <nz-empty nzNotFoundContent="Chưa có bài tập" /> }
-      </nz-card>
-
-      <nz-card nzTitle="Đề của tôi" class="mt">
         @for (e of exams(); track e.assignmentId) {
           <div class="asg">
             <div class="asg-main">
@@ -88,7 +69,21 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
               <span class="muted">Mở lúc {{ e.openAt | date: 'dd/MM HH:mm' }}</span>
             }
           </div>
-        } @empty { <nz-empty nzNotFoundContent="Chưa có đề nào" /> }
+        } @empty { <nz-empty nzNotFoundContent="Chưa có bài tập nào" /> }
+      </nz-card>
+
+      <nz-card nzTitle="Tài liệu của tôi" class="mt">
+        @for (m of materials(); track m.assignmentId) {
+          <div class="asg">
+            <div class="asg-main">
+              <strong>{{ m.title }}</strong>
+              <span class="muted">{{ m.className }} · Giao {{ m.assignedAt | date: 'dd/MM/yyyy' }}</span>
+              @if (m.note) { <span class="muted note">“{{ m.note }}”</span> }
+            </div>
+            @if (m.viewed) { <nz-tag nzColor="success">Đã xem</nz-tag> } @else { <nz-tag>Chưa xem</nz-tag> }
+            <button nz-button nzType="primary" nzSize="small" (click)="viewMaterial(m)"><nz-icon nzType="eye" /> Xem</button>
+          </div>
+        } @empty { <nz-empty nzNotFoundContent="Chưa có tài liệu nào" /> }
       </nz-card>
 
       <nz-card nzTitle="Lịch của tôi" class="mt">
@@ -124,19 +119,7 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
       </nz-card>
     }
 
-    <!-- Nộp bài -->
-    <nz-modal [nzVisible]="submitOpen()" [nzTitle]="'Nộp bài: ' + (current()?.title || '')" [nzOkLoading]="busy()"
-      (nzOnOk)="submit()" (nzOnCancel)="submitOpen.set(false)">
-      <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical">
-          <nz-form-item><nz-form-label>Link bài làm (Google Drive/ảnh…)</nz-form-label>
-            <nz-form-control><input nz-input [(ngModel)]="link" name="l" placeholder="https://..." /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Ghi chú</nz-form-label>
-            <nz-form-control><textarea nz-input [(ngModel)]="note" name="n" rows="2"></textarea></nz-form-control></nz-form-item>
-          <p class="muted">Bấm "OK" để đánh dấu đã nộp. Nộp sau hạn sẽ ghi nhận là "Muộn".</p>
-        </form>
-      </ng-container>
-    </nz-modal>
+    <app-document-preview />
   `,
   styles: `
     .mt { margin-top: 16px; }
@@ -147,6 +130,7 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
     .asg { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hs-border); flex-wrap: wrap; }
     .asg:last-child { border-bottom: none; }
     .asg-main { flex: 1; min-width: 180px; display: flex; flex-direction: column; }
+    .asg-main .note { font-style: italic; }
     .sched-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .sched-day { margin-bottom: 12px; }
     .sched-day:last-child { margin-bottom: 0; }
@@ -156,24 +140,16 @@ interface MyDay { iso: string; label: string; sessions: CalendarSession[]; }
 export class PortalPage {
   private readonly portalService = inject(PortalService);
   private readonly message = inject(NzMessageService);
+  private readonly preview = viewChild.required(DocumentPreview);
   protected readonly profile = signal<PortalProfile | null>(null);
   protected readonly notLinked = signal(false);
-  protected readonly assignments = signal<PortalAssignment[]>([]);
   protected readonly exams = signal<PortalExam[]>([]);
-
-  protected readonly statusLabels = SUBMISSION_STATUS_LABELS;
-  protected readonly statusColors = SUBMISSION_STATUS_COLORS;
+  protected readonly materials = signal<PortalMaterial[]>([]);
 
   /** Đề không còn làm được nữa (GV đóng hoặc quá hạn CloseAt) — phân biệt với đề CHƯA mở. */
   protected isExamExpired(e: PortalExam): boolean {
     return e.assignmentStatus === 'Closed' || (!!e.closeAt && new Date(e.closeAt).getTime() < Date.now());
   }
-
-  protected readonly submitOpen = signal(false);
-  protected readonly busy = signal(false);
-  protected readonly current = signal<PortalAssignment | null>(null);
-  protected link = '';
-  protected note = '';
 
   // "Lịch của tôi" — xem theo Ngày/Tuần các lớp đang học.
   private readonly weekdays = WEEKDAY_LABELS;
@@ -210,8 +186,8 @@ export class PortalPage {
       next: p => this.profile.set(p),
       error: () => this.notLinked.set(true)
     });
-    this.portalService.assignments().subscribe({ next: a => this.assignments.set(a) });
     this.portalService.myExams().subscribe({ next: e => this.exams.set(e), error: () => { /* im lặng */ } });
+    this.portalService.myMaterials().subscribe({ next: m => this.materials.set(m), error: () => { /* im lặng */ } });
     this.fetchMySchedule();
   }
 
@@ -246,29 +222,24 @@ export class PortalPage {
     ).subscribe(list => this.mySchedule.set(list));
   }
 
-  protected openSubmit(a: PortalAssignment): void {
-    this.current.set(a);
-    this.link = a.link ?? '';
-    this.note = '';
-    this.submitOpen.set(true);
-  }
-
-  protected submit(): void {
-    const a = this.current();
-    if (!a) return;
-    this.busy.set(true);
-    this.portalService.submit(a.id, { link: this.link || null, note: this.note || null }).pipe(
-      tap(() => {
-        this.busy.set(false);
-        this.submitOpen.set(false);
-        this.message.success('Đã nộp bài.');
-      }),
-      // Nộp đã xong: refetch danh sách; nếu refetch lỗi thì im lặng, không báo "nộp thất bại".
-      switchMap(() => this.portalService.assignments().pipe(catchError(() => EMPTY)))
-    ).subscribe({
-      next: x => this.assignments.set(x),
-      error: (e: HttpErrorResponse) => { this.busy.set(false); this.message.error(e.error?.message ?? e.message ?? 'Nộp bài thất bại.'); }
-    });
+  /**
+   * Mở tài liệu: file server → trình xem full màn hình; link ngoài → tab mới (window.open gọi đồng bộ
+   * trong click handler để không bị chặn popup). Đánh dấu đã-xem fire-and-forget + cập nhật tag lạc quan
+   * (BE idempotent nên gọi lặp vô hại).
+   */
+  protected viewMaterial(m: PortalMaterial): void {
+    if (m.source === 'ServerFile' && m.storedFileId) {
+      this.preview().open({ fileId: m.storedFileId, title: m.title, fileName: m.fileName });
+    } else if (m.url) {
+      window.open(m.url, '_blank');
+    } else {
+      this.message.warning('Tài liệu không có nguồn để mở.');
+      return;
+    }
+    if (!m.viewed) {
+      this.materials.update(list => list.map(x => x.assignmentId === m.assignmentId ? { ...x, viewed: true } : x));
+      this.portalService.markMaterialViewed(m.assignmentId).subscribe({ error: () => { /* im lặng */ } });
+    }
   }
 }
 

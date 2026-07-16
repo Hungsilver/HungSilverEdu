@@ -54,6 +54,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<ExamAttempt> ExamAttempts => Set<ExamAttempt>();
     public DbSet<ExamAttemptAnswer> ExamAttemptAnswers => Set<ExamAttemptAnswer>();
 
+    // Giao tài liệu cho lớp + theo dõi đã xem (2026-07-16).
+    public DbSet<MaterialAssignment> MaterialAssignments => Set<MaterialAssignment>();
+    public DbSet<MaterialAssignmentView> MaterialAssignmentViews => Set<MaterialAssignmentView>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

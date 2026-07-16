@@ -109,7 +109,17 @@ public sealed class ExamAssignmentService(
         return await ToDtosAsync(assignments, ct);
     }
 
-    /// <summary>Dựng DTO kèm tên lớp + sĩ số + số đã nộp (dùng chung ListByExam/ListBySession).</summary>
+    public async Task<Result<List<ExamAssignmentDto>>> ListByClassAsync(Guid classId, CancellationToken ct = default)
+    {
+        var access = await accessGuard.EnsureCanAccessClassAsync(classId, ct);
+        if (access.IsFailure) return Result.Failure<List<ExamAssignmentDto>>(access.Error);
+
+        var assignments = await context.ExamAssignments.AsNoTracking()
+            .Where(a => a.ClassId == classId).OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
+        return await ToDtosAsync(assignments, ct);
+    }
+
+    /// <summary>Dựng DTO kèm tên lớp + sĩ số + số đã nộp (dùng chung ListByExam/ListBySession/ListByClass).</summary>
     private async Task<List<ExamAssignmentDto>> ToDtosAsync(List<ExamAssignment> assignments, CancellationToken ct)
     {
         if (assignments.Count == 0) return new List<ExamAssignmentDto>();

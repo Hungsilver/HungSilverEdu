@@ -179,6 +179,11 @@ public class ExamsController(
     public async Task<ActionResult<List<ExamAssignmentDto>>> AssignmentsBySession(Guid sessionId, CancellationToken ct) =>
         (await assignments.ListBySessionAsync(sessionId, ct)).ToActionResult();
 
+    /// <summary>Mọi lượt giao đề của một lớp (section Bài tập trong trang chi tiết lớp).</summary>
+    [HttpGet("assignments/by-class/{classId:guid}")]
+    public async Task<ActionResult<List<ExamAssignmentDto>>> AssignmentsByClass(Guid classId, CancellationToken ct) =>
+        (await assignments.ListByClassAsync(classId, ct)).ToActionResult();
+
     [HttpPost("assignments/{assignmentId:guid}/close")]
     public async Task<ActionResult> CloseAssignment(Guid assignmentId, CancellationToken ct) =>
         (await assignments.CloseAsync(assignmentId, ct)).ToActionResult();

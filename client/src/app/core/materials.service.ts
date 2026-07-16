@@ -3,9 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  CreateMaterialFolderRequest, CreateMaterialRequest, Material, MaterialCategory, MaterialCategoryRequest,
-  MaterialFolder, MaterialPagedFilter, MaterialSubjectSummary, PagedResult, StoredFile,
-  UpdateMaterialFolderRequest, UpdateMaterialRequest
+  AssignMaterialRequest, CreateMaterialFolderRequest, CreateMaterialRequest, Material, MaterialAssignment,
+  MaterialAssignmentViewer, MaterialCategory, MaterialCategoryRequest, MaterialFolder, MaterialPagedFilter,
+  MaterialSubjectSummary, PagedResult, StoredFile, UpdateMaterialFolderRequest, UpdateMaterialRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -44,6 +44,31 @@ export class MaterialsService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<StoredFile>(`${this.apiUrl}/cover-image`, form);
+  }
+
+  // ---- Giao tài liệu cho lớp (2026-07-16) ----
+
+  /** Giao tài liệu cho lớp (tùy chọn gắn buổi) — học viên xem ở Portal. */
+  assign(materialId: string, request: AssignMaterialRequest): Observable<MaterialAssignment> {
+    return this.http.post<MaterialAssignment>(`${this.apiUrl}/${materialId}/assign`, request);
+  }
+
+  listAssignmentsByClass(classId: string): Observable<MaterialAssignment[]> {
+    return this.http.get<MaterialAssignment[]>(`${this.apiUrl}/assignments/by-class/${classId}`);
+  }
+
+  listAssignmentsBySession(sessionId: string): Observable<MaterialAssignment[]> {
+    return this.http.get<MaterialAssignment[]>(`${this.apiUrl}/assignments/by-session/${sessionId}`);
+  }
+
+  /** Thu hồi lượt giao — tài liệu biến mất khỏi Portal của lớp. */
+  removeAssignment(assignmentId: string): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/assignments/${assignmentId}`);
+  }
+
+  /** Trạng thái đã xem per-student của một lượt giao. */
+  assignmentViewers(assignmentId: string): Observable<MaterialAssignmentViewer[]> {
+    return this.http.get<MaterialAssignmentViewer[]>(`${this.apiUrl}/assignments/${assignmentId}/viewers`);
   }
 
   // ---- Bộ tài liệu (MaterialFolder) — phân cấp Môn → Bộ → Tài liệu ----

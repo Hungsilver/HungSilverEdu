@@ -24,13 +24,14 @@ import { ScreenService } from '../../core/screen.service';
 import { SessionsService } from '../../core/sessions.service';
 import { PageHeader } from '../../shared/page-header';
 import { SessionExams } from './session-exams';
+import { SessionMaterials } from './session-materials';
 
 @Component({
   selector: 'app-session-page',
   imports: [
     FormsModule, RouterLink, DatePipe,
     NzTableModule, NzCardModule, NzRadioModule, NzSelectModule, NzInputModule, NzButtonModule, NzIconModule,
-    NzTagModule, NzModalModule, NzInputNumberModule, PageHeader, SessionExams
+    NzTagModule, NzModalModule, NzInputNumberModule, PageHeader, SessionExams, SessionMaterials
   ],
   template: `
     @if (sheet(); as s) {
@@ -170,6 +171,8 @@ import { SessionExams } from './session-exams';
       }
 
       <app-session-exams [sessionId]="s.sessionId" [classId]="s.classId" [subjectId]="s.subjectId" [subjectName]="s.subjectName" />
+
+      <app-session-materials [sessionId]="s.sessionId" [classId]="s.classId" [subjectId]="s.subjectId" [subjectName]="s.subjectName" />
 
       <div class="save-bar">
         <button nz-button nzType="primary" nzSize="large" [nzLoading]="saving()" (click)="saveAll()">

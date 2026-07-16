@@ -3,8 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  CalendarSession, ExamAttemptResult, PortalAssignment, PortalAttempt, PortalExam, PortalProfile, PortalReview,
-  SaveExamAnswerRequest, SubmitAssignmentRequest
+  CalendarSession, ExamAttemptResult, PortalAttempt, PortalExam, PortalMaterial, PortalProfile, PortalReview,
+  SaveExamAnswerRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -16,18 +16,21 @@ export class PortalService {
     return this.http.get<PortalProfile>(`${this.apiUrl}/me`);
   }
 
-  assignments(): Observable<PortalAssignment[]> {
-    return this.http.get<PortalAssignment[]>(`${this.apiUrl}/assignments`);
-  }
-
   /** Lịch học của chính học sinh (các lớp đang học). from/to dạng yyyy-MM-dd. */
   schedule(from: string, to: string): Observable<CalendarSession[]> {
     const params = new HttpParams().set('from', from).set('to', to);
     return this.http.get<CalendarSession[]>(`${this.apiUrl}/schedule`, { params });
   }
 
-  submit(id: string, request: SubmitAssignmentRequest): Observable<void> {
-    return this.http.post<void>(`${this.apiUrl}/assignments/${id}/submit`, request);
+  // ---- Tài liệu được giao ----
+
+  myMaterials(): Observable<PortalMaterial[]> {
+    return this.http.get<PortalMaterial[]>(`${this.apiUrl}/materials`);
+  }
+
+  /** Đánh dấu đã xem (ghi lần đầu, idempotent) — gọi khi học viên mở tài liệu. */
+  markMaterialViewed(assignmentId: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/materials/${assignmentId}/view`, {});
   }
 
   // ---- Đề trắc nghiệm (Pha 2) ----

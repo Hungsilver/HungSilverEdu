@@ -43,6 +43,11 @@ public sealed class CurrentRelationCleanupService(AppDbContext context) : ICurre
             .ToListAsync(ct);
         context.Assignments.RemoveRange(assignments);
 
+        var materialAssignments = await context.MaterialAssignments
+            .Where(a => a.ClassId == classId)
+            .ToListAsync(ct);
+        context.MaterialAssignments.RemoveRange(materialAssignments);
+
         var today = DateOnly.FromDateTime(DateTime.Now);
         var futureSessions = await context.ClassSessions
             .Where(s => s.ClassId == classId

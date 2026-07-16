@@ -26,8 +26,9 @@ import {
 } from '../../core/models';
 
 /**
- * Section "Bài tập" trong màn hình buổi học: GV giao đề (trên lớp / về nhà, có thể không giới hạn giờ)
- * cho lớp của buổi, theo dõi nộp bài per-student (polling nhẹ khi còn lượt Open) và mở bài làm từng HS.
+ * Section "Bài tập": GV giao đề (trên lớp / về nhà, có thể không giới hạn giờ), theo dõi nộp bài
+ * per-student (polling nhẹ khi còn lượt Open) và mở bài làm từng HS. Dùng ở 2 nơi:
+ * màn hình buổi học (sessionId có — lượt giao gắn buổi) và trang chi tiết lớp (sessionId null — mọi lượt của lớp).
  */
 @Component({
   selector: 'app-session-exams',
@@ -38,7 +39,7 @@ import {
     NzTableModule, NzTagModule, NzTooltipModule
   ],
   template: `
-    <nz-card class="mt" nzTitle="Bài tập" [nzExtra]="extra">
+    <nz-card class="mt" [nzTitle]="cardTitle()" [nzExtra]="extra">
       <ng-template #extra>
         <div class="card-actions">
           <button nz-button nzSize="small" (click)="reload()" [nzLoading]="loading()" nz-tooltip nzTooltipTitle="Làm mới">
@@ -53,7 +54,7 @@ import {
       </ng-template>
 
       @if (assignments().length === 0) {
-        <nz-empty nzNotFoundContent="Buổi này chưa giao bài tập nào" />
+        <nz-empty [nzNotFoundContent]="emptyText()" />
       } @else if (screen.isMobile()) {
         <!-- Mobile: card cho từng lượt giao -->
         <div class="asg-cards">
@@ -231,10 +232,13 @@ export class SessionExams implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   protected readonly screen = inject(ScreenService);
 
-  readonly sessionId = input.required<string>();
+  /** Có giá trị ⇒ chỉ lượt giao gắn buổi này; null ⇒ mọi lượt giao của lớp (trang chi tiết lớp). */
+  readonly sessionId = input<string | null>(null);
   readonly classId = input.required<string>();
   readonly subjectId = input<string | null>(null);
   readonly subjectName = input<string | null>(null);
+  readonly cardTitle = input('Bài tập');
+  readonly emptyText = input('Buổi này chưa giao bài tập nào');
 
   protected readonly attemptLabels = EXAM_ATTEMPT_STATUS_LABELS;
   protected readonly loading = signal(false);
@@ -268,7 +272,11 @@ export class SessionExams implements OnInit {
 
   protected reload(silent = false): void {
     if (!silent) this.loading.set(true);
-    this.examService.listBySession(this.sessionId()).subscribe({
+    const sessionId = this.sessionId();
+    const source$ = sessionId
+      ? this.examService.listBySession(sessionId)
+      : this.examService.listByClass(this.classId());
+    source$.subscribe({
       next: list => {
         this.assignments.set(list);
         this.loading.set(false);

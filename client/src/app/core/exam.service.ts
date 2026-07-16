@@ -113,6 +113,11 @@ export class ExamService {
     return this.http.get<ExamAssignment[]>(`${this.apiUrl}/assignments/by-session/${sessionId}`);
   }
 
+  /** Mọi lượt giao của một lớp (section Bài tập trong trang chi tiết lớp). */
+  listByClass(classId: string): Observable<ExamAssignment[]> {
+    return this.http.get<ExamAssignment[]>(`${this.apiUrl}/assignments/by-class/${classId}`);
+  }
+
   /** GV xem bài làm một học viên đã nộp. */
   attemptReview(attemptId: string): Observable<TeacherAttemptReview> {
     return this.http.get<TeacherAttemptReview>(`${this.apiUrl}/attempts/${attemptId}/review`);

@@ -1,5 +1,4 @@
 using HungSilver.Application.Abstractions;
-using HungSilver.Application.Common;
 using HungSilver.Application.Portal;
 using HungSilver.Application.Schedule;
 using HungSilver.Application.Settings;
@@ -13,7 +12,6 @@ namespace HungSilver.Infrastructure.Portal;
 
 public sealed class PortalService(
     AppDbContext context,
-    ICurrentRelationCleanupService relationCleanup,
     ICurrentUser currentUser,
     ISettingsResolver settings) : IPortalService
 {
@@ -56,59 +54,6 @@ public sealed class PortalService(
             total, attended, hwDone, balance, upcoming);
     }
 
-    public async Task<Result<List<PortalAssignmentDto>>> GetMyAssignmentsAsync(CancellationToken ct = default)
-    {
-        var studentResult = await GetLinkedStudentAsync(ct);
-        if (studentResult.IsFailure)
-            return Result.Failure<List<PortalAssignmentDto>>(studentResult.Error);
-        var student = studentResult.Value;
-
-        var classIds = await LoadStudentClassIdsAsync(student.Id, ct);
-        if (classIds.Count == 0)
-            return new List<PortalAssignmentDto>();
-
-        var assignments = await (
-            from a in context.Assignments.AsNoTracking()
-            join c in context.Classes.AsNoTracking() on a.ClassId equals c.Id
-            where classIds.Contains(a.ClassId)
-            orderby a.DueDate descending, a.CreatedAt descending
-            select new { a, c.Name }).ToListAsync(ct);
-        if (assignments.Count == 0)
-            return new List<PortalAssignmentDto>();
-
-        var assignmentIds = assignments.Select(x => x.a.Id).ToList();
-        var subList = await context.Submissions.AsNoTracking()
-            .Where(s => s.StudentId == student.Id && assignmentIds.Contains(s.AssignmentId))
-            .ToListAsync(ct);
-        var subs = subList.GroupBy(s => s.AssignmentId).ToDictionary(g => g.Key, g => g.First());
-
-        var materialIds = assignments.Where(x => x.a.MaterialId.HasValue).Select(x => x.a.MaterialId!.Value).Distinct().ToList();
-        var materials = materialIds.Count == 0
-            ? new Dictionary<Guid, LearningMaterial>()
-            : await context.LearningMaterials.AsNoTracking()
-                .Where(m => materialIds.Contains(m.Id))
-                .ToDictionaryAsync(m => m.Id, m => m, ct);
-
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        return assignments.Select(x =>
-        {
-            subs.TryGetValue(x.a.Id, out var sub);
-            var status = sub is not null && sub.Status != SubmissionStatus.NotSubmitted
-                ? sub.Status
-                : (x.a.DueDate is not null && today > x.a.DueDate ? SubmissionStatus.Late : SubmissionStatus.NotSubmitted);
-
-            string? matTitle = null, matUrl = null;
-            if (x.a.MaterialId.HasValue && materials.TryGetValue(x.a.MaterialId.Value, out var m))
-            {
-                matTitle = m.Title;
-                matUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null ? $"/api/files/{m.StoredFileId}" : m.Url;
-            }
-
-            return new PortalAssignmentDto(x.a.Id, x.Name, x.a.Title, x.a.Instructions, matTitle, matUrl,
-                x.a.DueDate, status, sub?.SubmittedOn, sub?.Link);
-        }).ToList();
-    }
-
     public async Task<Result<List<CalendarSessionDto>>> GetScheduleRangeAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
     {
         var studentResult = await GetLinkedStudentAsync(ct);
@@ -146,59 +91,6 @@ public sealed class PortalService(
             })
             .OrderBy(i => i.SessionDate).ThenBy(i => i.ShiftOrder).ThenBy(i => i.StartTime)
             .ToList();
-    }
-
-    public async Task<Result> SubmitAssignmentAsync(Guid assignmentId, SubmitAssignmentRequest request, CancellationToken ct = default)
-    {
-        var studentResult = await GetLinkedStudentAsync(ct);
-        if (studentResult.IsFailure)
-            return Result.Failure(studentResult.Error);
-        var student = studentResult.Value;
-
-        var assignment = await context.Assignments.AsNoTracking().FirstOrDefaultAsync(a => a.Id == assignmentId, ct);
-        if (assignment is null)
-            return Result.Failure(Error.NotFound("Assignment.NotFound", "Không tìm thấy bài tập."));
-
-        var enrolled = (await relationCleanup.LoadValidActiveStudentIdsByClassesAsync([assignment.ClassId], ct))
-            .Contains(student.Id);
-        if (!enrolled)
-            return Result.Failure(Error.Forbidden("Assignment.NotInClass", "Bài tập không thuộc lớp của bạn."));
-
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        var sub = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == student.Id, ct);
-        var isNew = sub is null;
-        if (sub is null)
-        {
-            sub = new Submission { AssignmentId = assignmentId, StudentId = student.Id };
-            context.Submissions.Add(sub);
-        }
-
-        void Apply(Submission s)
-        {
-            s.Status = assignment.DueDate is not null && today > assignment.DueDate ? SubmissionStatus.Late : SubmissionStatus.Submitted;
-            s.SubmittedOn = today;
-            s.Link = request.Link?.Trim();
-            s.Note = request.Note?.Trim();
-        }
-
-        Apply(sub);
-
-        try
-        {
-            await context.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException) when (isNew)
-        {
-            // Đua check-then-insert: bản ghi nộp đã tồn tại (vi phạm unique (AssignmentId, StudentId))
-            // → tách bản mới, nạp lại bản hiện có rồi ghi đè nội dung nộp mới nhất.
-            context.Entry(sub).State = EntityState.Detached;
-            var existing = await context.Submissions.FirstOrDefaultAsync(s => s.AssignmentId == assignmentId && s.StudentId == student.Id, ct);
-            if (existing is null)
-                throw;
-            Apply(existing);
-            await context.SaveChangesAsync(ct);
-        }
-        return Result.Success();
     }
 
     private async Task<Result<Student>> GetLinkedStudentAsync(CancellationToken ct)

@@ -2,7 +2,6 @@ using HungSilver.Application.Abstractions;
 using HungSilver.Application.Account;
 using HungSilver.Application.Accounts;
 using HungSilver.Application.AiCredentials;
-using HungSilver.Application.Assignments;
 using HungSilver.Application.Auth;
 using HungSilver.Application.Exams;
 using HungSilver.Application.Files;
@@ -12,6 +11,7 @@ using HungSilver.Application.Users;
 using HungSilver.Application.Classes;
 using HungSilver.Application.Dashboard;
 using HungSilver.Application.Evaluations;
+using HungSilver.Application.Materials;
 using HungSilver.Application.Notifications;
 using HungSilver.Application.Portal;
 using HungSilver.Application.Reports;
@@ -26,7 +26,6 @@ using HungSilver.Infrastructure.Ai;
 using HungSilver.Infrastructure.AiCredentials;
 using HungSilver.Infrastructure.Documents;
 using HungSilver.Infrastructure.Exams;
-using HungSilver.Infrastructure.Assignments;
 using HungSilver.Infrastructure.Auth;
 using HungSilver.Infrastructure.Classes;
 using HungSilver.Infrastructure.Common;
@@ -34,6 +33,7 @@ using HungSilver.Infrastructure.Dashboard;
 using HungSilver.Infrastructure.Evaluations;
 using HungSilver.Infrastructure.Identity;
 using HungSilver.Infrastructure.Account;
+using HungSilver.Infrastructure.Materials;
 using HungSilver.Infrastructure.Notifications;
 using HungSilver.Infrastructure.Reports;
 using HungSilver.Infrastructure.Portal;
@@ -155,6 +155,10 @@ public static class DependencyInjection
         // Chốt lượt làm bài bỏ dở (tự chấm AutoSubmitted khi quá hạn giờ làm).
         services.AddHostedService<ExamAttemptFinalizeService>();
 
+        // Giao tài liệu cho lớp + portal học viên xem (2026-07-16)
+        services.AddScoped<IMaterialAssignmentService, MaterialAssignmentService>();
+        services.AddScoped<IPortalMaterialService, PortalMaterialService>();
+
         // Service nghiệp vụ (Infrastructure)
         services.AddScoped<IClassService, ClassService>();
         services.AddScoped<IScheduleService, ScheduleService>();
@@ -167,7 +171,6 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IWarningsService, WarningsService>();
         services.AddScoped<IPortalService, PortalService>();
-        services.AddScoped<IAssignmentService, AssignmentService>();
         services.AddScoped<IStudentImportService, StudentImportService>();
         services.AddScoped<IStudentAccountService, StudentAccountService>();
         services.AddScoped<IClassImportService, ClassImportService>();

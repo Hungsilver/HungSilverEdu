@@ -13,7 +13,10 @@ namespace HungSilver.WebApi.Controllers;
 [ApiController]
 [Route("api/materials")]
 [Authorize(Policy = "TeacherOrAdmin")]
-public class MaterialsController(IMaterialService materialService, IFileService fileService) : ControllerBase
+public class MaterialsController(
+    IMaterialService materialService,
+    IFileService fileService,
+    IMaterialAssignmentService assignmentService) : ControllerBase
 {
     private const long MaxCoverBytes = 10L * 1024 * 1024; // giống avatar (ProfileController)
     private static readonly string[] CoverImageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
@@ -35,6 +38,31 @@ public class MaterialsController(IMaterialService materialService, IFileService 
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult> Delete(Guid id, CancellationToken ct) =>
         (await materialService.DeleteAsync(id, ct)).ToActionResult();
+
+    // ---- Giao tài liệu cho lớp (mirror giao đề ở ExamsController) ----
+
+    /// <summary>Giao tài liệu cho lớp (tùy chọn gắn buổi học) — học viên xem ở Portal.</summary>
+    [HttpPost("{id:guid}/assign")]
+    public async Task<ActionResult<MaterialAssignmentDto>> Assign(Guid id, AssignMaterialRequest request, CancellationToken ct) =>
+        (await assignmentService.AssignAsync(id, request, ct)).ToActionResult();
+
+    [HttpGet("assignments/by-class/{classId:guid}")]
+    public async Task<ActionResult<List<MaterialAssignmentDto>>> AssignmentsByClass(Guid classId, CancellationToken ct) =>
+        (await assignmentService.ListByClassAsync(classId, ct)).ToActionResult();
+
+    [HttpGet("assignments/by-session/{sessionId:guid}")]
+    public async Task<ActionResult<List<MaterialAssignmentDto>>> AssignmentsBySession(Guid sessionId, CancellationToken ct) =>
+        (await assignmentService.ListBySessionAsync(sessionId, ct)).ToActionResult();
+
+    /// <summary>Thu hồi lượt giao (xóa mềm) — tài liệu biến mất khỏi Portal của lớp.</summary>
+    [HttpDelete("assignments/{id:guid}")]
+    public async Task<ActionResult> RemoveAssignment(Guid id, CancellationToken ct) =>
+        (await assignmentService.RemoveAsync(id, ct)).ToActionResult();
+
+    /// <summary>Trạng thái đã xem per-student của một lượt giao.</summary>
+    [HttpGet("assignments/{id:guid}/viewers")]
+    public async Task<ActionResult<List<MaterialAssignmentViewerDto>>> AssignmentViewers(Guid id, CancellationToken ct) =>
+        (await assignmentService.GetViewersAsync(id, ct)).ToActionResult();
 
     /// <summary>
     /// Upload ảnh bìa tài liệu (chỉ ảnh; lưu server bất kể FileStorage.Mode — mirror avatar;
