@@ -23,7 +23,7 @@ public sealed class ExamsControllerUploadTests
     {
         var sourceMaterialId = Guid.NewGuid();
         var materialService = new FakeMaterialService(new MaterialDto(
-            sourceMaterialId, "TL0001", null, Guid.NewGuid(), null, null,
+            sourceMaterialId, "TL0001", null, Guid.NewGuid(), null, null, null,
             Guid.NewGuid(), "Tiếng Anh", "10", "Unit 3",
             MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.docx", null, null, "/api/files/x", DateTime.Now));
         var files = new FakeFileService(Guid.NewGuid());
@@ -52,7 +52,7 @@ public sealed class ExamsControllerUploadTests
     {
         var sourceMaterialId = Guid.NewGuid();
         var materialService = new FakeMaterialService(new MaterialDto(
-            sourceMaterialId, "TL0002", null, null, Guid.NewGuid(), "Đề kiểm tra",
+            sourceMaterialId, "TL0002", null, null, null, Guid.NewGuid(), "Đề kiểm tra",
             Guid.NewGuid(), "Tiếng Anh", "9", "Tài liệu chung",
             MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.pdf", null, null, "/api/files/x", DateTime.Now));
         var jobs = new FakeJobService();

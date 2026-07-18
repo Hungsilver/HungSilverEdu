@@ -962,6 +962,8 @@ export interface Material {
   code: string;
   classId: string | null;
   folderId: string | null;
+  /** Unit chứa tài liệu (chỉ có nghĩa khi thuộc bộ); null = chưa thuộc Unit. */
+  unitId: string | null;
   categoryId: string | null;
   categoryName: string | null;
   subjectId: string | null;
@@ -990,6 +992,8 @@ export interface CreateMaterialRequest {
   coverFileId: string | null;
   /** Có giá trị ⇒ tài liệu thuộc bộ (Môn/Khối snapshot từ bộ); null ⇒ Tài liệu chung. */
   folderId?: string | null;
+  /** Unit trong bộ (phải thuộc đúng bộ folderId); null/bỏ trống = chưa thuộc Unit. */
+  unitId?: string | null;
 }
 
 export interface UpdateMaterialRequest {
@@ -1003,6 +1007,7 @@ export interface UpdateMaterialRequest {
   description: string | null;
   coverFileId: string | null;
   folderId?: string | null;
+  unitId?: string | null;
 }
 
 /** Bộ lọc danh sách tài liệu (phân trang) — Kho tài liệu. */
@@ -1015,6 +1020,10 @@ export interface MaterialPagedFilter {
   folderId?: string | null;
   /** true = chỉ Tài liệu chung (không thuộc bộ nào). */
   generalOnly?: boolean;
+  /** Lọc tài liệu trong 1 unit cụ thể. */
+  unitId?: string | null;
+  /** true = chỉ tài liệu chưa thuộc unit nào trong bộ (bỏ qua khi có unitId). */
+  noUnit?: boolean;
   page: number;
   pageSize: number;
 }
@@ -1030,6 +1039,7 @@ export interface MaterialFolder {
   coverFileId: string | null;
   description: string | null;
   materialCount: number;
+  unitCount: number;
   createdAt: string;
 }
 
@@ -1051,6 +1061,35 @@ export interface MaterialSubjectSummary {
   folderCount: number;
   materialCount: number;
 }
+
+// ---- Unit/Chương trong bộ (MaterialUnit) — Bộ → Unit → Tài liệu ----
+
+export enum MaterialUnitKind {
+  Unit = 'Unit',
+  Review = 'Review'
+}
+
+/** unitNo derive server-side theo vị trí (Unit đếm 1,2,3…; Review đếm 1,2… riêng) — không lưu DB. */
+export interface MaterialUnit {
+  id: string;
+  folderId: string;
+  kind: MaterialUnitKind;
+  name: string;
+  unitNo: number;
+  sortOrder: number;
+  materialCount: number;
+  createdAt: string;
+}
+
+export interface CreateMaterialUnitRequest {
+  folderId: string;
+  kind: MaterialUnitKind;
+  /** Unit thường bắt buộc; Review cho phép trống (hiển thị "Review 1"). */
+  name: string | null;
+}
+
+/** Không có folderId — unit thuộc bộ bất biến; thứ tự đổi qua reorderUnits. */
+export type UpdateMaterialUnitRequest = Omit<CreateMaterialUnitRequest, 'folderId'>;
 
 // ----------------- Nhập danh sách lớp từ Excel (Đợt 7) -----------------
 

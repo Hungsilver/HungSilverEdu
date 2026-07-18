@@ -3,9 +3,10 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  AssignMaterialRequest, CreateMaterialFolderRequest, CreateMaterialRequest, Material, MaterialAssignment,
-  MaterialAssignmentViewer, MaterialCategory, MaterialCategoryRequest, MaterialFolder, MaterialPagedFilter,
-  MaterialSubjectSummary, PagedResult, StoredFile, UpdateMaterialFolderRequest, UpdateMaterialRequest
+  AssignMaterialRequest, CreateMaterialFolderRequest, CreateMaterialRequest, CreateMaterialUnitRequest, Material,
+  MaterialAssignment, MaterialAssignmentViewer, MaterialCategory, MaterialCategoryRequest, MaterialFolder,
+  MaterialPagedFilter, MaterialSubjectSummary, MaterialUnit, PagedResult, StoredFile, UpdateMaterialFolderRequest,
+  UpdateMaterialRequest, UpdateMaterialUnitRequest
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -14,6 +15,7 @@ export class MaterialsService {
   private readonly apiUrl = `${environment.apiUrl}/materials`;
   private readonly catUrl = `${environment.apiUrl}/material-categories`;
   private readonly folderUrl = `${environment.apiUrl}/material-folders`;
+  private readonly unitUrl = `${environment.apiUrl}/material-units`;
 
   /** Danh sách tất cả tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên. */
   getPaged(filter: MaterialPagedFilter): Observable<PagedResult<Material>> {
@@ -24,6 +26,8 @@ export class MaterialsService {
     if (filter.gradeBand) params = params.set('gradeBand', filter.gradeBand);
     if (filter.folderId) params = params.set('folderId', filter.folderId);
     if (filter.generalOnly) params = params.set('generalOnly', 'true');
+    if (filter.unitId) params = params.set('unitId', filter.unitId);
+    if (filter.noUnit) params = params.set('noUnit', 'true');
     return this.http.get<PagedResult<Material>>(this.apiUrl, { params });
   }
 
@@ -83,6 +87,11 @@ export class MaterialsService {
     return this.http.get<MaterialFolder[]>(this.folderUrl, { params });
   }
 
+  /** Một bộ theo id — màn chi tiết bộ (deep-link/F5) nạp trực tiếp. */
+  getFolder(id: string): Observable<MaterialFolder> {
+    return this.http.get<MaterialFolder>(`${this.folderUrl}/${id}`);
+  }
+
   createFolder(request: CreateMaterialFolderRequest): Observable<MaterialFolder> {
     return this.http.post<MaterialFolder>(this.folderUrl, request);
   }
@@ -93,6 +102,31 @@ export class MaterialsService {
 
   deleteFolder(id: string): Observable<void> {
     return this.http.delete<void>(`${this.folderUrl}/${id}`);
+  }
+
+  // ---- Unit/Chương trong bộ (MaterialUnit) — Bộ → Unit → Tài liệu ----
+
+  /** Danh sách unit của một bộ, server đã sort + đánh số hiển thị (Unit 1/2…, Review 1/2… đếm riêng). */
+  getUnits(folderId: string): Observable<MaterialUnit[]> {
+    const params = new HttpParams().set('folderId', folderId);
+    return this.http.get<MaterialUnit[]>(this.unitUrl, { params });
+  }
+
+  createUnit(request: CreateMaterialUnitRequest): Observable<MaterialUnit> {
+    return this.http.post<MaterialUnit>(this.unitUrl, request);
+  }
+
+  updateUnit(id: string, request: UpdateMaterialUnitRequest): Observable<MaterialUnit> {
+    return this.http.put<MaterialUnit>(`${this.unitUrl}/${id}`, request);
+  }
+
+  deleteUnit(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.unitUrl}/${id}`);
+  }
+
+  /** Sắp xếp lại toàn bộ unit của bộ trong 1 call — orderedIds phải khớp chính xác tập unit hiện có. */
+  reorderUnits(folderId: string, orderedIds: string[]): Observable<MaterialUnit[]> {
+    return this.http.put<MaterialUnit[]>(`${this.unitUrl}/reorder`, { folderId, orderedIds });
   }
 
   // ---- Loại tài liệu (MaterialCategory) ----

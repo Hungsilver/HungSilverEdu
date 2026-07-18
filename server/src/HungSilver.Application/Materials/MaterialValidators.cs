@@ -38,6 +38,39 @@ public sealed class UpdateMaterialRequestValidator : AbstractValidator<UpdateMat
     }
 }
 
+// ----------------- Unit/Chương trong bộ (MaterialUnit) -----------------
+
+public sealed class CreateMaterialUnitRequestValidator : AbstractValidator<CreateMaterialUnitRequest>
+{
+    public CreateMaterialUnitRequestValidator()
+    {
+        RuleFor(x => x.FolderId).Must(id => id != Guid.Empty).WithMessage("Thiếu bộ tài liệu chứa unit.");
+        // Unit thường bắt buộc tên chủ đề; Review cho phép trống (hiển thị "Review 1").
+        RuleFor(x => x.Name).NotEmpty().WithMessage("Nhập tên chủ đề cho Unit.")
+            .When(x => x.Kind == MaterialUnitKind.Unit);
+        RuleFor(x => x.Name).MaximumLength(200);
+    }
+}
+
+public sealed class UpdateMaterialUnitRequestValidator : AbstractValidator<UpdateMaterialUnitRequest>
+{
+    public UpdateMaterialUnitRequestValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty().WithMessage("Nhập tên chủ đề cho Unit.")
+            .When(x => x.Kind == MaterialUnitKind.Unit);
+        RuleFor(x => x.Name).MaximumLength(200);
+    }
+}
+
+public sealed class ReorderMaterialUnitsRequestValidator : AbstractValidator<ReorderMaterialUnitsRequest>
+{
+    public ReorderMaterialUnitsRequestValidator()
+    {
+        RuleFor(x => x.FolderId).Must(id => id != Guid.Empty).WithMessage("Thiếu bộ tài liệu cần sắp xếp.");
+        RuleFor(x => x.OrderedIds).NotEmpty().WithMessage("Danh sách sắp xếp trống.");
+    }
+}
+
 // ----------------- Bộ tài liệu (MaterialFolder) -----------------
 
 public sealed class CreateMaterialFolderRequestValidator : AbstractValidator<CreateMaterialFolderRequest>

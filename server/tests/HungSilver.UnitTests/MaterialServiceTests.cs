@@ -58,6 +58,7 @@ public sealed class MaterialServiceTests : IDisposable
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
         new Repository<MaterialFolder>(_context),
+        new Repository<MaterialUnit>(_context),
         new AdminGuard(),
         new CurrentRelationCleanupService(_context),
         new UnitOfWork(_context),

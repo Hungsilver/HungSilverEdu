@@ -804,3 +804,152 @@ body.theme-dark {
   justify-content: center;
   margin-top: 16px;
 }
+
+/* ============================================================================
+   Kho tài liệu — flow "sách giáo khoa" (cam + xanh lá, kiểu Sách Mềm)
+   Scope class .hs-mat-theme gắn ở host của folder-detail.page (+ dùng chung
+   cho card sách ở tab Tài liệu môn học). Dark override qua body.theme-dark.
+   ========================================================================== */
+.hs-mat-theme {
+  --hs-mat-orange: #f4802a;         /* thanh Review, chip số, header Unit, nút Home/back */
+  --hs-mat-orange-strong: #d9670f;  /* hover/active cam */
+  --hs-mat-green: #7a9e3f;          /* thanh Unit, sidebar Tài nguyên khác */
+  --hs-mat-green-strong: #5f7f2e;   /* hover thanh Unit */
+  --hs-mat-green-text: #5f8329;     /* chữ bài học trên panel sáng (đủ contrast) */
+  --hs-mat-teal: #1f7a8c;           /* chip số ở header chi tiết Unit */
+  --hs-mat-panel: rgba(255, 255, 255, 0.8);
+  --hs-mat-hero-overlay: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.52));
+  --hs-mat-title: #14182b;
+  --hs-mat-subtitle: rgba(20, 24, 43, 0.65);
+  --hs-mat-side-title: #ffe3c2;     /* tiêu đề cam nhạt trên nền sidebar xanh */
+  --hs-mat-badge-bg: #8c95a3;       /* badge "N UNIT" trên card sách */
+}
+body.theme-dark .hs-mat-theme {
+  --hs-mat-orange: #c96a1d;
+  --hs-mat-orange-strong: #a85512;
+  --hs-mat-green: #64832f;
+  --hs-mat-green-strong: #4e6824;
+  --hs-mat-green-text: #9dc25a;
+  --hs-mat-teal: #2b8ba0;
+  --hs-mat-panel: rgba(30, 27, 46, 0.85);
+  --hs-mat-hero-overlay: linear-gradient(180deg, rgba(20, 18, 31, 0.5), rgba(20, 18, 31, 0.72));
+  --hs-mat-title: #f4f4f8;
+  --hs-mat-subtitle: rgba(244, 244, 248, 0.7);
+  --hs-mat-side-title: #ffd9ac;
+  --hs-mat-badge-bg: #5a6072;
+}
+
+/* ---- Màn immersive chi tiết Bộ/Unit (folder-detail.page, host .hs-mat-theme) ---- */
+.hs-mat-theme {
+  /* Khung trang: full-bleed trong .app-content (padding 16/14) */
+  .fd-page { position: relative; margin: -16px; min-height: calc(100% + 32px); padding: 20px 24px 32px; overflow: hidden; }
+  .fd-hero-bg { position: absolute; inset: 0; z-index: 0;
+    background: linear-gradient(160deg, #fff3d6 0%, #ffd98e 45%, #f6b352 100%);
+    background-size: cover; background-position: center; }
+  .has-cover .fd-hero-bg { filter: blur(24px) saturate(1.15); transform: scale(1.15); }
+  .fd-hero-overlay { position: absolute; inset: 0; z-index: 0; background: var(--hs-mat-hero-overlay); }
+  .fd-top, .fd-body { position: relative; z-index: 1; }
+
+  /* Header: nút Home tròn + tên bộ */
+  .fd-top { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+  .fd-home { width: 44px; height: 44px; min-width: 44px; font-size: 20px; border: 3px solid #fff;
+    background: var(--hs-mat-orange); color: #fff; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); }
+  .fd-home:hover, .fd-home:focus { background: var(--hs-mat-orange-strong); color: #fff; border-color: #fff; }
+  .fd-title { margin: 0; font-size: 26px; line-height: 1.25; color: var(--hs-mat-title); text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35); }
+  .fd-sub { color: var(--hs-mat-subtitle); font-weight: 600; margin-top: 2px; }
+
+  /* Bố cục panel + sidebar */
+  .fd-body { display: flex; gap: 16px; align-items: flex-start; }
+  .fd-panel { flex: 1; min-width: 0; background: var(--hs-mat-panel); backdrop-filter: blur(8px);
+    border-radius: 16px; padding: 20px 24px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
+  .fd-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
+  /* Mức 3: 2 cột thanh Unit */
+  .unit-cols { display: flex; gap: 14px; }
+  .unit-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .unit-bar { position: relative; display: flex; align-items: center; gap: 10px; min-height: 46px;
+    padding: 8px 12px 8px 14px; border-radius: 8px; cursor: pointer;
+    background: var(--hs-mat-green); color: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s; }
+  .unit-bar:hover, .unit-bar:focus-visible { background: var(--hs-mat-green-strong); transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+  .unit-bar.is-review { background: var(--hs-mat-orange); justify-content: center; text-transform: uppercase;
+    font-weight: 700; letter-spacing: 0.4px; }
+  .unit-bar.is-review:hover, .unit-bar.is-review:focus-visible { background: var(--hs-mat-orange-strong); }
+  .unit-label { font-weight: 700; font-size: 15px; }
+  .unit-no { background: var(--hs-mat-orange); color: #fff; font-weight: 800; font-size: 19px; line-height: 1;
+    padding: 9px 11px; border-radius: 4px; margin-top: -18px; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25); }
+  .unit-name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+  .unit-bar.is-review .unit-name { font-weight: 700; }
+  .unit-count { margin-left: auto; background: rgba(255, 255, 255, 0.25); border-radius: 999px;
+    min-width: 24px; text-align: center; font-size: 12px; font-weight: 700; padding: 2px 7px; }
+  .unit-bar.is-review .unit-count { margin-left: 0; }
+  .unit-actions { display: inline-flex; opacity: 0; transition: opacity 0.15s;
+    button { color: #fff; }
+    button[disabled] { color: rgba(255, 255, 255, 0.35); }
+  }
+  .unit-bar:hover .unit-actions, .unit-bar:focus-within .unit-actions { opacity: 1; }
+
+  /* Mức 4: header cam + danh sách bài học */
+  .unit-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--hs-mat-orange); color: #fff; border-radius: 10px; padding: 10px 16px; margin-bottom: 18px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15); }
+  .fd-back { width: 38px; height: 38px; min-width: 38px; border: 3px solid #fff;
+    background: var(--hs-mat-orange); color: #fff; }
+  .fd-back:hover, .fd-back:focus { background: var(--hs-mat-orange-strong); color: #fff; border-color: #fff; }
+  .uh-label { font-weight: 700; font-size: 17px; }
+  .uh-no { background: var(--hs-mat-teal); color: #fff; font-weight: 800; font-size: 21px; line-height: 1;
+    padding: 9px 13px; border-radius: 4px; margin-top: -20px; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25); }
+  .uh-name { font-weight: 700; font-size: 17px; overflow-wrap: anywhere; }
+  .uh-add { border-color: #fff; color: #fff; }
+  .uh-add:hover { border-color: #fff; color: var(--hs-mat-orange); background: #fff; }
+
+  .lesson-list { display: flex; flex-direction: column; }
+  .lesson-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 9px 4px;
+    border-radius: 8px; transition: background 0.15s; }
+  .lesson-row:hover { background: rgba(0, 0, 0, 0.04); }
+  .lesson-title { color: var(--hs-mat-green-text); font-weight: 800; font-size: 18px; text-transform: uppercase;
+    letter-spacing: 0.3px; cursor: pointer; }
+  .lesson-title:hover { color: var(--hs-mat-orange); }
+  .lesson-desc { color: var(--hs-text-muted); font-size: 13px; }
+  .lesson-actions { display: inline-flex; align-items: center; opacity: 0; transition: opacity 0.15s; margin-left: auto; }
+  .lesson-row:hover .lesson-actions, .lesson-row:focus-within .lesson-actions { opacity: 1; }
+
+  /* Sidebar "Tài nguyên khác" */
+  .fd-side { flex: 0 0 235px; background: var(--hs-mat-green); border-radius: 16px; padding: 16px 14px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1); }
+  .side-title { color: var(--hs-mat-side-title); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+  .side-hint { color: rgba(255, 255, 255, 0.75); font-size: 12px; margin: 2px 0 12px; }
+  .side-item { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+  .side-link { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 8px;
+    color: #fff; font-weight: 600; cursor: pointer;
+    span { overflow-wrap: anywhere; }
+  }
+  .side-link:hover { color: var(--hs-mat-side-title); }
+  .side-more { color: #fff; }
+  .side-empty { color: rgba(255, 255, 255, 0.75); font-size: 13px; }
+  .side-add { margin-top: 12px; background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.5); color: #fff; }
+  .side-add:hover { background: rgba(255, 255, 255, 0.28); border-color: #fff; color: #fff; }
+
+  @media (hover: none) {
+    .unit-actions, .lesson-actions { opacity: 1; }
+  }
+  @media (max-width: 991px) {
+    .fd-body { flex-direction: column; }
+    .fd-side { flex: none; width: 100%; }
+  }
+  @media (max-width: 767px) {
+    .unit-cols { flex-direction: column; gap: 12px; }
+  }
+  @media (max-width: 575px) {
+    .fd-page { margin: -14px; min-height: calc(100% + 28px); padding: 14px 14px 24px; }
+    .fd-title { font-size: 21px; }
+    .fd-home { width: 38px; height: 38px; min-width: 38px; font-size: 17px; }
+    .fd-panel { padding: 14px; }
+    .uh-no { margin-top: 0; }
+    .unit-no { margin-top: -14px; }
+    .lesson-title { font-size: 16px; }
+    .lesson-actions { margin-left: 0; }
+    .uh-add .btn-text { display: none; }
+  }
+}

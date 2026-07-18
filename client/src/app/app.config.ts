@@ -12,7 +12,9 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import {
   ApartmentOutline,
   AppstoreOutline,
+  ArrowDownOutline,
   ArrowLeftOutline,
+  ArrowUpOutline,
   AuditOutline,
   BankOutline,
   BarChartOutline,
@@ -43,6 +45,7 @@ import {
   FullscreenOutline,
   GiftOutline,
   HolderOutline,
+  HomeOutline,
   IdcardOutline,
   InsertRowRightOutline,
   KeyOutline,
@@ -55,6 +58,7 @@ import {
   MailOutline,
   MenuOutline,
   MinusOutline,
+  MoreOutline,
   PictureOutline,
   PlusOutline,
   ReadOutline,
@@ -122,7 +126,9 @@ export const appConfig: ApplicationConfig = {
       // Ngân hàng câu hỏi + ảnh bìa tài liệu + bộ tài liệu:
       CheckSquareOutline, FileAddOutline, PictureOutline, FolderOpenOutline,
       // Section Bài tập buổi học + trình xem tài liệu fullscreen:
-      UpOutline, FullscreenOutline
+      UpOutline, FullscreenOutline,
+      // Kho tài liệu — màn chi tiết Bộ/Unit kiểu sách (2026-07-18):
+      HomeOutline, ArrowUpOutline, ArrowDownOutline, MoreOutline
     ]),
     // Theme "Indigo học thuật" — recolor toàn bộ component ng-zorro qua CSS-variable theme.
     provideNzConfig({

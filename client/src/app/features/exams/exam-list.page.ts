@@ -32,7 +32,7 @@ import { PageHeader } from '../../shared/page-header';
   ],
   template: `
     <app-page-header [title]="headerTitle()" subtitle="Bộ đề trắc nghiệm sinh từ tài liệu" icon="file-text">
-      <a nz-button routerLink="/materials" [queryParams]="backParams()"><nz-icon nzType="arrow-left" /> Kho tài liệu</a>
+      <a nz-button [routerLink]="backLink()" [queryParams]="backQuery()"><nz-icon nzType="arrow-left" /> Kho tài liệu</a>
       <button nz-button (click)="openUploadGenerate()"><nz-icon nzType="upload" /> Tạo đề từ file upload</button>
       <button nz-button nzType="primary" (click)="openGenerate()"><nz-icon nzType="robot" /> Tạo đề bằng AI</button>
     </app-page-header>
@@ -197,20 +197,42 @@ export class ExamListPage implements OnInit, OnDestroy {
 
   readonly materialId = input.required<string>();
   readonly title2 = input<string>('', { alias: 'title' });
-  // Ngữ cảnh Kho tài liệu (query param) — để nút back quay về đúng tab/bộ đang xem.
+  // Ngữ cảnh Kho tài liệu (query param) — để nút back quay về đúng tab/bộ/unit đang xem.
   readonly tab = input<string | undefined>();
   readonly subjectId = input<string | undefined>();
   readonly folderId = input<string | undefined>();
+  readonly unitId = input<string | undefined>();
 
-  /** Query params cho nút back — chỉ gồm param có giá trị (không có ⇒ về mặc định /materials). */
+  /** Query params chuyển tiếp ngữ cảnh (exam-list → exam-detail) — chỉ gồm param có giá trị. */
   protected readonly backParams = computed(() => {
     const p: Record<string, string> = {};
     const tab = this.tab();
     const subjectId = this.subjectId();
     const folderId = this.folderId();
+    const unitId = this.unitId();
     if (tab) p['tab'] = tab;
     if (subjectId) p['subjectId'] = subjectId;
     if (folderId) p['folderId'] = folderId;
+    if (unitId) p['unitId'] = unitId;
+    return p;
+  });
+
+  /** Nút back: có folderId → màn immersive /materials/folders/:id, không → tab Kho tài liệu cũ. */
+  protected readonly backLink = computed(() =>
+    this.folderId() ? ['/materials/folders', this.folderId()!] : ['/materials']);
+  protected readonly backQuery = computed(() => {
+    const p: Record<string, string> = {};
+    const folderId = this.folderId();
+    const subjectId = this.subjectId();
+    if (folderId) {
+      if (subjectId) p['subjectId'] = subjectId;
+      const unitId = this.unitId();
+      if (unitId) p['unitId'] = unitId;
+      return p;
+    }
+    const tab = this.tab();
+    if (tab) p['tab'] = tab;
+    if (subjectId) p['subjectId'] = subjectId;
     return p;
   });
 

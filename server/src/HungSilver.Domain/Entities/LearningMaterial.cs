@@ -18,6 +18,9 @@ public class LearningMaterial : BaseEntity
     /// <summary>Bộ tài liệu chứa tài liệu này (MaterialFolder.Id, không khóa ngoại). Null = "Tài liệu chung".</summary>
     public Guid? FolderId { get; set; }
 
+    /// <summary>Unit chứa tài liệu (MaterialUnit.Id, không khóa ngoại). Chỉ có nghĩa khi có FolderId; null = chưa thuộc Unit.</summary>
+    public Guid? UnitId { get; set; }
+
     /// <summary>Khối (snapshot tên từ danh mục Khối GradeCategory). Tùy chọn.</summary>
     public string? GradeBand { get; set; }
 

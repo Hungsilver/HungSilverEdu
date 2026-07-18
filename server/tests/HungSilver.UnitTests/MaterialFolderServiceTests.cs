@@ -46,6 +46,7 @@ public sealed class MaterialFolderServiceTests : IDisposable
     private MaterialFolderService NewService() => new(
         new Repository<MaterialFolder>(_context),
         new Repository<LearningMaterial>(_context),
+        new Repository<MaterialUnit>(_context),
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
         new UnitOfWork(_context),

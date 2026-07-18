@@ -116,6 +116,13 @@ export const routes: Routes = [
         data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
         loadComponent: () => import('./features/materials/materials.page').then(m => m.MaterialsPage)
       },
+      // Màn immersive chi tiết Bộ (units) + chi tiết Unit — đặt TRƯỚC materials/:materialId/exams.
+      {
+        path: 'materials/folders/:folderId',
+        canActivate: [roleGuard],
+        data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
+        loadComponent: () => import('./features/materials/folder-detail.page').then(m => m.FolderDetailPage)
+      },
       {
         path: 'materials/:materialId/exams',
         canActivate: [roleGuard],

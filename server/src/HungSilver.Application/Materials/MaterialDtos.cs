@@ -7,6 +7,7 @@ public sealed record MaterialDto(
     string Code,
     Guid? ClassId,
     Guid? FolderId,
+    Guid? UnitId,
     Guid? CategoryId,
     string? CategoryName,
     Guid? SubjectId,
@@ -22,7 +23,8 @@ public sealed record MaterialDto(
     string DownloadUrl,
     DateTime CreatedAt);
 
-/// <summary>Có FolderId ⇒ tài liệu thuộc bộ: Môn/Khối snapshot TỪ BỘ (bỏ qua giá trị client gửi), Loại không bắt buộc.</summary>
+/// <summary>Có FolderId ⇒ tài liệu thuộc bộ: Môn/Khối snapshot TỪ BỘ (bỏ qua giá trị client gửi), Loại không bắt buộc.
+/// UnitId chỉ có nghĩa khi có FolderId và unit phải thuộc đúng bộ đó.</summary>
 public sealed record CreateMaterialRequest(
     Guid? CategoryId,
     Guid? SubjectId,
@@ -33,7 +35,8 @@ public sealed record CreateMaterialRequest(
     Guid? StoredFileId,
     string? Description,
     Guid? CoverFileId,
-    Guid? FolderId = null);
+    Guid? FolderId = null,
+    Guid? UnitId = null);
 
 public sealed record UpdateMaterialRequest(
     Guid? CategoryId,
@@ -45,9 +48,11 @@ public sealed record UpdateMaterialRequest(
     Guid? StoredFileId,
     string? Description,
     Guid? CoverFileId,
-    Guid? FolderId = null);
+    Guid? FolderId = null,
+    Guid? UnitId = null);
 
-/// <summary>Bộ lọc danh sách tài liệu — FolderId ưu tiên; GeneralOnly=true chỉ lấy tài liệu chung (FolderId null).</summary>
+/// <summary>Bộ lọc danh sách tài liệu — FolderId ưu tiên; GeneralOnly=true chỉ lấy tài liệu chung (FolderId null);
+/// UnitId lọc theo unit trong bộ; NoUnit=true chỉ lấy tài liệu chưa thuộc unit (bỏ qua khi UnitId cụ thể).</summary>
 public sealed class MaterialListFilter
 {
     public Guid? SubjectId { get; set; }
@@ -55,13 +60,15 @@ public sealed class MaterialListFilter
     public string? GradeBand { get; set; }
     public Guid? FolderId { get; set; }
     public bool GeneralOnly { get; set; }
+    public Guid? UnitId { get; set; }
+    public bool NoUnit { get; set; }
 }
 
 // ----------------- Bộ tài liệu (MaterialFolder) -----------------
 
 public sealed record MaterialFolderDto(
     Guid Id, Guid SubjectId, string SubjectName, string Name, string? GradeBand,
-    Guid? CoverFileId, string? Description, int MaterialCount, DateTime CreatedAt);
+    Guid? CoverFileId, string? Description, int MaterialCount, int UnitCount, DateTime CreatedAt);
 
 public sealed record CreateMaterialFolderRequest(
     Guid SubjectId, string Name, string? GradeBand, Guid? CoverFileId, string? Description);
@@ -72,6 +79,22 @@ public sealed record UpdateMaterialFolderRequest(
 
 /// <summary>Mức 1 "Tài liệu môn học": mỗi môn kèm số bộ + số tài liệu trong các bộ.</summary>
 public sealed record MaterialSubjectSummaryDto(Guid SubjectId, string SubjectName, int FolderCount, int MaterialCount);
+
+// ----------------- Unit/Chương trong bộ (MaterialUnit) -----------------
+
+/// <summary>UnitNo derive server-side theo vị trí SortOrder, đếm riêng từng Kind
+/// (Unit đếm 1,2,3…; Review đếm 1,2… độc lập) — không lưu DB nên reorder/xóa không bao giờ lệch số.</summary>
+public sealed record MaterialUnitDto(
+    Guid Id, Guid FolderId, MaterialUnitKind Kind, string Name,
+    int UnitNo, int SortOrder, int MaterialCount, DateTime CreatedAt);
+
+public sealed record CreateMaterialUnitRequest(Guid FolderId, MaterialUnitKind Kind, string? Name);
+
+/// <summary>Không có FolderId — unit thuộc bộ bất biến. Không có SortOrder — sắp xếp qua endpoint reorder.</summary>
+public sealed record UpdateMaterialUnitRequest(MaterialUnitKind Kind, string? Name);
+
+/// <summary>OrderedIds phải khớp CHÍNH XÁC tập unit đang có của bộ (không thiếu, không thừa, không trùng).</summary>
+public sealed record ReorderMaterialUnitsRequest(Guid FolderId, List<Guid> OrderedIds);
 
 // ----------------- Danh mục học liệu (thư viện) -----------------
 

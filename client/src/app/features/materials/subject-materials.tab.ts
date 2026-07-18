@@ -1,58 +1,53 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
+import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzMessageService } from 'ng-zorro-antd/message';
-import { NzModalModule } from 'ng-zorro-antd/modal';
-import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
+import { NzModalModule, NzModalService } from 'ng-zorro-antd/modal';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
-import { NzTableModule } from 'ng-zorro-antd/table';
-import { NzTagModule } from 'ng-zorro-antd/tag';
-import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
-import { NzUploadFile, NzUploadModule, NzUploadXHRArgs } from 'ng-zorro-antd/upload';
+import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { FilesService } from '../../core/files.service';
 import { MaterialsService } from '../../core/materials.service';
-import { Grade, Material, MaterialFolder, MaterialSource, MaterialSubjectSummary } from '../../core/models';
+import { Grade, MaterialFolder, MaterialSubjectSummary } from '../../core/models';
 import { AvatarCropModal } from '../../shared/avatar-crop-modal';
-import { DocumentPreview } from '../../shared/document-preview';
-import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
-import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
+
+/** Nhóm bộ tài liệu theo Khối — section heading kiểu trang thư viện Sách Mềm. */
+interface FolderGroup {
+  key: string;
+  label: string;
+  folders: MaterialFolder[];
+}
 
 /**
- * Tab "Tài liệu môn học" — điều hướng 3 mức, trạng thái nằm trên URL (?tab=subject&subjectId=&folderId=):
- * Mức 1: lưới Môn học → Mức 2: lưới Bộ tài liệu (vd "Tiếng Anh 10", CRUD + ảnh bìa 16:9) →
- * Mức 3: danh sách tài liệu trong bộ (Unit 1, Unit 2... — nơi upload file; nút "Đề" sinh đề AI từng tài liệu).
- * Tài liệu trong bộ dùng form tối giản — Môn/Khối tự snapshot từ bộ ở server.
+ * Tab "Tài liệu môn học" — 2 mức trong tab, trạng thái nằm trên URL (?tab=subject&subjectId=):
+ * Mức 1: lưới Môn học → Mức 2: lưới "card sách" các Bộ tài liệu nhóm theo Khối (kiểu Sách Mềm).
+ * Click card → màn immersive /materials/folders/:folderId (units + tài liệu — folder-detail.page).
+ * Link cũ ?folderId= được redirect sang route mới (replaceUrl) để bookmark/back-link không vỡ.
  */
 @Component({
   selector: 'app-subject-materials-tab',
+  host: { class: 'hs-mat-theme' },
   imports: [
-    DatePipe, FormsModule, ReactiveFormsModule,
-    NzButtonModule, NzCardModule, NzEmptyModule, NzFormModule, NzIconModule, NzInputModule, NzModalModule,
-    NzPopconfirmModule, NzSelectModule, NzSpinModule, NzTableModule, NzTagModule, NzTooltipModule, NzUploadModule,
-    AvatarCropModal, DocumentPreview, TableDragScroll
+    ReactiveFormsModule,
+    NzButtonModule, NzCardModule, NzDropDownModule, NzEmptyModule, NzFormModule, NzIconModule, NzInputModule,
+    NzModalModule, NzSelectModule, NzSpinModule, NzUploadModule,
+    AvatarCropModal
   ],
   template: `
-    <!-- Breadcrumb tự dựng: Môn học / {Môn} / {Bộ} -->
-    @if (level() > 1) {
+    <!-- Breadcrumb tự dựng: Môn học / {Môn} -->
+    @if (level() === 2) {
       <div class="crumbs">
-        <a (click)="go(null, null)">Môn học</a>
-        @if (level() === 2) {
-          <span class="sep">/</span><span class="current">{{ subjectName() || 'Môn học' }}</span>
-        } @else {
-          <span class="sep">/</span><a (click)="go(subjectId(), null)">{{ subjectName() || 'Môn học' }}</a>
-          <span class="sep">/</span><span class="current">{{ currentFolder()?.name || 'Bộ tài liệu' }}</span>
-        }
+        <a (click)="goSubjects()">Môn học</a>
+        <span class="sep">/</span><span class="current">{{ subjectName() || 'Môn học' }}</span>
       </div>
     }
 
@@ -62,7 +57,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
         @case (1) {
           <div class="material-grid">
             @for (s of summaries(); track s.subjectId) {
-              <nz-card class="subject-card" (click)="go(s.subjectId, null)">
+              <nz-card class="subject-card" (click)="openSubject(s.subjectId)">
                 <div class="subject-icon"><nz-icon nzType="book" /></div>
                 <div class="mc-title">{{ s.subjectName }}</div>
                 <div class="mc-meta">{{ s.folderCount }} bộ tài liệu · {{ s.materialCount }} tài liệu</div>
@@ -73,99 +68,50 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
           </div>
         }
 
-        <!-- ================= MỨC 2: LƯỚI BỘ TÀI LIỆU ================= -->
+        <!-- ================= MỨC 2: LƯỚI "CARD SÁCH" BỘ TÀI LIỆU (nhóm theo Khối) ================= -->
         @case (2) {
           @if (canManage()) {
             <div class="toolbar">
               <button nz-button nzType="primary" (click)="openCreateFolder()"><nz-icon nzType="plus" /> Thêm bộ tài liệu</button>
             </div>
           }
-          <div class="material-grid">
-            @for (f of folders(); track f.id) {
-              <nz-card class="material-card" [nzCover]="fCover"
-                       [nzActions]="canManage() ? [fOpen, fEdit, fDel] : [fOpen]">
-                <div class="mc-head">
-                  @if (f.gradeBand) { <nz-tag nzColor="blue">Khối {{ f.gradeBand }}</nz-tag> }
-                  <nz-tag>{{ f.materialCount }} tài liệu</nz-tag>
-                </div>
-                <div class="mc-title clickable" [title]="f.name" (click)="go(subjectId(), f.id)">{{ f.name }}</div>
-                @if (f.description) { <div class="mc-desc">{{ f.description }}</div> }
-              </nz-card>
-              <ng-template #fCover>
-                @if (f.coverFileId) {
-                  <img class="mc-cover clickable" [src]="filesService.downloadUrl(f.coverFileId)" [alt]="f.name"
-                       loading="lazy" (click)="go(subjectId(), f.id)" />
-                } @else {
-                  <div class="mc-cover-placeholder clickable" aria-hidden="true" (click)="go(subjectId(), f.id)"><nz-icon nzType="folder-open" /></div>
-                }
-              </ng-template>
-              <ng-template #fOpen>
-                <span nz-tooltip nzTooltipTitle="Mở bộ tài liệu" aria-label="Mở bộ tài liệu" (click)="go(subjectId(), f.id)"><nz-icon nzType="eye" /></span>
-              </ng-template>
-              <ng-template #fEdit>
-                <span nz-tooltip nzTooltipTitle="Sửa bộ tài liệu" aria-label="Sửa bộ tài liệu" (click)="openEditFolder(f)"><nz-icon nzType="edit" /></span>
-              </ng-template>
-              <ng-template #fDel>
-                <span class="danger-action" nz-tooltip nzTooltipTitle="Xóa bộ tài liệu" aria-label="Xóa bộ tài liệu"
-                      nz-popconfirm nzPopconfirmTitle="Xóa bộ tài liệu này?" (nzOnConfirm)="removeFolder(f)"><nz-icon nzType="delete" /></span>
-              </ng-template>
-            } @empty {
-              @if (!loading()) { <nz-empty class="grid-empty" nzNotFoundContent="Chưa có bộ tài liệu nào — bấm Thêm bộ tài liệu." /> }
-            }
-          </div>
-        }
-
-        <!-- ================= MỨC 3: DANH SÁCH TÀI LIỆU TRONG BỘ ================= -->
-        @case (3) {
-          <div class="toolbar">
-            <input nz-input class="search" placeholder="Mã hoặc tên tài liệu" [(ngModel)]="search" (keyup.enter)="applySearch()" />
-            <button nz-button (click)="applySearch()"><nz-icon nzType="search" /> Tìm</button>
-            <span class="spacer"></span>
-            @if (canManage()) {
-              <button nz-button nzType="primary" (click)="openCreateMaterial()"><nz-icon nzType="plus" /> Thêm tài liệu</button>
-            }
-          </div>
-          <nz-table #table appTableDragScroll [nzData]="materials()" [nzLoading]="loading()" [nzFrontPagination]="false"
-            [nzPageIndex]="page()" [nzPageSize]="pageSize()" [nzTotal]="total()"
-            nzShowSizeChanger [nzPageSizeOptions]="PAGE_SIZE_OPTIONS"
-            (nzPageIndexChange)="page.set($event); loadMaterials()"
-            (nzPageSizeChange)="pageSize.set($event); page.set(1); loadMaterials()"
-            [nzScroll]="{ x: '820px', y: scrollY }">
-            <thead><tr>
-              <th nzWidth="56px" style="white-space: nowrap">STT</th>
-              <th nzWidth="110px">Mã</th>
-              <th>Tên tài liệu</th>
-              <th nzWidth="220px">Nguồn</th>
-              <th nzWidth="110px">Ngày tạo</th>
-              <th nzRight nzWidth="190px">Thao tác</th>
-            </tr></thead>
-            <tbody>
-              @for (m of table.data; track m.id; let i = $index) {
-                <tr>
-                  <td>{{ (page() - 1) * pageSize() + i + 1 }}</td>
-                  <td><nz-tag>{{ m.code }}</nz-tag></td>
-                  <td>
-                    <div class="row-title">{{ m.title }}</div>
-                    @if (m.description) { <div class="row-desc">{{ m.description }}</div> }
-                  </td>
-                  <td>{{ m.fileName || m.url || '—' }}</td>
-                  <td>{{ m.createdAt | date: 'dd/MM/yyyy' }}</td>
-                  <td nzRight>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Xem tài liệu" aria-label="Xem tài liệu" (click)="openMaterial(m)"><nz-icon nzType="eye" /></button>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Download tài liệu" aria-label="Download tài liệu" (click)="download(m)"><nz-icon nzType="download" /></button>
-                    <button nz-button nzType="link" nzSize="small" (click)="openExams(m)"><nz-icon nzType="file-text" /> Đề</button>
-                    @if (canManage()) {
-                      <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa tài liệu" aria-label="Sửa tài liệu" (click)="openEditMaterial(m)"><nz-icon nzType="edit" /></button>
-                      <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa tài liệu" aria-label="Xóa tài liệu"
-                              nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="removeMaterial(m)"><nz-icon nzType="delete" /></button>
+          @for (group of groupedFolders(); track group.key) {
+            <h3 class="group-heading">{{ group.label }}</h3>
+            <div class="book-grid">
+              @for (f of group.folders; track f.id) {
+                <div class="book-card" tabindex="0" role="button" [attr.aria-label]="'Mở bộ ' + f.name"
+                     (click)="openFolder(f)" (keyup.enter)="openFolder(f)">
+                  <div class="book-cover">
+                    @if (f.coverFileId) {
+                      <img [src]="filesService.downloadUrl(f.coverFileId)" [alt]="f.name" loading="lazy" />
+                    } @else {
+                      <div class="book-cover-ph" aria-hidden="true"><nz-icon nzType="read" /></div>
                     }
-                  </td>
-                </tr>
+                    @if (canManage()) {
+                      <button class="book-menu" nz-button nzShape="circle" nzSize="small" nz-dropdown
+                              [nzDropdownMenu]="menu" nzTrigger="click" aria-label="Thao tác bộ tài liệu"
+                              (click)="$event.stopPropagation()"><nz-icon nzType="more" /></button>
+                      <nz-dropdown-menu #menu="nzDropdownMenu">
+                        <ul nz-menu>
+                          <li nz-menu-item (click)="openEditFolder(f)"><nz-icon nzType="edit" /> Sửa bộ tài liệu</li>
+                          <li nz-menu-item nzDanger (click)="confirmRemoveFolder(f)"><nz-icon nzType="delete" /> Xóa bộ tài liệu</li>
+                        </ul>
+                      </nz-dropdown-menu>
+                    }
+                  </div>
+                  <div class="book-body">
+                    <div class="book-title" [title]="f.name">{{ f.name }}</div>
+                    @if (f.description) { <div class="book-sub">{{ f.description }}</div> }
+                  </div>
+                  <div class="book-foot">
+                    <span class="foot-count"><span class="dot"></span>{{ f.materialCount }} tài liệu</span>
+                    <span class="foot-badge">{{ f.unitCount || 0 }} UNIT</span>
+                  </div>
+                </div>
               }
-            </tbody>
-          </nz-table>
-          @if (!loading() && materials().length === 0) {
-            <p class="muted">Bộ này chưa có tài liệu — bấm <strong>Thêm tài liệu</strong> để upload (Unit 1, Unit 2, Exercise...).</p>
+            </div>
+          } @empty {
+            @if (!loading()) { <nz-empty class="grid-empty" nzNotFoundContent="Chưa có bộ tài liệu nào — bấm Thêm bộ tài liệu." /> }
           }
         }
       }
@@ -205,46 +151,6 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
       </ng-container>
     </nz-modal>
 
-    <!-- Modal thêm/sửa TÀI LIỆU trong bộ (tối giản — Môn/Khối snapshot từ bộ ở server) -->
-    <nz-modal [nzVisible]="materialModalOpen()" [nzTitle]="editingMaterial() ? 'Sửa tài liệu' : 'Thêm tài liệu vào bộ'"
-      [nzOkLoading]="saving()" [nzOkDisabled]="materialForm.invalid" (nzOnOk)="saveMaterial()" (nzOnCancel)="materialModalOpen.set(false)">
-      <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical" [formGroup]="materialForm">
-          @if (editingMaterial(); as m) {
-            <nz-form-item><nz-form-label>Mã tài liệu</nz-form-label>
-              <nz-form-control><input nz-input [value]="m.code" disabled /></nz-form-control></nz-form-item>
-          }
-          <nz-form-item><nz-form-label nzRequired>Tên tài liệu</nz-form-label>
-            <nz-form-control nzErrorTip="Nhập tên tài liệu">
-              <input nz-input formControlName="title" placeholder="VD: Unit 1, Exercise..." /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label nzRequired>Nguồn</nz-form-label>
-            <nz-form-control>
-              <nz-select formControlName="source" class="full">
-                <nz-option [nzValue]="MaterialSource.ExternalUrl" nzLabel="Liên kết (URL)" />
-                @if (serverUploadAllowed()) { <nz-option [nzValue]="MaterialSource.ServerFile" nzLabel="Tải file lên server" /> }
-              </nz-select>
-            </nz-form-control></nz-form-item>
-          @if (materialForm.value.source === MaterialSource.ExternalUrl) {
-            <nz-form-item><nz-form-label nzRequired>Đường dẫn (URL)</nz-form-label>
-              <nz-form-control><input nz-input formControlName="url" placeholder="https://..." /></nz-form-control></nz-form-item>
-          } @else {
-            <nz-form-item><nz-form-label nzRequired>File</nz-form-label>
-              <nz-form-control>
-                <nz-upload [nzCustomRequest]="customUpload" [nzLimit]="1" nzAccept="*">
-                  <button nz-button type="button"><nz-icon nzType="link" /> Chọn file</button>
-                </nz-upload>
-                @if (uploadedFileName()) { <span class="muted">Đã tải: {{ uploadedFileName() }}</span> }
-              </nz-form-control></nz-form-item>
-          }
-          <nz-form-item><nz-form-label>Mô tả</nz-form-label>
-            <nz-form-control><input nz-input formControlName="description" /></nz-form-control></nz-form-item>
-        </form>
-      </ng-container>
-    </nz-modal>
-
-    <!-- Trình xem tài liệu full màn hình -->
-    <app-document-preview />
-
     <!-- Modal crop ảnh bìa bộ 16:9 -->
     <app-avatar-crop-modal
       [visible]="coverCropVisible()" [imageFile]="coverSourceFile()"
@@ -259,37 +165,53 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
     .crumbs a:hover { text-decoration: underline; }
     .crumbs .sep { color: var(--hs-text-muted); }
     .crumbs .current { font-weight: 600; }
-    .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-    .toolbar .search { max-width: 280px; }
-    .toolbar .spacer { flex: 1; }
+    .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; justify-content: flex-end; }
     .full { width: 100%; }
-    .muted { color: var(--hs-text-muted); margin-top: 12px; }
-    .clickable { cursor: pointer; }
 
+    /* ===== Mức 1: lưới Môn (giữ nguyên, polish nhẹ) ===== */
     .material-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; min-height: 120px; }
-    .grid-empty { grid-column: 1 / -1; align-self: center; }
-    .material-card { display: flex; flex-direction: column; }
-    .subject-card { cursor: pointer; text-align: center; transition: box-shadow 0.2s; }
-    .subject-card:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); }
+    .grid-empty { grid-column: 1 / -1; align-self: center; display: block; }
+    .subject-card { cursor: pointer; text-align: center; transition: box-shadow 0.2s, transform 0.2s; }
+    .subject-card:hover { box-shadow: var(--hs-shadow-hover); transform: translateY(-2px); }
     .subject-icon { font-size: 40px; color: var(--hs-primary, #4f46e5); margin-bottom: 8px; }
-    .mc-cover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
-    .mc-cover-placeholder { aspect-ratio: 16 / 9; display: grid; place-items: center; font-size: 40px;
-      color: rgba(255, 255, 255, 0.9);
-      background: linear-gradient(135deg, var(--hs-primary, #4f46e5) 0%, #818cf8 60%, #c7d2fe 100%); }
-    .mc-head { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
     .mc-title { font-weight: 600; line-height: 1.4;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .mc-meta { color: var(--hs-text-muted); font-size: 13px; margin-top: 4px; }
-    .mc-desc { color: var(--hs-text-muted); font-size: 13px; margin-top: 4px;
+
+    /* ===== Mức 2: card sách kiểu thư viện Sách Mềm ===== */
+    .group-heading { font-size: 17px; margin: 4px 0 12px; }
+    .group-heading:not(:first-of-type) { margin-top: 20px; }
+    .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .book-card { display: flex; flex-direction: column; cursor: pointer; overflow: hidden;
+      background: var(--hs-surface); border: 1px solid var(--hs-border); border-radius: var(--hs-radius);
+      box-shadow: var(--hs-shadow); transition: box-shadow 0.2s, transform 0.2s; }
+    .book-card:hover, .book-card:focus-visible { box-shadow: var(--hs-shadow-hover); transform: translateY(-2px); }
+    .book-cover { position: relative; }
+    .book-cover img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+    .book-cover-ph { aspect-ratio: 16 / 9; display: grid; place-items: center; font-size: 42px;
+      color: rgba(255, 255, 255, 0.92);
+      background: linear-gradient(135deg, var(--hs-mat-green) 0%, #a3c162 55%, #ffd98e 100%); }
+    .book-menu { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.15s;
+      background: rgba(0, 0, 0, 0.4); color: #fff; border: 0; }
+    .book-menu:hover, .book-menu:focus { background: rgba(0, 0, 0, 0.6); color: #fff; }
+    .book-card:hover .book-menu, .book-card:focus-within .book-menu { opacity: 1; }
+    @media (hover: none) { .book-menu { opacity: 1; } }
+    .book-body { flex: 1; padding: 12px 16px 10px; }
+    .book-title { font-weight: 600; font-size: 15px; line-height: 1.4;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .danger-action { color: var(--hs-danger, #ff4d4f); }
-    .row-title { font-weight: 500; }
-    .row-desc { color: var(--hs-text-muted); font-size: 12px; }
+    .book-sub { color: var(--hs-text-muted); font-size: 13px; margin-top: 4px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .book-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      border-top: 1px solid var(--hs-border); padding: 9px 16px; }
+    .foot-count { display: inline-flex; align-items: center; gap: 6px;
+      color: var(--hs-mat-green-text); font-weight: 600; font-size: 13px; }
+    .foot-count .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hs-mat-green); }
+    .foot-badge { background: var(--hs-mat-badge-bg); color: #fff; border-radius: 4px;
+      padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
     .cover-preview { margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
     .cover-preview img { width: 100%; max-width: 320px; aspect-ratio: 16 / 9; object-fit: cover;
       border-radius: 8px; border: 1px solid var(--hs-border); }
-    @media (max-width: 575px) { .toolbar .search { max-width: none; flex: 1; } }
   `
 })
 export class SubjectMaterialsTab {
@@ -298,42 +220,53 @@ export class SubjectMaterialsTab {
   protected readonly filesService = inject(FilesService);
   private readonly router = inject(Router);
   private readonly message = inject(NzMessageService);
+  private readonly modal = inject(NzModalService);
 
-  /** Trạng thái điều hướng từ URL (?subjectId=&folderId=) — trang cha bind query param rồi truyền xuống. */
+  /** Trạng thái điều hướng từ URL (?subjectId=) — trang cha bind query param rồi truyền xuống.
+   * folderId chỉ còn để redirect link cũ sang /materials/folders/:folderId. */
   readonly subjectId = input<string | null>(null);
   readonly folderId = input<string | null>(null);
   readonly grades = input<Grade[]>([]);
-  readonly serverUploadAllowed = input(false);
 
   protected readonly canManage = () => this.auth.isAdmin() || this.auth.isTeacher();
-  protected readonly MaterialSource = MaterialSource;
-  protected readonly PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
-  protected readonly scrollY = TABLE_SCROLL_Y;
 
-  protected readonly level = computed(() => (this.folderId() ? 3 : this.subjectId() ? 2 : 1));
+  protected readonly level = computed(() => (this.subjectId() ? 2 : 1));
 
   protected readonly summaries = signal<MaterialSubjectSummary[]>([]);
   protected readonly folders = signal<MaterialFolder[]>([]);
-  protected readonly materials = signal<Material[]>([]);
   protected readonly loading = signal(false);
+  protected readonly saving = signal(false);
 
-  protected readonly currentFolder = computed(() => this.folders().find(f => f.id === this.folderId()) ?? null);
   protected readonly subjectName = computed(() => {
     const sid = this.subjectId();
     if (!sid) return '';
     return this.summaries().find(s => s.subjectId === sid)?.subjectName
-      ?? this.currentFolder()?.subjectName
       ?? this.folders().find(f => f.subjectId === sid)?.subjectName
       ?? '';
   });
 
-  // Mức 3: search + phân trang server
-  protected search = '';
-  protected readonly page = signal(1);
-  protected readonly pageSize = signal(20);
-  protected readonly total = signal(0);
-
-  protected readonly saving = signal(false);
+  /** Nhóm bộ theo Khối (thứ tự theo danh mục Khối), nhóm chưa phân khối xuống cuối. */
+  protected readonly groupedFolders = computed<FolderGroup[]>(() => {
+    const folders = this.folders();
+    if (folders.length === 0) return [];
+    const byBand = new Map<string, MaterialFolder[]>();
+    for (const f of folders) {
+      const key = f.gradeBand ?? '';
+      byBand.set(key, [...(byBand.get(key) ?? []), f]);
+    }
+    const groups: FolderGroup[] = [];
+    for (const g of this.grades()) {
+      const items = byBand.get(g.name);
+      if (items) { groups.push({ key: g.name, label: `Khối ${g.name}`, folders: items }); byBand.delete(g.name); }
+    }
+    // Khối chỉ còn trong snapshot (đã xóa khỏi danh mục) — vẫn hiện để không "mất" bộ.
+    for (const [key, items] of byBand) {
+      if (key !== '') groups.push({ key, label: `Khối ${key}`, folders: items });
+    }
+    const noBand = byBand.get('');
+    if (noBand) groups.push({ key: '__none__', label: 'Chưa phân khối', folders: noBand });
+    return groups;
+  });
 
   // Modal bộ tài liệu
   protected readonly folderModalOpen = signal(false);
@@ -345,39 +278,23 @@ export class SubjectMaterialsTab {
     description: new FormControl<string | null>(null)
   });
 
-  // Modal tài liệu trong bộ (tối giản)
-  protected readonly materialModalOpen = signal(false);
-  protected readonly editingMaterial = signal<Material | null>(null);
-  protected readonly uploadedFileId = signal<string | null>(null);
-  protected readonly uploadedFileName = signal<string | null>(null);
-  protected readonly materialForm = new FormGroup({
-    title: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    source: new FormControl(MaterialSource.ExternalUrl, { nonNullable: true }),
-    url: new FormControl<string | null>(null),
-    description: new FormControl<string | null>(null)
-  });
-
   // Crop ảnh bìa bộ
   protected readonly coverCropVisible = signal(false);
   protected readonly coverSourceFile = signal<File | null>(null);
   protected readonly coverUploading = signal(false);
 
-  /** Trình xem tài liệu full màn hình dùng chung. */
-  private readonly preview = viewChild.required(DocumentPreview);
-
   constructor() {
-    // Nạp dữ liệu theo mức hiện tại — effect theo input để tự nạp lại khi query param đổi
-    // (cùng route nên component KHÔNG bị tạo lại khi điều hướng giữa các mức).
+    // Nạp dữ liệu theo mức — effect theo input để tự nạp lại khi query param đổi.
+    // Link cũ ?folderId= → redirect sang màn immersive mới (replaceUrl để back-stack không kẹt).
     effect(() => {
       const sid = this.subjectId();
       const fid = this.folderId();
       untracked(() => {
         if (fid) {
-          this.page.set(1);
-          this.search = '';
-          this.loadMaterials();
-          // Cần danh sách bộ của môn cho breadcrumb + tên bộ (vào thẳng URL mức 3).
-          if (sid && this.folders().every(f => f.subjectId !== sid)) this.loadFolders(sid);
+          this.router.navigate(['/materials/folders', fid], {
+            queryParams: { subjectId: sid },
+            replaceUrl: true
+          });
         } else if (sid) {
           this.loadFolders(sid);
         } else {
@@ -387,13 +304,22 @@ export class SubjectMaterialsTab {
     });
   }
 
-  /** Điều hướng giữa các mức — đẩy trạng thái lên URL (null sẽ XÓA param). */
-  protected go(subjectId: string | null, folderId: string | null): void {
-    this.router.navigate([], {
-      queryParams: { tab: 'subject', subjectId, folderId },
-      queryParamsHandling: 'merge'
-    });
+  // ---- Điều hướng ----
+
+  protected goSubjects(): void {
+    this.router.navigate([], { queryParams: { tab: 'subject', subjectId: null, folderId: null }, queryParamsHandling: 'merge' });
   }
+
+  protected openSubject(subjectId: string): void {
+    this.router.navigate([], { queryParams: { tab: 'subject', subjectId, folderId: null }, queryParamsHandling: 'merge' });
+  }
+
+  /** Mở màn immersive chi tiết bộ (units) — route riêng, kèm subjectId cho nút Home. */
+  protected openFolder(f: MaterialFolder): void {
+    this.router.navigate(['/materials/folders', f.id], { queryParams: { subjectId: this.subjectId() } });
+  }
+
+  // ---- Nạp dữ liệu ----
 
   private loadSummary(): void {
     this.loading.set(true);
@@ -411,23 +337,6 @@ export class SubjectMaterialsTab {
     });
     // Nạp kèm summary nếu chưa có — để breadcrumb có tên môn khi vào thẳng URL.
     if (this.summaries().length === 0) this.materialsService.getSubjectsSummary().subscribe(s => this.summaries.set(s));
-  }
-
-  protected loadMaterials(): void {
-    const fid = this.folderId();
-    if (!fid) return;
-    this.loading.set(true);
-    this.materialsService.getPaged({
-      search: this.search, folderId: fid, page: this.page(), pageSize: this.pageSize()
-    }).subscribe({
-      next: r => { this.materials.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
-      error: () => this.loading.set(false)
-    });
-  }
-
-  protected applySearch(): void {
-    this.page.set(1);
-    this.loadMaterials();
   }
 
   // ---- CRUD Bộ tài liệu ----
@@ -465,102 +374,22 @@ export class SubjectMaterialsTab {
     });
   }
 
-  protected removeFolder(f: MaterialFolder): void {
+  /** Xóa từ menu ⋮ — confirm bằng modal (popconfirm không hợp trong dropdown). */
+  protected confirmRemoveFolder(f: MaterialFolder): void {
+    this.modal.confirm({
+      nzTitle: 'Xóa bộ tài liệu này?',
+      nzContent: f.name,
+      nzOkText: 'Xóa',
+      nzOkDanger: true,
+      nzOnOk: () => this.removeFolder(f)
+    });
+  }
+
+  private removeFolder(f: MaterialFolder): void {
     this.materialsService.deleteFolder(f.id).subscribe({
       next: () => { this.message.success('Đã xóa bộ tài liệu.'); this.loadFolders(this.subjectId()!); },
-      // Bộ còn tài liệu ⇒ BE chặn (MaterialFolder.InUse) — hiện message tiếng Việt từ server.
+      // Bộ còn tài liệu/Unit ⇒ BE chặn (MaterialFolder.InUse / .HasUnits) — hiện message tiếng Việt từ server.
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
-    });
-  }
-
-  // ---- CRUD Tài liệu trong bộ (tối giản) ----
-
-  protected openCreateMaterial(): void {
-    this.editingMaterial.set(null);
-    this.uploadedFileId.set(null);
-    this.uploadedFileName.set(null);
-    this.materialForm.reset({ title: '', source: MaterialSource.ExternalUrl, url: null, description: null });
-    this.materialModalOpen.set(true);
-  }
-
-  protected openEditMaterial(m: Material): void {
-    this.editingMaterial.set(m);
-    this.uploadedFileId.set(m.storedFileId);
-    this.uploadedFileName.set(m.storedFileId ? (m.fileName ?? 'file hiện tại') : null);
-    this.materialForm.reset({ title: m.title, source: m.source, url: m.url, description: m.description });
-    this.materialModalOpen.set(true);
-  }
-
-  protected saveMaterial(): void {
-    if (this.materialForm.invalid) return;
-    const v = this.materialForm.getRawValue();
-    if (v.source === MaterialSource.ServerFile && !this.uploadedFileId()) { this.message.warning('Vui lòng tải file lên.'); return; }
-    if (v.source === MaterialSource.ExternalUrl && !v.url) { this.message.warning('Vui lòng nhập URL.'); return; }
-
-    // Môn/Khối server tự snapshot từ bộ — client không gửi.
-    const editing = this.editingMaterial();
-    const body = {
-      categoryId: editing?.categoryId ?? null,
-      subjectId: null,
-      gradeBand: null,
-      title: v.title,
-      source: v.source,
-      url: v.source === MaterialSource.ExternalUrl ? v.url : null,
-      storedFileId: v.source === MaterialSource.ServerFile ? this.uploadedFileId() : null,
-      description: v.description,
-      coverFileId: editing?.coverFileId ?? null,
-      folderId: this.folderId()
-    };
-    const op = editing ? this.materialsService.update(editing.id, body) : this.materialsService.create(body);
-
-    this.saving.set(true);
-    op.subscribe({
-      next: () => { this.saving.set(false); this.materialModalOpen.set(false); this.message.success('Đã lưu tài liệu.'); this.loadMaterials(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ?? 'Lưu thất bại.'); }
-    });
-  }
-
-  protected removeMaterial(m: Material): void {
-    this.materialsService.delete(m.id).subscribe({
-      next: () => { this.message.success('Đã xóa.'); this.loadMaterials(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
-    });
-  }
-
-  protected customUpload = (item: NzUploadXHRArgs): Subscription =>
-    this.filesService.upload(item.file as unknown as File).subscribe({
-      next: f => {
-        this.uploadedFileId.set(f.id);
-        this.uploadedFileName.set(f.fileName);
-        item.onSuccess?.(f, item.file, null as never);
-        this.message.success('Đã tải file lên.');
-      },
-      error: (e: HttpErrorResponse) => {
-        item.onError?.(e as never, item.file);
-        this.message.error(e.error?.message ?? e.message);
-      }
-    });
-
-  protected openMaterial(m: Material): void {
-    if (m.source === MaterialSource.ExternalUrl) {
-      window.open(m.url!, '_blank');
-    } else if (m.storedFileId) {
-      this.preview().open({ fileId: m.storedFileId, title: m.title, fileName: m.fileName });
-    }
-  }
-
-  protected download(m: Material): void {
-    if (m.source === MaterialSource.ServerFile && m.storedFileId) {
-      this.filesService.download(m.storedFileId, m.fileName ?? m.title);
-    } else if (m.url) {
-      window.open(m.url, '_blank');
-    }
-  }
-
-  /** Mở trang đề (sinh đề AI) của tài liệu — kèm ngữ cảnh để nút back quay về đúng bộ. */
-  protected openExams(m: Material): void {
-    this.router.navigate(['/materials', m.id, 'exams'], {
-      queryParams: { title: m.title, tab: 'subject', subjectId: this.subjectId(), folderId: this.folderId() }
     });
   }
 

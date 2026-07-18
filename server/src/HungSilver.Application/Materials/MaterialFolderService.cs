@@ -11,6 +11,8 @@ public interface IMaterialFolderService
     /// <summary>Mức 1 "Tài liệu môn học": danh sách môn kèm số bộ + số tài liệu.</summary>
     Task<Result<List<MaterialSubjectSummaryDto>>> GetSubjectsSummaryAsync(CancellationToken ct = default);
     Task<Result<List<MaterialFolderDto>>> GetBySubjectAsync(Guid subjectId, CancellationToken ct = default);
+    /// <summary>Một bộ theo id — màn chi tiết bộ (deep-link/F5) cần nạp trực tiếp.</summary>
+    Task<Result<MaterialFolderDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Result<MaterialFolderDto>> CreateAsync(CreateMaterialFolderRequest request, CancellationToken ct = default);
     Task<Result<MaterialFolderDto>> UpdateAsync(Guid id, UpdateMaterialFolderRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
@@ -23,6 +25,7 @@ public interface IMaterialFolderService
 public sealed class MaterialFolderService(
     IRepository<MaterialFolder> folders,
     IRepository<LearningMaterial> materials,
+    IRepository<MaterialUnit> units,
     IRepository<Subject> subjects,
     IRepository<StoredFile> storedFiles,
     IUnitOfWork unitOfWork,
@@ -61,8 +64,21 @@ public sealed class MaterialFolderService(
     {
         var list = (await folders.FindAsync(f => f.SubjectId == subjectId, ct))
             .OrderBy(f => f.Name, StringComparer.CurrentCulture).ToList();
-        var counts = await CountMaterialsByFolderAsync(list.Select(f => f.Id).ToList(), ct);
-        return list.Select(f => ToDto(f, counts.GetValueOrDefault(f.Id))).ToList();
+        var ids = list.Select(f => f.Id).ToList();
+        var counts = await CountMaterialsByFolderAsync(ids, ct);
+        var unitCounts = await CountUnitsByFolderAsync(ids, ct);
+        return list.Select(f => ToDto(f, counts.GetValueOrDefault(f.Id), unitCounts.GetValueOrDefault(f.Id))).ToList();
+    }
+
+    public async Task<Result<MaterialFolderDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var folder = await folders.GetByIdAsync(id, ct: ct);
+        if (folder is null)
+            return Result.Failure<MaterialFolderDto>(NotFoundError);
+
+        var counts = await CountMaterialsByFolderAsync([id], ct);
+        var unitCounts = await CountUnitsByFolderAsync([id], ct);
+        return ToDto(folder, counts.GetValueOrDefault(id), unitCounts.GetValueOrDefault(id));
     }
 
     public async Task<Result<MaterialFolderDto>> CreateAsync(CreateMaterialFolderRequest request, CancellationToken ct = default)
@@ -91,7 +107,7 @@ public sealed class MaterialFolderService(
 
         await folders.AddAsync(folder, ct);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(folder, 0);
+        return ToDto(folder, 0, 0);
     }
 
     public async Task<Result<MaterialFolderDto>> UpdateAsync(Guid id, UpdateMaterialFolderRequest request, CancellationToken ct = default)
@@ -130,7 +146,8 @@ public sealed class MaterialFolderService(
         }
 
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(folder, children.Count);
+        var unitCounts = await CountUnitsByFolderAsync([id], ct);
+        return ToDto(folder, children.Count, unitCounts.GetValueOrDefault(id));
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
@@ -142,6 +159,10 @@ public sealed class MaterialFolderService(
         if (await materials.AnyAsync(m => m.FolderId == id, ct))
             return Result.Failure(Error.Conflict("MaterialFolder.InUse",
                 "Bộ tài liệu vẫn còn tài liệu bên trong — hãy xóa hoặc chuyển hết tài liệu trước."));
+
+        if (await units.AnyAsync(u => u.FolderId == id, ct))
+            return Result.Failure(Error.Conflict("MaterialFolder.HasUnits",
+                "Bộ tài liệu vẫn còn Unit bên trong — hãy xóa hết Unit trước."));
 
         folders.SoftDelete(folder); // ảnh bìa (nếu có) thành orphan — FileCleanupService tự dọn
         await unitOfWork.SaveChangesAsync(ct);
@@ -155,8 +176,15 @@ public sealed class MaterialFolderService(
         return items.GroupBy(m => m.FolderId!.Value).ToDictionary(g => g.Key, g => g.Count());
     }
 
+    private async Task<Dictionary<Guid, int>> CountUnitsByFolderAsync(List<Guid> folderIds, CancellationToken ct)
+    {
+        if (folderIds.Count == 0) return [];
+        var items = await units.FindAsync(u => folderIds.Contains(u.FolderId), ct);
+        return items.GroupBy(u => u.FolderId).ToDictionary(g => g.Key, g => g.Count());
+    }
+
     private static string? CleanBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    private static MaterialFolderDto ToDto(MaterialFolder f, int materialCount) =>
-        new(f.Id, f.SubjectId, f.SubjectName, f.Name, f.GradeBand, f.CoverFileId, f.Description, materialCount, f.CreatedAt);
+    private static MaterialFolderDto ToDto(MaterialFolder f, int materialCount, int unitCount) =>
+        new(f.Id, f.SubjectId, f.SubjectName, f.Name, f.GradeBand, f.CoverFileId, f.Description, materialCount, unitCount, f.CreatedAt);
 }

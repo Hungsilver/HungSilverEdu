@@ -25,6 +25,7 @@ public sealed class MaterialService(
     IRepository<Subject> subjects,
     IRepository<StoredFile> storedFiles,
     IRepository<MaterialFolder> folders,
+    IRepository<MaterialUnit> units,
     IClassAccessGuard accessGuard,
     ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork,
@@ -44,6 +45,8 @@ public sealed class MaterialService(
         var band = CleanBand(filter.GradeBand);
         var folderId = Normalize(filter.FolderId);
         var generalOnly = folderId == null && filter.GeneralOnly; // FolderId cụ thể thì bỏ qua GeneralOnly
+        var unitId = Normalize(filter.UnitId);
+        var noUnit = unitId == null && filter.NoUnit; // UnitId cụ thể thì bỏ qua NoUnit
         var term = string.IsNullOrWhiteSpace(paging.Search) ? null : paging.Search.Trim().ToLower();
 
         var paged = await materials.GetPagedAsync(paging.Page, paging.PageSize,
@@ -52,6 +55,8 @@ public sealed class MaterialService(
                  && (band == null || m.GradeBand == band)
                  && (folderId == null || m.FolderId == folderId)
                  && (!generalOnly || m.FolderId == null)
+                 && (unitId == null || m.UnitId == unitId)
+                 && (!noUnit || m.UnitId == null)
                  && (term == null || m.Title.ToLower().Contains(term) || m.Code.ToLower().Contains(term)), ct: ct);
 
         var categoryNames = await LoadCategoryNamesAsync(paged.Items, ct);
@@ -79,6 +84,10 @@ public sealed class MaterialService(
             return Result.Failure<MaterialDto>(context.Error);
         var (folderId, subjectId, subjectName, gradeBand) = context.Value;
 
+        var unitId = await ResolveUnitAsync(folderId, request.UnitId, ct);
+        if (unitId.IsFailure)
+            return Result.Failure<MaterialDto>(unitId.Error);
+
         var cover = await CoverFileResolver.ResolveAsync(storedFiles, request.CoverFileId, ct);
         if (cover.IsFailure)
             return Result.Failure<MaterialDto>(cover.Error);
@@ -87,6 +96,7 @@ public sealed class MaterialService(
         {
             Code = await NextCodeAsync(ct),
             FolderId = folderId,
+            UnitId = unitId.Value,
             CategoryId = Normalize(request.CategoryId),
             SubjectId = subjectId,
             SubjectName = subjectName,
@@ -129,11 +139,16 @@ public sealed class MaterialService(
             return Result.Failure<MaterialDto>(context.Error);
         var (folderId, subjectId, subjectName, gradeBand) = context.Value;
 
+        var unitId = await ResolveUnitAsync(folderId, request.UnitId, ct);
+        if (unitId.IsFailure)
+            return Result.Failure<MaterialDto>(unitId.Error);
+
         var cover = await CoverFileResolver.ResolveAsync(storedFiles, request.CoverFileId, ct);
         if (cover.IsFailure)
             return Result.Failure<MaterialDto>(cover.Error);
 
         material.FolderId = folderId;
+        material.UnitId = unitId.Value;
         material.CategoryId = Normalize(request.CategoryId);
         material.SubjectId = subjectId;
         material.SubjectName = subjectName;
@@ -206,6 +221,20 @@ public sealed class MaterialService(
         return (folderId, subjectId, await SubjectNameAsync(subjectId, ct), CleanBand(requestGradeBand));
     }
 
+    /// <summary>UnitId chỉ có nghĩa khi tài liệu thuộc bộ (có FolderId) và unit phải thuộc đúng bộ đó;
+    /// tài liệu chung (FolderId null) ⇒ ép UnitId null.</summary>
+    private async Task<Result<Guid?>> ResolveUnitAsync(Guid? folderId, Guid? requestUnitId, CancellationToken ct)
+    {
+        var unitId = Normalize(requestUnitId);
+        if (unitId is null || folderId is null)
+            return Result.Success<Guid?>(null);
+
+        var unit = await units.GetByIdAsync(unitId.Value, ct: ct);
+        if (unit is null || unit.FolderId != folderId.Value)
+            return Result.Failure<Guid?>(Error.Validation("Material.UnitNotInFolder", "Unit không thuộc bộ tài liệu đã chọn."));
+        return Result.Success<Guid?>(unitId);
+    }
+
     private static Guid? Normalize(Guid? id) => id is null || id == Guid.Empty ? null : id;
 
     private static string? CleanBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
@@ -243,7 +272,7 @@ public sealed class MaterialService(
         var downloadUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
-        return new MaterialDto(m.Id, m.Code, m.ClassId, m.FolderId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
+        return new MaterialDto(m.Id, m.Code, m.ClassId, m.FolderId, m.UnitId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
             m.Title, m.Source, m.Url, m.StoredFileId, fileName, m.CoverFileId, m.Description, downloadUrl, m.CreatedAt);
     }
 }

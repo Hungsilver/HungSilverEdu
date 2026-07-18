@@ -20,6 +20,11 @@ public class MaterialFoldersController(IMaterialFolderService folderService) : C
     public async Task<ActionResult<List<MaterialFolderDto>>> GetBySubject([FromQuery] Guid subjectId, CancellationToken ct) =>
         (await folderService.GetBySubjectAsync(subjectId, ct)).ToActionResult();
 
+    /// <summary>Một bộ theo id — màn chi tiết bộ (deep-link/F5) nạp trực tiếp.</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<MaterialFolderDto>> GetById(Guid id, CancellationToken ct) =>
+        (await folderService.GetByIdAsync(id, ct)).ToActionResult();
+
     [HttpPost]
     public async Task<ActionResult<MaterialFolderDto>> Create(CreateMaterialFolderRequest request, CancellationToken ct) =>
         (await folderService.CreateAsync(request, ct)).ToActionResult();

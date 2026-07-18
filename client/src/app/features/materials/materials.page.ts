@@ -34,7 +34,7 @@ const TAB_KEYS = ['subject', 'general', 'catalog', 'questions'] as const;
       <nz-tab nzTitle="Tài liệu môn học">
         <app-subject-materials-tab
           [subjectId]="subjectIdParam() ?? null" [folderId]="folderIdParam() ?? null"
-          [grades]="grades()" [serverUploadAllowed]="serverUploadAllowed()" />
+          [grades]="grades()" />
       </nz-tab>
 
       <nz-tab nzTitle="Tài liệu chung">
