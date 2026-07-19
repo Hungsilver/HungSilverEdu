@@ -28,6 +28,7 @@ import { TeachersService } from '../../core/teachers.service';
 import { UsersService } from '../../core/users.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
 import { PageHeader } from '../../shared/page-header';
+import { StudentHomeworkModal } from '../../shared/student-homework-modal';
 import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
 import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
@@ -37,7 +38,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
     DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings, TableDragScroll,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzModalModule, NzPopconfirmModule, NzPopoverModule, NzSelectModule, NzTableModule,
-    NzTagModule, NzCheckboxModule, NzAlertModule, NzTooltipModule
+    NzTagModule, NzCheckboxModule, NzAlertModule, NzTooltipModule, StudentHomeworkModal
   ],
   template: `
     <app-page-header title="Học viên" subtitle="Hồ sơ học viên và lớp đang theo học" icon="idcard">
@@ -137,6 +138,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
               </td>
             }
             <td (click)="$event.stopPropagation()">
+              <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Xem BTVN" aria-label="Xem BTVN" (click)="openHomework(s)"><nz-icon nzType="file-search" /></button>
               <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Quản lý tài khoản" aria-label="Quản lý tài khoản" (click)="openAccount(s)"><nz-icon nzType="key" /></button>
               <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa học viên" aria-label="Sửa học viên" (click)="openForm(s)"><nz-icon nzType="edit" /></button>
               <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa học viên" aria-label="Xóa học viên"
@@ -224,6 +226,11 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
             <div><b>Học viên</b><span>{{ s.fullName }}</span></div>
             <div><b>SĐT PH</b><span>{{ s.parentPhone || '—' }}</span></div>
           </div>
+          <div class="detail-actions">
+            <button nz-button nzType="primary" (click)="openHomework(s)">
+              <nz-icon nzType="file-search" /> Xem bài tập về nhà
+            </button>
+          </div>
           <nz-table [nzData]="s.classes" [nzFrontPagination]="false" nzSize="small">
             <thead><tr><th>Mã lớp</th><th>Lớp</th><th>Giáo viên</th><th>Môn</th><th>Khối</th><th>Cơ sở</th><th>Học phí</th></tr></thead>
             <tbody>
@@ -235,6 +242,9 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
         }
       </ng-container>
     </nz-modal>
+
+    <app-student-homework-modal [(open)]="homeworkOpen"
+      [studentId]="homeworkStudentId()" [studentName]="homeworkStudentName()" />
   `,
   styles: `
     .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
@@ -249,6 +259,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
     .detail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
     .detail div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; }
     .detail b { display: block; color: var(--hs-text-muted); font-size: 12px; margin-bottom: 4px; }
+    .detail-actions { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
     .acc-head div { border: 1px solid var(--hs-border); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
     .acc-head b { display: block; color: var(--hs-text-muted); font-size: 12px; margin-bottom: 4px; }
     .acc-alert { margin-bottom: 12px; }
@@ -305,6 +316,9 @@ export class StudentsPage {
   protected readonly editing = signal<Student | null>(null);
   protected readonly detailOpen = signal(false);
   protected readonly detail = signal<Student | null>(null);
+  protected readonly homeworkOpen = signal(false);
+  protected readonly homeworkStudentId = signal<string | null>(null);
+  protected readonly homeworkStudentName = signal<string | null>(null);
 
   // Chọn nhiều để cấp tài khoản hàng loạt (chỉ HS chưa có tài khoản).
   protected readonly checked = signal<Set<string>>(new Set());
@@ -423,6 +437,12 @@ export class StudentsPage {
 
   protected openDetail(s: Student): void {
     this.studentsService.getById(s.id).subscribe({ next: x => { this.detail.set(x); this.detailOpen.set(true); }, error: err => this.showError(err, 'Không tải được chi tiết.') });
+  }
+
+  protected openHomework(s: Student): void {
+    this.homeworkStudentId.set(s.id);
+    this.homeworkStudentName.set(s.fullName);
+    this.homeworkOpen.set(true);
   }
 
   protected deleteStudent(s: Student): void {

@@ -119,6 +119,82 @@ public sealed class ExamAssignmentService(
         return await ToDtosAsync(assignments, ct);
     }
 
+    public async Task<Result<List<StudentHomeworkDto>>> ListStudentHomeworkAsync(
+        Guid studentId,
+        Guid? classId = null,
+        CancellationToken ct = default)
+    {
+        var studentAccess = await accessGuard.EnsureCanAccessStudentAsync(studentId, ct);
+        if (studentAccess.IsFailure) return Result.Failure<List<StudentHomeworkDto>>(studentAccess.Error);
+
+        if (classId is not null)
+        {
+            var classAccess = await accessGuard.EnsureCanAccessClassAsync(classId.Value, ct);
+            if (classAccess.IsFailure) return Result.Failure<List<StudentHomeworkDto>>(classAccess.Error);
+        }
+
+        var activeClassIds = await context.Enrollments.AsNoTracking()
+            .Where(e => e.StudentId == studentId && e.IsActive)
+            .Select(e => e.ClassId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        if (classId is Guid cid)
+        {
+            if (!activeClassIds.Contains(cid))
+                return Result.Failure<List<StudentHomeworkDto>>(Error.NotFound(
+                    "Student.NotInClass", "Học viên không thuộc lớp này."));
+            activeClassIds = [cid];
+        }
+
+        if (activeClassIds.Count == 0)
+            return new List<StudentHomeworkDto>();
+
+        var rows = await (
+            from a in context.ExamAssignments.AsNoTracking()
+            join c in context.Classes.AsNoTracking() on a.ClassId equals c.Id
+            join at0 in context.ExamAttempts.AsNoTracking().Where(t => t.StudentId == studentId)
+                on a.Id equals at0.ExamAssignmentId into atJoin
+            from at in atJoin.DefaultIfEmpty()
+            join s0 in context.ClassSessions.AsNoTracking()
+                on a.ClassSessionId equals s0.Id into sessionJoin
+            from session in sessionJoin.DefaultIfEmpty()
+            where activeClassIds.Contains(a.ClassId) && a.Mode == ExamDeliveryMode.Homework
+            orderby a.OpenAt descending, a.CreatedAt descending
+            select new
+            {
+                Assignment = a,
+                ClassName = c.Name,
+                Attempt = at,
+                SessionNumber = (int?)session.SessionNumber,
+                SessionDate = (DateOnly?)session.SessionDate
+            })
+            .ToListAsync(ct);
+
+        return rows.Select(x => new StudentHomeworkDto(
+                x.Assignment.Id,
+                x.Assignment.ExamId,
+                x.Assignment.ExamTitle ?? "Đề",
+                x.Assignment.ClassId,
+                x.ClassName,
+                x.Assignment.ClassSessionId,
+                x.SessionNumber,
+                x.SessionDate,
+                x.Assignment.DurationMinutes,
+                x.Assignment.OpenAt,
+                x.Assignment.CloseAt,
+                x.Assignment.Status,
+                x.Attempt?.Id,
+                x.Attempt?.Status,
+                x.Attempt?.StartedAt,
+                x.Attempt?.SubmittedAt,
+                x.Attempt?.Score,
+                x.Assignment.TotalPoints,
+                x.Attempt?.CorrectCount,
+                x.Attempt?.TotalCount))
+            .ToList();
+    }
+
     /// <summary>Dựng DTO kèm tên lớp + sĩ số + số đã nộp (dùng chung ListByExam/ListBySession/ListByClass).</summary>
     private async Task<List<ExamAssignmentDto>> ToDtosAsync(List<ExamAssignment> assignments, CancellationToken ct)
     {

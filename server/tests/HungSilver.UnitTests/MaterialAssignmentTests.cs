@@ -300,6 +300,64 @@ public sealed class MaterialAssignmentTests : IDisposable
         Assert.True((await guarded.ListByClassAsync(classId)).IsFailure);
     }
 
+    [Fact]
+    public async Task StudentHomework_ReturnsOnlyHomework_ForActiveClasses_WithAttemptInfo()
+    {
+        var classId = SeedClass();
+        var otherClassId = SeedClass("Lớp B");
+        var studentId = SeedStudent(Guid.NewGuid(), classId, "An");
+        _context.Enrollments.Add(new Enrollment { StudentId = studentId, ClassId = otherClassId, EnrolledOn = DateOnly.FromDateTime(DateTime.Now), IsActive = true });
+
+        var exam = new Exam { Title = "Đề BTVN", Status = ExamStatus.Published, TotalPoints = 10m, DurationMinutes = 45 };
+        _context.Exams.Add(exam);
+        _context.SaveChanges();
+
+        var homework = new ExamAssignment { ExamId = exam.Id, ExamTitle = "BTVN Unit 1", ClassId = classId, Mode = ExamDeliveryMode.Homework, DurationMinutes = null, OpenAt = DateTime.Now.AddDays(-1), CloseAt = DateTime.Now.AddDays(1), TotalPoints = 10m, Status = ExamAssignmentStatus.Open };
+        var otherHomework = new ExamAssignment { ExamId = exam.Id, ExamTitle = "BTVN Unit 2", ClassId = otherClassId, Mode = ExamDeliveryMode.Homework, DurationMinutes = 45, OpenAt = DateTime.Now.AddDays(-2), CloseAt = DateTime.Now.AddDays(2), TotalPoints = 10m, Status = ExamAssignmentStatus.Open };
+        var inClass = new ExamAssignment { ExamId = exam.Id, ExamTitle = "Làm trên lớp", ClassId = classId, Mode = ExamDeliveryMode.InClass, DurationMinutes = 45, OpenAt = DateTime.Now, TotalPoints = 10m, Status = ExamAssignmentStatus.Open };
+        _context.ExamAssignments.AddRange(homework, otherHomework, inClass);
+        _context.SaveChanges();
+
+        _context.ExamAttempts.Add(new ExamAttempt
+        {
+            ExamAssignmentId = homework.Id,
+            StudentId = studentId,
+            Status = ExamAttemptStatus.Submitted,
+            StartedAt = DateTime.Now.AddHours(-2),
+            SubmittedAt = DateTime.Now.AddHours(-1),
+            Score = 8.5m,
+            CorrectCount = 17,
+            TotalCount = 20
+        });
+        _context.SaveChanges();
+
+        var svc = new ExamAssignmentService(_context, new AdminGuard(), _currentUser);
+        var all = (await svc.ListStudentHomeworkAsync(studentId)).Value;
+        Assert.Equal(2, all.Count);
+        Assert.DoesNotContain(all, x => x.ExamTitle == "Làm trên lớp");
+
+        var onlyClass = (await svc.ListStudentHomeworkAsync(studentId, classId)).Value;
+        var item = Assert.Single(onlyClass);
+        Assert.Equal(homework.Id, item.AssignmentId);
+        Assert.Equal(ExamAttemptStatus.Submitted, item.AttemptStatus);
+        Assert.Equal(8.5m, item.Score);
+        Assert.Null(item.DurationMinutes);
+    }
+
+    [Fact]
+    public async Task StudentHomework_ClassFilter_NotEnrolled_ReturnsNotFound()
+    {
+        var classId = SeedClass();
+        var otherClassId = SeedClass("Lớp B");
+        var studentId = SeedStudent(Guid.NewGuid(), classId, "An");
+
+        var svc = new ExamAssignmentService(_context, new AdminGuard(), _currentUser);
+        var result = await svc.ListStudentHomeworkAsync(studentId, otherClassId);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Student.NotInClass", result.Error.Code);
+    }
+
     // ---- Fakes (mirror ExamAssignHardeningTests — private per-file theo hiện trạng test suite) ----
 
     private sealed class FakeCurrentUser : ICurrentUser

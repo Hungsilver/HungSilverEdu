@@ -204,6 +204,7 @@ public sealed class ExamsControllerUploadTests
         public Task<Result<List<ExamAssignmentDto>>> ListByExamAsync(Guid examId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<ExamAssignmentDto>>> ListByClassAsync(Guid classId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Result<List<StudentHomeworkDto>>> ListStudentHomeworkAsync(Guid studentId, Guid? classId = null, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result> CloseAsync(Guid assignmentId, CancellationToken ct = default) => throw new NotImplementedException();
     }
 

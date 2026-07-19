@@ -57,6 +57,31 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
       <nz-progress [nzPercent]="answeredPercent()" nzSize="small" [nzShowInfo]="true"
         [nzFormat]="progressFormat" nzStatus="active" />
 
+      <div class="question-map" aria-label="Danh sách câu hỏi">
+        <div class="map-head">
+          <div>
+            <strong>Câu hỏi</strong>
+            <span>{{ answeredCount() }}/{{ a.questions.length }} đã làm</span>
+          </div>
+          <div class="legend">
+            <span><i class="dot done"></i> Đã làm</span>
+            <span><i class="dot pending"></i> Chưa làm</span>
+          </div>
+        </div>
+        <div class="map-grid">
+          @for (q of a.questions; track q.id) {
+            <button nz-button nzShape="circle" class="map-btn"
+              [class.done]="hasAnswer(q)"
+              [class.pending]="!hasAnswer(q)"
+              [class.active]="activeQuestionId() === q.id"
+              [attr.aria-label]="'Tới câu ' + (q.orderNo + 1) + (hasAnswer(q) ? ', đã làm' : ', chưa làm')"
+              (click)="jumpToQuestion(q)">
+              {{ q.orderNo + 1 }}
+            </button>
+          }
+        </div>
+      </div>
+
       <div class="questions">
         @for (sec of sections(); track $index) {
           @if (sec.title || sec.passage) {
@@ -65,7 +90,8 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
             </nz-card>
           }
           @for (v of sec.items; track v.q.id) {
-            <nz-card class="q-card">
+            <nz-card class="q-card" [attr.id]="questionDomId(v.q)" tabindex="-1"
+              [class.active]="activeQuestionId() === v.q.id">
               <div class="q-head">
                 <span class="q-no">{{ v.q.orderNo + 1 }}.</span>
                 <nz-tag>{{ typeLabels[v.q.type] }}</nz-tag>
@@ -128,9 +154,37 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
     .timer.warn { color: #DC2626; }
     .no-limit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .no-limit .deadline { color: var(--hs-text-muted); font-size: 13px; }
+    .question-map {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid var(--hs-border, #e5e7eb);
+      border-radius: 8px;
+      background: var(--hs-surface, #fff);
+    }
+    .map-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .map-head strong { display: block; color: var(--hs-text, #111827); }
+    .map-head span { color: var(--hs-text-muted, #6b7280); font-size: 13px; }
+    .legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; border: 1px solid transparent; }
+    .dot.done { background: var(--hs-primary, #4f46e5); }
+    .dot.pending { background: var(--hs-surface, #fff); border-color: var(--hs-border, #d1d5db); }
+    .map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 8px; }
+    .map-btn {
+      width: 36px;
+      min-width: 36px;
+      height: 36px;
+      justify-self: center;
+      font-weight: 600;
+    }
+    .map-btn.done { color: #fff; background: var(--hs-primary, #4f46e5); border-color: var(--hs-primary, #4f46e5); }
+    .map-btn.pending { color: var(--hs-text, #111827); background: var(--hs-surface, #fff); border-color: var(--hs-border, #d1d5db); }
+    .map-btn.active { outline: 2px solid var(--hs-primary, #4f46e5); outline-offset: 2px; }
     .questions { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
     .group-card { background: var(--hs-surface-alt, #f5f7ff); }
     .passage { white-space: pre-wrap; margin: 0; }
+    .q-card { scroll-margin-top: 16px; }
+    .q-card.active { border-color: var(--hs-primary, #4f46e5); box-shadow: 0 0 0 1px color-mix(in srgb, var(--hs-primary, #4f46e5) 35%, transparent); }
     .q-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
     .q-no { font-weight: 700; }
     .q-stem { font-weight: 500; white-space: pre-wrap; }
@@ -144,7 +198,13 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
     .match-row .mr { min-width: 160px; }
     .footer { margin: 24px 0; text-align: center; }
     .back { margin-top: 12px; }
-    @media (max-width: 575px) { .match-row { flex-direction: column; align-items: stretch; } .match-row .mr { width: 100%; } }
+    @media (max-width: 575px) {
+      .map-head { align-items: flex-start; flex-direction: column; }
+      .map-grid { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px; }
+      .map-btn { width: 34px; min-width: 34px; height: 34px; font-size: 13px; }
+      .match-row { flex-direction: column; align-items: stretch; }
+      .match-row .mr { width: 100%; }
+    }
   `
 })
 export class ExamTakePage implements OnInit, OnDestroy {
@@ -159,6 +219,7 @@ export class ExamTakePage implements OnInit, OnDestroy {
   protected readonly attempt = signal<PortalAttempt | null>(null);
   protected readonly sections = signal<Section[]>([]);
   protected readonly remaining = signal(0);
+  protected readonly activeQuestionId = signal<string | null>(null);
   protected answers: Record<string, any> = {};
   private timer?: ReturnType<typeof setInterval>;
   private submitting = false;
@@ -206,18 +267,29 @@ export class ExamTakePage implements OnInit, OnDestroy {
     return total === 0 ? 0 : Math.round((this.answeredCount() / total) * 100);
   }
 
-  private answeredCount(): number {
+  protected answeredCount(): number {
     const qs = this.attempt()?.questions ?? [];
     return qs.filter(q => this.hasAnswer(q)).length;
   }
 
-  private hasAnswer(q: PortalQuestion): boolean {
+  protected hasAnswer(q: PortalQuestion): boolean {
     const a = this.answers[q.id];
     if (a === undefined || a === null) return false;
     if (q.type === 'FillBlank') return Array.isArray(a) && a.some((x: string) => (x ?? '').trim());
     if (q.type === 'Matching') return a && Object.values(a).some(v => v);
     if (q.type === 'TrueFalse') return typeof a === 'boolean';
     return !!a;
+  }
+
+  protected questionDomId(q: PortalQuestion): string {
+    return `exam-question-${q.id}`;
+  }
+
+  protected jumpToQuestion(q: PortalQuestion): void {
+    this.activeQuestionId.set(q.id);
+    const el = document.getElementById(this.questionDomId(q));
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => el?.focus({ preventScroll: true }), 250);
   }
 
   private initAnswers(a: PortalAttempt): void {
@@ -300,6 +372,7 @@ export class ExamTakePage implements OnInit, OnDestroy {
   }
 
   protected onAnswer(q: PortalQuestion): void {
+    this.activeQuestionId.set(q.id);
     // Gom thay đổi rồi lưu sau 500ms yên — FillBlank gõ từng ký tự không bắn request liên tục.
     this.dirty.set(q.id, q);
     this.saveTrigger.next();

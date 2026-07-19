@@ -38,6 +38,7 @@ import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
 import { ClassFormModal } from './class-form-modal';
 import { PageHeader } from '../../shared/page-header';
+import { StudentHomeworkModal } from '../../shared/student-homework-modal';
 import { SessionExams } from '../sessions/session-exams';
 import { SessionMaterials } from '../sessions/session-materials';
 
@@ -49,7 +50,7 @@ import { SessionMaterials } from '../sessions/session-materials';
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
     NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule,
     NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader, ClassFormModal,
-    SessionExams, SessionMaterials
+    SessionExams, SessionMaterials, StudentHomeworkModal
   ],
   template: `
     <a routerLink="/classes" class="back"><nz-icon nzType="arrow-left" /> Danh sách lớp</a>
@@ -213,6 +214,7 @@ import { SessionMaterials } from '../sessions/session-materials';
                   </div>
                   <div class="card-field"><span class="label">Chuyên cần</span><span>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</span></div>
                   <div class="card-actions">
+                    <button nz-button nzSize="small" (click)="openHomework(r)"><nz-icon nzType="file-search" /> BTVN</button>
                     @if (r.userId) {
                       <button nz-button nzSize="small" (click)="openResetPassword(r)"><nz-icon nzType="key" /> Đổi MK</button>
                     }
@@ -246,6 +248,9 @@ import { SessionMaterials } from '../sessions/session-materials';
                     <td>{{ ov(r.studentId)?.attendanceRate ?? 0 }}%</td>
                     <td>{{ ov(r.studentId)?.homeworkRate ?? 0 }}%</td>
                     <td nzRight>
+                      <button nz-button nzType="link" nzSize="small" (click)="openHomework(r)">
+                        <nz-icon nzType="file-search" /> BTVN
+                      </button>
                       @if (r.userId) {
                         <button nz-button nzType="link" nzSize="small" (click)="openResetPassword(r)">
                           <nz-icon nzType="key" /> Đổi MK
@@ -303,6 +308,11 @@ import { SessionMaterials } from '../sessions/session-materials';
                   </nz-descriptions-item>
                   <nz-descriptions-item nzTitle="Số buổi học">{{ o.totalRecords }}</nz-descriptions-item>
                 </nz-descriptions>
+                <div class="study-actions">
+                  <button nz-button nzType="primary" (click)="openHomework(r)">
+                    <nz-icon nzType="file-search" /> Xem chi tiết bài tập về nhà
+                  </button>
+                </div>
               } @else {
                 <p class="muted">Chưa có dữ liệu tình hình học tập.</p>
               }
@@ -336,6 +346,9 @@ import { SessionMaterials } from '../sessions/session-materials';
         }
       </ng-container>
     </nz-modal>
+
+    <app-student-homework-modal [(open)]="homeworkOpen"
+      [studentId]="homeworkStudentId()" [studentName]="homeworkStudentName()" [classId]="id()" />
 
     <!-- Nhập học viên từ Excel -->
     <nz-modal [nzVisible]="importOpen()" nzTitle="Nhập học viên từ Excel" [nzWidth]="680" [nzFooter]="null" (nzOnCancel)="importOpen.set(false)">
@@ -481,6 +494,7 @@ import { SessionMaterials } from '../sessions/session-materials';
     .card-field:last-of-type { border-bottom: none; }
     .card-field .label { color: var(--hs-text-muted); }
     .card-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+    .study-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
     @media (max-width: 768px) {
       .enroll-row { flex-direction: column; }
       .enroll-select { min-width: 100%; }
@@ -561,6 +575,9 @@ export class ClassDetailPage implements OnInit {
   protected readonly selectedRosterItem = signal<RosterItem | null>(null);
   protected readonly studentDetailData = signal<Student | null>(null);
   protected readonly studentTuition = signal<TuitionInvoice[]>([]);
+  protected readonly homeworkOpen = signal(false);
+  protected readonly homeworkStudentId = signal<string | null>(null);
+  protected readonly homeworkStudentName = signal<string | null>(null);
   protected readonly studentDetailTitle = computed(() => {
     const r = this.selectedRosterItem();
     return r ? `Chi tiết: ${r.fullName}` : 'Chi tiết học viên';
@@ -616,6 +633,12 @@ export class ClassDetailPage implements OnInit {
     this.tuitionService.getByStudent(r.studentId).subscribe(invs => {
       this.studentTuition.set(invs.filter(inv => inv.classId === classId));
     });
+  }
+
+  protected openHomework(r: RosterItem): void {
+    this.homeworkStudentId.set(r.studentId);
+    this.homeworkStudentName.set(r.fullName);
+    this.homeworkOpen.set(true);
   }
 
   // ---- Import Excel ----

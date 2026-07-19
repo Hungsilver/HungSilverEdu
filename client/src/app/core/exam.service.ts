@@ -6,7 +6,7 @@ import {
   AssignExamRequest, CreateExamFromQuestionsRequest, CreateExamFromQuestionsResult, ExamAssignment, ExamDetail,
   ExamGenerationJob, ExamGenerationJobStartResult, ExamListItem, ExamQuestion, ExamQuestionBankFilter,
   ExamQuestionBankItem, ExamQuestionIdsResult, ExamReport, ExamStatus, GenerateExamRequest, PagedResult,
-  TeacherAttemptReview, UpdateExamRequest, UpsertQuestionRequest
+  StudentHomework, TeacherAttemptReview, UpdateExamRequest, UpsertQuestionRequest
 } from './models';
 
 /** Bộ đề trắc nghiệm: sinh từ tài liệu bằng AI, duyệt/sửa, phát hành. */
@@ -116,6 +116,13 @@ export class ExamService {
   /** Mọi lượt giao của một lớp (section Bài tập trong trang chi tiết lớp). */
   listByClass(classId: string): Observable<ExamAssignment[]> {
     return this.http.get<ExamAssignment[]>(`${this.apiUrl}/assignments/by-class/${classId}`);
+  }
+
+  /** Bài tập về nhà của riêng một học viên, tùy chọn lọc theo lớp. */
+  studentHomework(studentId: string, classId?: string | null): Observable<StudentHomework[]> {
+    let params = new HttpParams();
+    if (classId) params = params.set('classId', classId);
+    return this.http.get<StudentHomework[]>(`${this.apiUrl}/students/${studentId}/homework`, { params });
   }
 
   /** GV xem bài làm một học viên đã nộp. */

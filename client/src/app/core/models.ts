@@ -1482,6 +1482,29 @@ export interface ExamAssignment {
   createdAt: string;
 }
 
+export interface StudentHomework {
+  assignmentId: string;
+  examId: string;
+  examTitle: string;
+  classId: string;
+  className: string;
+  classSessionId: string | null;
+  sessionNumber: number | null;
+  sessionDate: string | null;
+  durationMinutes: number | null;
+  openAt: string;
+  closeAt: string | null;
+  assignmentStatus: ExamAssignmentStatus;
+  attemptId: string | null;
+  attemptStatus: ExamAttemptStatus | null;
+  startedAt: string | null;
+  submittedAt: string | null;
+  score: number | null;
+  totalPoints: number;
+  correctCount: number | null;
+  totalCount: number | null;
+}
+
 export interface PortalExam {
   assignmentId: string;
   examId: string;

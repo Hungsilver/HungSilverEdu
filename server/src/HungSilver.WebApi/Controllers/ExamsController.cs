@@ -184,6 +184,14 @@ public class ExamsController(
     public async Task<ActionResult<List<ExamAssignmentDto>>> AssignmentsByClass(Guid classId, CancellationToken ct) =>
         (await assignments.ListByClassAsync(classId, ct)).ToActionResult();
 
+    /// <summary>Bài tập về nhà của một học viên, tùy chọn lọc theo lớp.</summary>
+    [HttpGet("students/{studentId:guid}/homework")]
+    public async Task<ActionResult<List<StudentHomeworkDto>>> StudentHomework(
+        Guid studentId,
+        [FromQuery] Guid? classId,
+        CancellationToken ct) =>
+        (await assignments.ListStudentHomeworkAsync(studentId, classId, ct)).ToActionResult();
+
     [HttpPost("assignments/{assignmentId:guid}/close")]
     public async Task<ActionResult> CloseAssignment(Guid assignmentId, CancellationToken ct) =>
         (await assignments.CloseAsync(assignmentId, ct)).ToActionResult();

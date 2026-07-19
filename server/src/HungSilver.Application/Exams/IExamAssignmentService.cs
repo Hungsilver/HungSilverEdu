@@ -11,5 +11,7 @@ public interface IExamAssignmentService
     Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default);
     /// <summary>Mọi lượt giao của một lớp (section Bài tập trong trang chi tiết lớp).</summary>
     Task<Result<List<ExamAssignmentDto>>> ListByClassAsync(Guid classId, CancellationToken ct = default);
+    /// <summary>Bài tập về nhà của một học viên, tùy chọn lọc theo lớp.</summary>
+    Task<Result<List<StudentHomeworkDto>>> ListStudentHomeworkAsync(Guid studentId, Guid? classId = null, CancellationToken ct = default);
     Task<Result> CloseAsync(Guid assignmentId, CancellationToken ct = default);
 }
