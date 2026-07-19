@@ -1,5 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -21,10 +21,10 @@ import { PageHeader } from '../../shared/page-header';
 
 interface TakeQ {
   q: PortalQuestion;
-  options: { key: string; text: string }[]; // SingleChoice, hoặc cột trái của Matching
-  right: { key: string; text: string }[];    // cột phải của Matching
-  blankCount: number;                          // FillBlank
-  wordBox: string[];                           // FillBlank (gợi ý)
+  options: { key: string; text: string }[];
+  right: { key: string; text: string }[];
+  blankCount: number;
+  wordBox: string[];
 }
 
 interface Section { title: string | null; passage: string | null; items: TakeQ[]; }
@@ -40,109 +40,132 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
     @if (loading()) {
       <div class="center"><nz-spin nzSimple /></div>
     } @else if (attempt(); as a) {
-      <app-page-header [title]="a.examTitle" subtitle="Làm bài — chọn đáp án, hệ thống tự lưu" icon="form">
-        @if (a.expiresAt) {
-          <div class="timer" [class.warn]="remaining() <= 60">
-            <nz-icon nzType="clock-circle" /> {{ mmss() }}
-          </div>
-        } @else {
-          <div class="no-limit">
-            <nz-tag nzColor="blue"><nz-icon nzType="clock-circle" /> Không giới hạn thời gian</nz-tag>
-            @if (a.closeAt) { <span class="deadline">Hạn nộp: {{ a.closeAt | date: 'HH:mm dd/MM/yyyy' }}</span> }
-          </div>
-        }
-        <button nz-button nzType="primary" (click)="confirmSubmit()"><nz-icon nzType="check" /> Nộp bài</button>
-      </app-page-header>
+      <app-page-header [title]="a.examTitle" subtitle="Làm bài — chọn đáp án, hệ thống tự lưu" icon="form" />
 
-      <nz-progress [nzPercent]="answeredPercent()" nzSize="small" [nzShowInfo]="true"
-        [nzFormat]="progressFormat" nzStatus="active" />
-
-      <div class="question-map" aria-label="Danh sách câu hỏi">
-        <div class="map-head">
-          <div>
-            <strong>Câu hỏi</strong>
-            <span>{{ answeredCount() }}/{{ a.questions.length }} đã làm</span>
-          </div>
-          <div class="legend">
-            <span><i class="dot done"></i> Đã làm</span>
-            <span><i class="dot pending"></i> Chưa làm</span>
-          </div>
+      <div class="exam-toolbar">
+        <div class="progress-wrap">
+          <nz-progress [nzPercent]="answeredPercent()" nzSize="small" [nzShowInfo]="true"
+            [nzFormat]="progressFormat" nzStatus="active" />
         </div>
-        <div class="map-grid">
-          @for (q of a.questions; track q.id) {
-            <button nz-button nzShape="circle" class="map-btn"
-              [class.done]="hasAnswer(q)"
-              [class.pending]="!hasAnswer(q)"
-              [class.active]="activeQuestionId() === q.id"
-              [attr.aria-label]="'Tới câu ' + (q.orderNo + 1) + (hasAnswer(q) ? ', đã làm' : ', chưa làm')"
-              (click)="jumpToQuestion(q)">
-              {{ q.orderNo + 1 }}
-            </button>
+
+        <div class="toolbar-actions">
+          @if (a.expiresAt) {
+            <div class="timer" [class.warn]="remaining() <= 60">
+              <nz-icon nzType="clock-circle" /> {{ mmss() }}
+            </div>
+          } @else {
+            <div class="no-limit">
+              <nz-tag nzColor="blue"><nz-icon nzType="clock-circle" /> Không giới hạn thời gian</nz-tag>
+              @if (a.closeAt) { <span class="deadline">Hạn nộp: {{ a.closeAt | date: 'HH:mm dd/MM/yyyy' }}</span> }
+            </div>
           }
+          <button nz-button (click)="toggleQuestionMap()" [attr.aria-expanded]="questionMapOpen()">
+            <nz-icon [nzType]="questionMapOpen() ? 'right' : 'appstore'" />
+            {{ questionMapOpen() ? 'Ẩn câu hỏi' : 'Danh sách câu' }}
+          </button>
+          <button nz-button nzType="primary" (click)="confirmSubmit()"><nz-icon nzType="check" /> Nộp bài</button>
         </div>
       </div>
 
-      <div class="questions">
-        @for (sec of sections(); track $index) {
-          @if (sec.title || sec.passage) {
-            <nz-card class="group-card" [nzTitle]="sec.title || 'Ngữ liệu'">
-              @if (sec.passage) { <p class="passage">{{ sec.passage }}</p> }
-            </nz-card>
-          }
-          @for (v of sec.items; track v.q.id) {
-            <nz-card class="q-card" [attr.id]="questionDomId(v.q)" tabindex="-1"
-              [class.active]="activeQuestionId() === v.q.id">
-              <div class="q-head">
-                <span class="q-no">{{ v.q.orderNo + 1 }}.</span>
-                <nz-tag>{{ typeLabels[v.q.type] }}</nz-tag>
-                <span class="q-stem">{{ v.q.stem }}</span>
-              </div>
-
-              @switch (v.q.type) {
-                @case ('SingleChoice') {
-                  <nz-radio-group class="opts" [(ngModel)]="answers[v.q.id]" (ngModelChange)="onAnswer(v.q)">
-                    @for (o of v.options; track o.key) {
-                      <label nz-radio [nzValue]="o.key"><strong>{{ o.key }}.</strong> {{ o.text }}</label>
-                    }
-                  </nz-radio-group>
-                }
-                @case ('TrueFalse') {
-                  <nz-radio-group [(ngModel)]="answers[v.q.id]" (ngModelChange)="onAnswer(v.q)">
-                    <label nz-radio-button [nzValue]="true">Đúng</label>
-                    <label nz-radio-button [nzValue]="false">Sai</label>
-                  </nz-radio-group>
-                }
-                @case ('FillBlank') {
-                  @if (v.wordBox.length) {
-                    <div class="wordbox">Hộp từ: @for (w of v.wordBox; track w) { <nz-tag>{{ w }}</nz-tag> }</div>
-                  }
-                  @for (i of blanks(v.blankCount); track i) {
-                    <div class="blank-row">
-                      <span>Ô {{ i + 1 }}</span>
-                      <input nz-input [(ngModel)]="answers[v.q.id][i]" (ngModelChange)="onAnswer(v.q)" [ngModelOptions]="{standalone:true}" />
-                    </div>
-                  }
-                }
-                @case ('Matching') {
-                  @for (l of v.options; track l.key) {
-                    <div class="match-row">
-                      <span class="ml"><strong>{{ l.key }}.</strong> {{ l.text }}</span>
-                      <nz-select class="mr" nzPlaceHolder="Chọn" [(ngModel)]="answers[v.q.id][l.key]"
-                        (ngModelChange)="onAnswer(v.q)" [ngModelOptions]="{standalone:true}" nzAllowClear>
-                        @for (r of v.right; track r.key) { <nz-option [nzValue]="r.key" [nzLabel]="r.key + '. ' + r.text" /> }
-                      </nz-select>
-                    </div>
-                  }
-                }
+      <div class="exam-layout" [class.with-map]="questionMapOpen()">
+        <main class="question-area">
+          <div class="questions">
+            @for (sec of sections(); track $index) {
+              @if (sec.title || sec.passage) {
+                <nz-card class="group-card" [nzTitle]="sec.title || 'Ngữ liệu'">
+                  @if (sec.passage) { <p class="passage">{{ sec.passage }}</p> }
+                </nz-card>
               }
-            </nz-card>
-          }
+              @for (v of sec.items; track v.q.id) {
+                <nz-card class="q-card" [attr.id]="questionDomId(v.q)" tabindex="-1"
+                  [class.active]="activeQuestionId() === v.q.id">
+                  <div class="q-head">
+                    <span class="q-no">{{ v.q.orderNo + 1 }}.</span>
+                    <nz-tag>{{ typeLabels[v.q.type] }}</nz-tag>
+                    <span class="q-stem">{{ v.q.stem }}</span>
+                  </div>
+
+                  @switch (v.q.type) {
+                    @case ('SingleChoice') {
+                      <nz-radio-group class="opts" [(ngModel)]="answers[v.q.id]" (ngModelChange)="onAnswer(v.q)">
+                        @for (o of v.options; track o.key) {
+                          <label nz-radio [nzValue]="o.key"><strong>{{ o.key }}.</strong> {{ o.text }}</label>
+                        }
+                      </nz-radio-group>
+                    }
+                    @case ('TrueFalse') {
+                      <nz-radio-group [(ngModel)]="answers[v.q.id]" (ngModelChange)="onAnswer(v.q)">
+                        <label nz-radio-button [nzValue]="true">Đúng</label>
+                        <label nz-radio-button [nzValue]="false">Sai</label>
+                      </nz-radio-group>
+                    }
+                    @case ('FillBlank') {
+                      @if (v.wordBox.length) {
+                        <div class="wordbox">Hộp từ: @for (w of v.wordBox; track w) { <nz-tag>{{ w }}</nz-tag> }</div>
+                      }
+                      @for (i of blanks(v.blankCount); track i) {
+                        <div class="blank-row">
+                          <span>Ô {{ i + 1 }}</span>
+                          <input nz-input [(ngModel)]="answers[v.q.id][i]" (ngModelChange)="onAnswer(v.q)" [ngModelOptions]="{standalone:true}" />
+                        </div>
+                      }
+                    }
+                    @case ('Matching') {
+                      @for (l of v.options; track l.key) {
+                        <div class="match-row">
+                          <span class="ml"><strong>{{ l.key }}.</strong> {{ l.text }}</span>
+                          <nz-select class="mr" nzPlaceHolder="Chọn" [(ngModel)]="answers[v.q.id][l.key]"
+                            (ngModelChange)="onAnswer(v.q)" [ngModelOptions]="{standalone:true}" nzAllowClear>
+                            @for (r of v.right; track r.key) { <nz-option [nzValue]="r.key" [nzLabel]="r.key + '. ' + r.text" /> }
+                          </nz-select>
+                        </div>
+                      }
+                    }
+                  }
+                </nz-card>
+              }
+            }
+          </div>
+
+          <div class="footer">
+            <button nz-button nzType="primary" nzSize="large" (click)="confirmSubmit()"><nz-icon nzType="check" /> Nộp bài</button>
+          </div>
+        </main>
+
+        @if (questionMapOpen()) {
+          <aside class="question-map" aria-label="Danh sách câu hỏi">
+            <div class="map-head">
+              <div>
+                <strong>Câu hỏi</strong>
+                <span>{{ answeredCount() }}/{{ a.questions.length }} đã làm</span>
+              </div>
+              <button nz-button nzSize="small" nzShape="circle" aria-label="Ẩn danh sách câu hỏi" (click)="toggleQuestionMap()">
+                <nz-icon nzType="right" />
+              </button>
+            </div>
+            <div class="legend">
+              <span><i class="dot done"></i> Đã làm</span>
+              <span><i class="dot pending"></i> Chưa làm</span>
+            </div>
+            <div class="map-grid">
+              @for (q of a.questions; track q.id) {
+                <button nz-button nzShape="circle" class="map-btn"
+                  [class.done]="hasAnswer(q)"
+                  [class.pending]="!hasAnswer(q)"
+                  [class.active]="activeQuestionId() === q.id"
+                  [attr.aria-label]="'Tới câu ' + (q.orderNo + 1) + (hasAnswer(q) ? ', đã làm' : ', chưa làm')"
+                  (click)="jumpToQuestion(q)">
+                  {{ q.orderNo + 1 }}
+                </button>
+              }
+            </div>
+          </aside>
         }
       </div>
 
-      <div class="footer">
-        <button nz-button nzType="primary" nzSize="large" (click)="confirmSubmit()"><nz-icon nzType="check" /> Nộp bài</button>
-      </div>
+      @if (questionMapOpen()) {
+        <button class="map-scrim" type="button" aria-label="Ẩn danh sách câu hỏi" (click)="toggleQuestionMap()"></button>
+      }
     } @else {
       <nz-alert nzType="error" nzMessage="Không mở được đề. Có thể chưa đến giờ, đã hết hạn, hoặc bạn đã nộp." nzShowIcon />
       <button nz-button class="back" (click)="router.navigate(['/portal'])"><nz-icon nzType="arrow-left" /> Về trang chính</button>
@@ -150,40 +173,58 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
   `,
   styles: `
     .center { text-align: center; padding: 48px; }
-    .timer { font-weight: 700; font-size: 18px; color: var(--hs-primary); display: flex; align-items: center; gap: 6px; }
+    .exam-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--hs-border, #e5e7eb);
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--hs-surface, #fff) 94%, transparent);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, .08);
+    }
+    .progress-wrap { flex: 1; min-width: 160px; }
+    .toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .timer { font-weight: 700; font-size: 18px; color: var(--hs-primary); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
     .timer.warn { color: #DC2626; }
-    .no-limit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .no-limit { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .no-limit .deadline { color: var(--hs-text-muted); font-size: 13px; }
+    .exam-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+    .exam-layout.with-map { grid-template-columns: minmax(0, 1fr) 272px; }
+    .question-area { min-width: 0; }
     .question-map {
-      margin-top: 12px;
+      position: sticky;
+      top: 78px;
+      max-height: calc(100vh - 96px);
+      overflow: auto;
       padding: 12px;
       border: 1px solid var(--hs-border, #e5e7eb);
       border-radius: 8px;
       background: var(--hs-surface, #fff);
+      box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
     }
-    .map-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .map-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
     .map-head strong { display: block; color: var(--hs-text, #111827); }
     .map-head span { color: var(--hs-text-muted, #6b7280); font-size: 13px; }
-    .legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--hs-text-muted); font-size: 12px; }
     .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; border: 1px solid transparent; }
     .dot.done { background: var(--hs-primary, #4f46e5); }
     .dot.pending { background: var(--hs-surface, #fff); border-color: var(--hs-border, #d1d5db); }
     .map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr)); gap: 8px; }
-    .map-btn {
-      width: 36px;
-      min-width: 36px;
-      height: 36px;
-      justify-self: center;
-      font-weight: 600;
-    }
+    .map-btn { width: 36px; min-width: 36px; height: 36px; justify-self: center; font-weight: 600; }
     .map-btn.done { color: #fff; background: var(--hs-primary, #4f46e5); border-color: var(--hs-primary, #4f46e5); }
     .map-btn.pending { color: var(--hs-text, #111827); background: var(--hs-surface, #fff); border-color: var(--hs-border, #d1d5db); }
     .map-btn.active { outline: 2px solid var(--hs-primary, #4f46e5); outline-offset: 2px; }
-    .questions { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+    .questions { display: flex; flex-direction: column; gap: 12px; }
     .group-card { background: var(--hs-surface-alt, #f5f7ff); }
     .passage { white-space: pre-wrap; margin: 0; }
-    .q-card { scroll-margin-top: 16px; }
+    .q-card { scroll-margin-top: 96px; }
     .q-card.active { border-color: var(--hs-primary, #4f46e5); box-shadow: 0 0 0 1px color-mix(in srgb, var(--hs-primary, #4f46e5) 35%, transparent); }
     .q-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
     .q-no { font-weight: 700; }
@@ -198,8 +239,32 @@ interface Section { title: string | null; passage: string | null; items: TakeQ[]
     .match-row .mr { min-width: 160px; }
     .footer { margin: 24px 0; text-align: center; }
     .back { margin-top: 12px; }
+    .map-scrim { display: none; }
+    @media (max-width: 1024px) {
+      .exam-layout.with-map { grid-template-columns: minmax(0, 1fr); }
+      .question-map {
+        position: fixed;
+        top: 88px;
+        right: 12px;
+        bottom: 12px;
+        z-index: 35;
+        width: min(320px, calc(100vw - 24px));
+        max-height: none;
+      }
+      .map-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        border: 0;
+        background: rgba(15, 23, 42, .18);
+      }
+    }
     @media (max-width: 575px) {
-      .map-head { align-items: flex-start; flex-direction: column; }
+      .exam-toolbar { align-items: stretch; flex-direction: column; gap: 8px; padding: 8px; }
+      .toolbar-actions { justify-content: space-between; }
+      .toolbar-actions button { flex: 1; }
+      .timer, .no-limit { width: 100%; justify-content: center; }
       .map-grid { grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px; }
       .map-btn { width: 34px; min-width: 34px; height: 34px; font-size: 13px; }
       .match-row { flex-direction: column; align-items: stretch; }
@@ -220,6 +285,7 @@ export class ExamTakePage implements OnInit, OnDestroy {
   protected readonly sections = signal<Section[]>([]);
   protected readonly remaining = signal(0);
   protected readonly activeQuestionId = signal<string | null>(null);
+  protected readonly questionMapOpen = signal(false);
   protected answers: Record<string, any> = {};
   private timer?: ReturnType<typeof setInterval>;
   private submitting = false;
@@ -283,6 +349,10 @@ export class ExamTakePage implements OnInit, OnDestroy {
 
   protected questionDomId(q: PortalQuestion): string {
     return `exam-question-${q.id}`;
+  }
+
+  protected toggleQuestionMap(): void {
+    this.questionMapOpen.update(v => !v);
   }
 
   protected jumpToQuestion(q: PortalQuestion): void {
