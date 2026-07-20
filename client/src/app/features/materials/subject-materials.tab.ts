@@ -141,7 +141,7 @@ interface FolderGroup {
               }
               <nz-upload nzAccept=".jpg,.jpeg,.png,.gif,.webp" [nzShowUploadList]="false" [nzBeforeUpload]="beforeCoverUpload">
                 <button nz-button type="button" [nzLoading]="coverUploading()">
-                  <nz-icon nzType="picture" /> {{ folderCoverId() ? 'Đổi ảnh bìa' : 'Chọn ảnh bìa (16:9)' }}
+                  <nz-icon nzType="picture" /> {{ folderCoverId() ? 'Đổi ảnh bìa' : 'Chọn ảnh bìa sách' }}
                 </button>
               </nz-upload>
             </nz-form-control></nz-form-item>
@@ -151,12 +151,12 @@ interface FolderGroup {
       </ng-container>
     </nz-modal>
 
-    <!-- Modal crop ảnh bìa bộ 16:9 -->
+    <!-- Modal crop ảnh bìa bộ theo tỉ lệ bìa sách -->
     <app-avatar-crop-modal
       [visible]="coverCropVisible()" [imageFile]="coverSourceFile()"
-      [aspectRatio]="16 / 9" [roundCropper]="false" [resizeToWidth]="1280"
-      [modalWidth]="680" [containWithinAspectRatio]="true"
-      title="Cắt ảnh bìa (tỉ lệ 16:9)" outputFileName="cover.png"
+      [aspectRatio]="3 / 4" [roundCropper]="false" [resizeToWidth]="900"
+      [modalWidth]="520" [cropAreaMaxWidth]="360" [containWithinAspectRatio]="true"
+      title="Cắt ảnh bìa sách" outputFileName="book-cover.png"
       (cropped)="onCoverCropped($event)"
       (cancelled)="coverCropVisible.set(false); coverSourceFile.set(null)" />
   `,
@@ -188,8 +188,8 @@ interface FolderGroup {
       box-shadow: var(--hs-shadow); transition: box-shadow 0.2s, transform 0.2s; }
     .book-card:hover, .book-card:focus-visible { box-shadow: var(--hs-shadow-hover); transform: translateY(-2px); }
     .book-cover { position: relative; }
-    .book-cover img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
-    .book-cover-ph { aspect-ratio: 16 / 9; display: grid; place-items: center; font-size: 42px;
+    .book-cover img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
+    .book-cover-ph { aspect-ratio: 3 / 4; display: grid; place-items: center; font-size: 42px;
       color: rgba(255, 255, 255, 0.92);
       background: linear-gradient(135deg, var(--hs-mat-green) 0%, #a3c162 55%, #ffd98e 100%); }
     .book-menu { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.15s;
@@ -211,7 +211,7 @@ interface FolderGroup {
       padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
     .cover-preview { margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-    .cover-preview img { width: 100%; max-width: 320px; aspect-ratio: 16 / 9; object-fit: cover;
+    .cover-preview img { width: 100%; max-width: 180px; aspect-ratio: 3 / 4; object-fit: cover;
       border-radius: 8px; border: 1px solid var(--hs-border); }
   `
 })
@@ -394,7 +394,7 @@ export class SubjectMaterialsTab {
     });
   }
 
-  // ---- Ảnh bìa bộ: chọn → crop 16:9 → upload (Public) ----
+  // ---- Ảnh bìa bộ: chọn → crop tỉ lệ bìa sách → upload (Public) ----
 
   protected beforeCoverUpload = (file: NzUploadFile): false => {
     const f = file as unknown as File;

@@ -19,7 +19,12 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
       nzCentered
     >
       <ng-container *nzModalContent>
-        <div class="crop-area" [class.cover-crop]="isCoverCrop()">
+        <div
+          class="crop-area"
+          [class.free-crop]="isFreeCrop()"
+          [style.aspect-ratio]="cropAreaAspectRatio()"
+          [style.max-width.px]="cropAreaMaxWidth() || null"
+        >
           <image-cropper
             [imageFile]="imageFile() ?? undefined"
             [aspectRatio]="aspectRatio()"
@@ -74,13 +79,13 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
       width: 100%;
       height: 340px;
     }
-    .crop-area.cover-crop {
+    .crop-area.free-crop {
       min-height: unset;
-      aspect-ratio: 16 / 9;
+      margin: 0 auto;
     }
-    .crop-area.cover-crop image-cropper {
+    .crop-area.free-crop image-cropper {
       height: auto;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: inherit;
     }
     .zoom-controls {
       display: flex;
@@ -102,7 +107,7 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
       .crop-area image-cropper {
         height: 300px;
       }
-      .crop-area.cover-crop image-cropper {
+      .crop-area.free-crop image-cropper {
         height: auto;
       }
     }
@@ -111,7 +116,7 @@ import { ImageCroppedEvent, ImageCropperComponent, ImageTransform } from 'ngx-im
 export class AvatarCropModal {
   readonly visible = input(false);
   readonly imageFile = input<File | null>(null);
-  // Tham số hóa để dùng chung (avatar tròn 1:1 mặc định; ảnh bìa tài liệu truyền 16/9 + vuông).
+  // Tham số hóa để dùng chung: avatar tròn 1:1 mặc định; ảnh bìa tài liệu có thể truyền tỉ lệ ngang/dọc.
   readonly aspectRatio = input(1);
   readonly roundCropper = input(true);
   readonly title = input('Chỉnh sửa ảnh đại diện');
@@ -120,13 +125,15 @@ export class AvatarCropModal {
   readonly resizeToWidth = input(0);
   readonly modalWidth = input(520);
   readonly containWithinAspectRatio = input(false);
+  readonly cropAreaMaxWidth = input(0);
   readonly cropped = output<File>();
   readonly cancelled = output<void>();
 
   protected readonly zoomLevel = signal(100);
   protected readonly croppedBlob = signal<Blob | null>(null);
   protected readonly transform = computed<ImageTransform>(() => ({ scale: this.zoomLevel() / 100 }));
-  protected readonly isCoverCrop = computed(() => !this.roundCropper() && this.aspectRatio() > 1);
+  protected readonly isFreeCrop = computed(() => !this.roundCropper());
+  protected readonly cropAreaAspectRatio = computed(() => this.isFreeCrop() ? `${this.aspectRatio()}` : null);
 
   protected readonly zoomFormatter = (value: number): string => `${value}%`;
 

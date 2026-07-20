@@ -407,7 +407,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **Học phí** (`Tuition*`): CRUD + đánh dấu đã đóng, status tính lại theo `DueDate/PaidOn` + `DueSoonDays`.
 - **Kho tài liệu** (`Material*`): link ngoài hoặc file server (`StoredFile`/`IFileStorage`); **mã tự sinh `TL0001`** (cột `Code`
   unique kể cả soft-deleted); "Loại tài liệu" = `MaterialCategory` (CRUD, chặn xóa khi đang dùng); Khối snapshot tên từ `GradeCategory`;
-  ảnh bìa 16:9 (`CoverFileId`, upload `POST /api/materials/cover-image` Public + crop 16:9 qua `avatar-crop-modal` đã tham số hóa;
+  ảnh bìa (`CoverFileId`, upload `POST /api/materials/cover-image` Public; Tài liệu chung dùng 16:9, Bộ tài liệu môn học dùng bìa sách 3:4 qua `avatar-crop-modal` đã tham số hóa;
   validate cover tồn tại + là ảnh `Materials.CoverNotFound/CoverNotImage`; đổi/xóa ảnh không xóa file cũ — orphan cleanup lo).
   **Tái cấu trúc 2026-07-07 — 2 nhánh tài liệu:** (1) **Tài liệu môn học** phân cấp **Môn → Bộ tài liệu → Tài liệu**: entity mới
   `MaterialFolder` (SubjectId bất biến + SubjectName snapshot, Name vd "Tiếng Anh 10", GradeBand?, CoverFileId?, Description?;
@@ -420,7 +420,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   **FE `/materials` = shell 4 tab, trạng thái trên URL `?tab=subject|general|catalog|questions&subjectId=&folderId=`**
   (bind qua `withComponentInputBinding` + `input({alias})` trên MaterialsPage, truyền xuống tab con; đổi mức = navigate merge
   queryParams — F5/share URL/back giữ đúng vị trí): **Tài liệu môn học** (`subject-materials.tab.ts` — 3 mức + breadcrumb tự dựng:
-  lưới Môn (card + số bộ/tài liệu) → lưới Bộ (nzCover 16:9/placeholder folder-open, CRUD + crop ảnh bìa) → bảng tài liệu trong bộ
+  lưới Môn (card + số bộ/tài liệu) → lưới Bộ (card bìa sách 3:4/placeholder folder-open, CRUD + crop ảnh bìa) → bảng tài liệu trong bộ
   (STT/Mã/Tên/Nguồn/Ngày + Xem/Download/**Đề**/Sửa/Xóa, search + phân trang; icon mắt mở **trình xem FULL màn hình dùng chung `shared/document-preview.ts`** (2026-07-10, thay modal 1000px lặp ở 2 tab): nz-modal `nzWrapClassName="hs-modal-fullscreen"` 100vw×100dvh (style global `styles.scss`), PDF/Word/ODT/RTF/TXT qua `/api/files/{id}/preview` (iframe), **ảnh** tải blob thường hiện `<img>` (fix ảnh trước bị đẩy nhầm vào /preview), loại khác hiện thông báo + nút Tải xuống; header tên tài liệu + nút Tải xuống; race-guard + revoke objectURL; exam-detail có nút **"Phóng to"** trên panel tài liệu gốc mở cùng trình xem qua `previewUrl`)) · **Tài liệu chung** (`general-materials.tab.ts` —
   lưới card như cũ, lọc `generalOnly`) · **Danh mục** (chỉ Loại tài liệu — Môn/Khối quản ở Lớp học) · **Quản lí câu hỏi**
   (`question-bank.tab.ts`, lazy — §15.14). Chuỗi back exam-detail → exam-list → `/materials` **chuyển tiếp ngữ cảnh**
@@ -432,7 +432,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   reorder/xóa giữa chừng tự đánh lại. Quy tắc: xóa Unit chặn khi còn tài liệu (`MaterialUnit.InUse`); xóa Bộ chặn thêm khi còn Unit
   (`MaterialFolder.HasUnits`); gán tài liệu vào unit validate unit thuộc đúng bộ (`Material.UnitNotInFolder`), tài liệu chung ép
   `UnitId=null`; sắp xếp qua `PUT /api/material-units/reorder` (orderedIds khớp CHÍNH XÁC tập unit sống — chống reorder trên dữ liệu cũ).
-  **FE:** tab Tài liệu môn học còn 2 mức trong shell (lưới Môn → lưới **card sách** nhóm theo Khối: bìa 16:9, footer "N tài liệu · N UNIT",
+  **FE:** tab Tài liệu môn học còn 2 mức trong shell (lưới Môn → lưới **card sách** nhóm theo Khối: bìa 3:4, footer "N tài liệu · N UNIT",
   CRUD bộ trong dropdown ⋮ trên bìa); mức chi tiết tách ra **route immersive `/materials/folders/:folderId(?subjectId=&unitId=)`**
   (`folder-detail.page.ts`, full-bleed negative margin trong `.app-content`): hero = ảnh bìa blur + overlay (fallback gradient ấm),
   nút Home tròn, panel mờ 2 cột thanh Unit (Unit xanh lá + chip số cam nhô; Review thanh cam) → click vào màn bài học (header cam +
@@ -681,6 +681,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 
 > Ghi lại mỗi thay đổi đáng kể (entity/endpoint/luồng/config/hạ tầng) theo định dạng: `ngày — mô tả — file chính`.
 
+- **2026-07-20** — **Kho tài liệu: bìa bộ tài liệu môn học chuyển sang tỉ lệ sách**: FE đổi card/preview/crop ảnh bìa trong tab **Tài liệu môn học** từ 16:9 sang 3:4 để upload trang bìa sách dễ căn và hiển thị đúng dáng bìa; `avatar-crop-modal` hỗ trợ crop ảnh không tròn theo tỉ lệ ngang/dọc truyền vào, giữ nguyên crop avatar. Không đổi API/schema. — `client/src/app/features/materials/subject-materials.tab.ts`, `client/src/app/shared/avatar-crop-modal.ts`, `ARCHITECTURE.md`.
 - **2026-07-19** — **Luồng HS làm bài: cố định thanh tiến độ/thời gian/nộp bài + panel câu hỏi ẩn/hiện** (§15.15): `exam-take.page` tách page header khỏi thanh làm bài, thêm toolbar sticky chứa progress, đồng hồ/hạn nộp, nút mở danh sách câu và nút nộp bài; danh sách câu đã làm/chưa làm chuyển sang panel cạnh phải có nút ẩn/hiện (mobile/tablet hiển thị dạng overlay), giúp giữ không gian chính cho câu hỏi. Không đổi API/schema. Build FE sạch. — `client/src/app/features/portal/exam-take.page.ts`, `ARCHITECTURE.md`.
 - **2026-07-19** — **Xem chi tiết BTVN theo học viên từ màn Học viên và Chi tiết lớp → Học viên** (§15.15): thêm endpoint `GET /api/exams/students/{studentId}/homework?classId=` (Teacher/Admin, qua `ClassAccessGuard`, chỉ Homework của lớp học viên đang active; trả trạng thái attempt/điểm/hạn nộp/attemptId). FE thêm `StudentHomeworkModal` dùng chung: mở từ bảng Học viên, popup chi tiết Học viên, tab Học viên trong Chi tiết lớp (lọc theo lớp), có nút xem bài làm đã nộp và báo cáo lượt giao. Không migration. Build BE/FE sạch; test `MaterialAssignmentTests` 12/12. — `server/src/HungSilver.Application/Exams/{ExamAssignmentDtos,IExamAssignmentService}.cs`, `server/src/HungSilver.Infrastructure/Exams/ExamAssignmentService.cs`, `server/src/HungSilver.WebApi/Controllers/ExamsController.cs`, `client/src/app/{core/{models,exam.service}.ts,shared/student-homework-modal.ts,features/{students/students.page.ts,classes/class-detail.page.ts}}`, `server/tests/HungSilver.UnitTests/MaterialAssignmentTests.cs`, `ARCHITECTURE.md`.
 - **2026-07-19** — **Luồng HS làm bài: thêm bảng trạng thái câu hỏi và nhảy nhanh tới câu** (§15.15): `exam-take.page` hiển thị lưới số câu ngay dưới tiến độ, phân biệt **Đã làm/Chưa làm**, cập nhật theo đáp án hiện tại, bấm số câu cuộn/focus tới đúng card câu hỏi và tô trạng thái câu đang thao tác. Không đổi API/schema; giữ autosave/debounce/flush khi nộp như cũ. Build FE sạch. — `client/src/app/features/portal/exam-take.page.ts`, `ARCHITECTURE.md`.
