@@ -185,6 +185,7 @@ import { DocumentPreview } from '../../shared/document-preview';
     <app-avatar-crop-modal
       [visible]="coverCropVisible()" [imageFile]="coverSourceFile()"
       [aspectRatio]="16 / 9" [roundCropper]="false" [resizeToWidth]="1280"
+      [modalWidth]="680" [containWithinAspectRatio]="true"
       title="Cắt ảnh bìa (tỉ lệ 16:9)" outputFileName="cover.png"
       (cropped)="onCoverCropped($event)"
       (cancelled)="coverCropVisible.set(false); coverSourceFile.set(null)" />
