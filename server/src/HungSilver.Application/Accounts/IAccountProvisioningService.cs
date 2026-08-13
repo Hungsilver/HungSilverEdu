@@ -43,19 +43,33 @@ public interface IAccountProvisioningService
 
     /// <summary>Khóa/mở khóa đăng nhập tài khoản giáo viên.</summary>
     Task<Result> SetTeacherLockedAsync(Guid teacherProfileId, bool locked, CancellationToken ct = default);
+
+    /// <summary>Gỡ liên kết tài khoản khỏi hồ sơ giáo viên (KHÔNG xóa tài khoản).</summary>
+    Task<Result> UnlinkTeacherAsync(Guid teacherProfileId, CancellationToken ct = default);
+
+    /// <summary>Liên kết giáo viên với một tài khoản (role Teacher) đã tồn tại — enforce 1-1.</summary>
+    Task<Result> LinkTeacherAsync(Guid teacherProfileId, Guid userId, CancellationToken ct = default);
 }
 
 /// <summary>Tùy chọn khi cấp/đặt lại tài khoản.</summary>
 /// <param name="Password">Mật khẩu khởi tạo; null/trống ⇒ dùng mật khẩu mặc định cấu hình.</param>
-/// <param name="LoginEmail">Email đăng nhập tùy chọn; null ⇒ ưu tiên email hồ sơ (nếu có &amp; chưa dùng) rồi email ảo.</param>
+/// <param name="LoginEmail">Email đăng nhập tùy chọn; null ⇒ dùng email hồ sơ nếu có, không có thì để trống
+/// (đăng nhập bằng mã — hệ thống không sinh email ảo nữa).</param>
 /// <param name="MustChangePassword">Bắt buộc đổi mật khẩu lần đầu (mặc định true).</param>
 public sealed record ProvisionAccountOptions(
     string? Password = null,
     string? LoginEmail = null,
     bool MustChangePassword = true);
 
-public sealed record AccountProvisionResultDto(Guid UserId, string UserName, bool MustChangePassword);
+/// <summary>
+/// Kết quả cấp tài khoản. <paramref name="Password"/> là mật khẩu vừa đặt — CHỈ trả về đúng lúc cấp/đặt lại
+/// để hiển thị bảng bàn giao cho người quản lý; hệ thống không lưu và không có endpoint đọc lại.
+/// </summary>
+public sealed record AccountProvisionResultDto(
+    Guid UserId, string UserName, string Password, bool MustChangePassword);
 
-public sealed record BulkProvisionItemDto(Guid Id, bool Success, string? UserName, string? Error);
+/// <summary>Một dòng trong bảng bàn giao khi cấp hàng loạt (kèm mã + họ tên để phát cho đúng người).</summary>
+public sealed record BulkProvisionItemDto(
+    Guid Id, bool Success, string? Code, string? FullName, string? UserName, string? Password, string? Error);
 
 public sealed record BulkProvisionResultDto(int Total, int Succeeded, int Failed, IReadOnlyList<BulkProvisionItemDto> Items);

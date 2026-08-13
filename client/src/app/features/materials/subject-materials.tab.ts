@@ -35,7 +35,6 @@ interface FolderGroup {
  */
 @Component({
   selector: 'app-subject-materials-tab',
-  host: { class: 'hs-mat-theme' },
   imports: [
     ReactiveFormsModule,
     NzButtonModule, NzCardModule, NzDropDownModule, NzEmptyModule, NzFormModule, NzIconModule, NzInputModule,
@@ -60,7 +59,7 @@ interface FolderGroup {
               <nz-card class="subject-card" (click)="openSubject(s.subjectId)">
                 <div class="subject-icon"><nz-icon nzType="book" /></div>
                 <div class="mc-title">{{ s.subjectName }}</div>
-                <div class="mc-meta">{{ s.folderCount }} bộ tài liệu · {{ s.materialCount }} tài liệu</div>
+                <div class="mc-meta">{{ s.folderCount }} bộ · {{ s.materialCount }} tài liệu@if (s.examCount > 0) { · {{ s.examCount }} đề }</div>
               </nz-card>
             } @empty {
               @if (!loading()) { <nz-empty class="grid-empty" nzNotFoundContent="Chưa có môn học nào — thêm Môn tại Lớp học → Danh mục." /> }
@@ -105,7 +104,10 @@ interface FolderGroup {
                   </div>
                   <div class="book-foot">
                     <span class="foot-count"><span class="dot"></span>{{ f.materialCount }} tài liệu</span>
-                    <span class="foot-badge">{{ f.unitCount || 0 }} UNIT</span>
+                    <span class="foot-badges">
+                      @if (f.examCount > 0) { <span class="foot-exam">{{ f.examCount }} đề</span> }
+                      <span class="foot-badge">{{ f.unitCount || 0 }} UNIT</span>
+                    </span>
                   </div>
                 </div>
               }
@@ -191,7 +193,7 @@ interface FolderGroup {
     .book-cover img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
     .book-cover-ph { aspect-ratio: 3 / 4; display: grid; place-items: center; font-size: 42px;
       color: rgba(255, 255, 255, 0.92);
-      background: linear-gradient(135deg, var(--hs-mat-green) 0%, #a3c162 55%, #ffd98e 100%); }
+      background: linear-gradient(135deg, var(--hs-primary, #4f46e5) 0%, #7c3aed 55%, #a855f7 100%); }
     .book-menu { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.15s;
       background: rgba(0, 0, 0, 0.4); color: #fff; border: 0; }
     .book-menu:hover, .book-menu:focus { background: rgba(0, 0, 0, 0.6); color: #fff; }
@@ -205,9 +207,12 @@ interface FolderGroup {
     .book-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px;
       border-top: 1px solid var(--hs-border); padding: 9px 16px; }
     .foot-count { display: inline-flex; align-items: center; gap: 6px;
-      color: var(--hs-mat-green-text); font-weight: 600; font-size: 13px; }
-    .foot-count .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hs-mat-green); }
-    .foot-badge { background: var(--hs-mat-badge-bg); color: #fff; border-radius: 4px;
+      color: var(--hs-text-muted); font-weight: 600; font-size: 13px; }
+    .foot-count .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hs-primary, #4f46e5); }
+    .foot-badges { display: inline-flex; gap: 6px; align-items: center; }
+    .foot-exam { background: var(--hs-primary-weak, #eef0fe); color: var(--hs-primary, #4f46e5); border-radius: 999px;
+      padding: 2px 9px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .foot-badge { background: var(--hs-surface-3, #edeff8); color: var(--hs-text-muted); border-radius: 4px;
       padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
     .cover-preview { margin-bottom: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }

@@ -96,7 +96,6 @@ public sealed class ExamGenerationService(
             TotalPoints = 10m,
             Status = ExamStatus.Draft,
             Source = request.Mode == ExamGenerationMode.Extract ? ExamGenSource.Extracted : ExamGenSource.Generated,
-            Language = "en",
             CreatedByUserId = userId
         };
 

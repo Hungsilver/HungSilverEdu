@@ -28,6 +28,7 @@ public sealed class MaterialFolderService(
     IRepository<MaterialUnit> units,
     IRepository<Subject> subjects,
     IRepository<StoredFile> storedFiles,
+    IRepository<Exam> exams,
     IUnitOfWork unitOfWork,
     IValidator<CreateMaterialFolderRequest> createValidator,
     IValidator<UpdateMaterialFolderRequest> updateValidator) : IMaterialFolderService
@@ -39,23 +40,30 @@ public sealed class MaterialFolderService(
         var activeSubjects = (await subjects.FindAsync(s => s.IsActive, ct)).OrderBy(s => s.IndexOrder).ThenBy(s => s.Name).ToList();
         var allFolders = await folders.FindAsync(_ => true, ct);
         var folderCountBySubject = allFolders.GroupBy(f => f.SubjectId).ToDictionary(g => g.Key, g => g.Count());
-        var materialCountByFolder = await CountMaterialsByFolderAsync(allFolders.Select(f => f.Id).ToList(), ct);
+        var folderIds = allFolders.Select(f => f.Id).ToList();
+        var materialCountByFolder = await CountMaterialsByFolderAsync(folderIds, ct);
+        var examCountByFolder = await CountExamsByFolderAsync(folderIds, ct);
         var materialCountBySubject = allFolders
             .GroupBy(f => f.SubjectId)
             .ToDictionary(g => g.Key, g => g.Sum(f => materialCountByFolder.GetValueOrDefault(f.Id)));
+        var examCountBySubject = allFolders
+            .GroupBy(f => f.SubjectId)
+            .ToDictionary(g => g.Key, g => g.Sum(f => examCountByFolder.GetValueOrDefault(f.Id)));
 
         // Môn active trước (kể cả 0 bộ — GV cần thấy môn để tạo bộ đầu tiên), sau đó append môn chỉ còn
         // trong snapshot của bộ (môn đã xóa/ngừng dùng nhưng còn bộ — tránh bộ "mồ côi vô hình").
         var result = activeSubjects
             .Select(s => new MaterialSubjectSummaryDto(s.Id, s.Name,
-                folderCountBySubject.GetValueOrDefault(s.Id), materialCountBySubject.GetValueOrDefault(s.Id)))
+                folderCountBySubject.GetValueOrDefault(s.Id), materialCountBySubject.GetValueOrDefault(s.Id),
+                examCountBySubject.GetValueOrDefault(s.Id)))
             .ToList();
         var known = activeSubjects.Select(s => s.Id).ToHashSet();
         result.AddRange(allFolders
             .Where(f => !known.Contains(f.SubjectId))
             .GroupBy(f => f.SubjectId)
             .Select(g => new MaterialSubjectSummaryDto(g.Key, g.First().SubjectName,
-                g.Count(), g.Sum(f => materialCountByFolder.GetValueOrDefault(f.Id)))));
+                g.Count(), g.Sum(f => materialCountByFolder.GetValueOrDefault(f.Id)),
+                g.Sum(f => examCountByFolder.GetValueOrDefault(f.Id)))));
 
         return result;
     }
@@ -67,7 +75,9 @@ public sealed class MaterialFolderService(
         var ids = list.Select(f => f.Id).ToList();
         var counts = await CountMaterialsByFolderAsync(ids, ct);
         var unitCounts = await CountUnitsByFolderAsync(ids, ct);
-        return list.Select(f => ToDto(f, counts.GetValueOrDefault(f.Id), unitCounts.GetValueOrDefault(f.Id))).ToList();
+        var examCounts = await CountExamsByFolderAsync(ids, ct);
+        return list.Select(f => ToDto(f, counts.GetValueOrDefault(f.Id), unitCounts.GetValueOrDefault(f.Id),
+            examCounts.GetValueOrDefault(f.Id))).ToList();
     }
 
     public async Task<Result<MaterialFolderDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -78,7 +88,8 @@ public sealed class MaterialFolderService(
 
         var counts = await CountMaterialsByFolderAsync([id], ct);
         var unitCounts = await CountUnitsByFolderAsync([id], ct);
-        return ToDto(folder, counts.GetValueOrDefault(id), unitCounts.GetValueOrDefault(id));
+        var examCounts = await CountExamsByFolderAsync([id], ct);
+        return ToDto(folder, counts.GetValueOrDefault(id), unitCounts.GetValueOrDefault(id), examCounts.GetValueOrDefault(id));
     }
 
     public async Task<Result<MaterialFolderDto>> CreateAsync(CreateMaterialFolderRequest request, CancellationToken ct = default)
@@ -107,7 +118,7 @@ public sealed class MaterialFolderService(
 
         await folders.AddAsync(folder, ct);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(folder, 0, 0);
+        return ToDto(folder, 0, 0, 0);
     }
 
     public async Task<Result<MaterialFolderDto>> UpdateAsync(Guid id, UpdateMaterialFolderRequest request, CancellationToken ct = default)
@@ -147,7 +158,8 @@ public sealed class MaterialFolderService(
 
         await unitOfWork.SaveChangesAsync(ct);
         var unitCounts = await CountUnitsByFolderAsync([id], ct);
-        return ToDto(folder, children.Count, unitCounts.GetValueOrDefault(id));
+        var examCounts = await CountExamsByFolderAsync([id], ct);
+        return ToDto(folder, children.Count, unitCounts.GetValueOrDefault(id), examCounts.GetValueOrDefault(id));
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
@@ -185,6 +197,19 @@ public sealed class MaterialFolderService(
 
     private static string? CleanBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    private static MaterialFolderDto ToDto(MaterialFolder f, int materialCount, int unitCount) =>
-        new(f.Id, f.SubjectId, f.SubjectName, f.Name, f.GradeBand, f.CoverFileId, f.Description, materialCount, unitCount, f.CreatedAt);
+    /// <summary>Số đề của bộ = tổng đề sinh từ các tài liệu trong bộ (badge trên card sách).</summary>
+    private async Task<Dictionary<Guid, int>> CountExamsByFolderAsync(List<Guid> folderIds, CancellationToken ct)
+    {
+        if (folderIds.Count == 0) return [];
+        var items = await materials.FindAsync(m => m.FolderId != null && folderIds.Contains(m.FolderId.Value), ct);
+        if (items.Count == 0) return [];
+
+        var examCounts = await MaterialExamCounter.CountByMaterialAsync(exams, items.Select(m => m.Id), ct);
+        return items
+            .GroupBy(m => m.FolderId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(m => examCounts.GetValueOrDefault(m.Id)));
+    }
+
+    private static MaterialFolderDto ToDto(MaterialFolder f, int materialCount, int unitCount, int examCount) =>
+        new(f.Id, f.SubjectId, f.SubjectName, f.Name, f.GradeBand, f.CoverFileId, f.Description, materialCount, unitCount, examCount, f.CreatedAt);
 }

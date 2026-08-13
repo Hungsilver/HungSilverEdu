@@ -107,7 +107,6 @@ public sealed class ExamQuestionBankService(AppDbContext context, IUnitOfWork un
             TotalPoints = 10m,
             Status = ExamStatus.Draft,
             Source = ExamGenSource.Manual,
-            Language = sourceExams.FirstOrDefault()?.Language ?? "en",
             CreatedByUserId = userId
         };
 
@@ -178,7 +177,6 @@ public sealed class ExamQuestionBankService(AppDbContext context, IUnitOfWork un
             TotalPoints = source.TotalPoints,
             Status = ExamStatus.Draft,
             Source = source.Source,
-            Language = source.Language,
             CreatedByUserId = userId
         };
 

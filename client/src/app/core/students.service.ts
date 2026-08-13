@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { AccountProvisionResult, BulkProvisionResult, PagedResult, ParentReport, ProvisionAccountRequest, RedeemRewardRequest, Student, StudentProgress, StudentRequest } from './models';
+import { AccountProvisionResult, BulkProvisionResult, PagedResult, ParentReport, ProvisionAccountRequest, RedeemRewardRequest, Student, StudentProgress, StudentRequest, UnlinkedStudentUser } from './models';
 
 export interface StudentQuery {
   page: number;
@@ -13,6 +13,8 @@ export interface StudentQuery {
   subjectId?: string;
   gradeId?: string;
   teacherProfileId?: string;
+  /** Lọc theo lớp — dùng khi cần cô lập danh sách một lớp để cấp tài khoản hàng loạt. */
+  classId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -28,6 +30,7 @@ export class StudentsService {
     if (query.subjectId) params = params.set('subjectId', query.subjectId);
     if (query.gradeId) params = params.set('gradeId', query.gradeId);
     if (query.teacherProfileId) params = params.set('teacherProfileId', query.teacherProfileId);
+    if (query.classId) params = params.set('classId', query.classId);
     return this.http.get<PagedResult<Student>>(this.apiUrl, { params });
   }
 
@@ -69,6 +72,11 @@ export class StudentsService {
   }
 
   /** Cấp tài khoản đăng nhập cho học sinh (tên đăng nhập = Mã HV; mật khẩu trống ⇒ mặc định). */
+  /** Tài khoản role Học sinh chưa gắn hồ sơ nào (server đã loại tài khoản đã liên kết). */
+  getUnlinkedUsers(): Observable<UnlinkedStudentUser[]> {
+    return this.http.get<UnlinkedStudentUser[]>(`${this.apiUrl}/unlinked-users`);
+  }
+
   provisionAccount(studentId: string, request: ProvisionAccountRequest = {}): Observable<AccountProvisionResult> {
     return this.http.post<AccountProvisionResult>(`${this.apiUrl}/${studentId}/account`, request);
   }

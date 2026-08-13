@@ -9,7 +9,9 @@ namespace HungSilver.WebApi.Controllers;
 
 [ApiController]
 [Route("api/users")]
-[Authorize(Policy = "TeacherOrAdmin")]
+// Toàn bộ quản trị tài khoản là AdminOnly — trước đây GET mở cho cả Giáo viên, tức GV xem được
+// tên đăng nhập/email/họ tên của MỌI tài khoản trong hệ thống.
+[Authorize(Policy = "AdminOnly")]
 public class UsersController(IUserAdminService userAdminService) : ControllerBase
 {
     [HttpGet]

@@ -36,18 +36,31 @@ public static class DbSeeder
             }
         }
 
-        // Cấu hình mặc định (scope System). Vận hành thật ⇒ cho upload file lên server.
-        if (!await context.Settings.IgnoreQueryFilters().AnyAsync())
+        // Cấu hình mặc định (scope System) — seed TỪNG khóa nếu thiếu (idempotent), để DB cũ
+        // vẫn nhận được khóa mới thêm về sau mà không phải xóa bảng.
+        var existingKeys = await context.Settings
+            .Where(s => s.Scope == SettingScope.System)
+            .Select(s => s.Key)
+            .ToListAsync();
+        var missing = SettingKeys.Defaults.Where(kv => !existingKeys.Contains(kv.Key)).ToList();
+        if (missing.Count > 0)
         {
-            foreach (var kv in SettingKeys.Defaults)
-            {
-                var value = kv.Key == SettingKeys.FileStorageMode
-                    ? nameof(FileStorageMode.Server)
-                    : kv.Value;
-                context.Settings.Add(new AppSetting { Key = kv.Key, Value = value, Scope = SettingScope.System });
-            }
+            foreach (var kv in missing)
+                context.Settings.Add(new AppSetting { Key = kv.Key, Value = kv.Value, Scope = SettingScope.System });
             await context.SaveChangesAsync();
-            logger.LogInformation("Seeded default settings (FileStorage.Mode = Server)");
+            logger.LogInformation("Seeded {Count} default settings: {Keys}", missing.Count, string.Join(", ", missing.Select(m => m.Key)));
+        }
+
+        // Dọn khóa đã bỏ (FileStorage.Mode, Account.LocalEmailDomain) để không còn hiện ở màn Cấu hình.
+        var obsoleteKeys = SettingKeys.Obsolete.ToArray();
+        var obsolete = await context.Settings
+            .Where(s => obsoleteKeys.Contains(s.Key))
+            .ToListAsync();
+        if (obsolete.Count > 0)
+        {
+            context.Settings.RemoveRange(obsolete);
+            await context.SaveChangesAsync();
+            logger.LogInformation("Removed {Count} obsolete settings", obsolete.Count);
         }
 
         // Đảm bảo có row Khung Ca học (Schedule.Shifts) để màn Cấu hình chỉnh tay được — idempotent.
@@ -67,7 +80,6 @@ public static class DbSeeder
         }
 
         await SeedGradeCategoriesAsync(context, logger);
-        await SeedMaterialCategoriesAsync(context, logger);
         await SeedPointReasonsAsync(context, logger);
 
         // Auto-seed tài khoản Admin nếu chưa có admin nào trong hệ thống.
@@ -84,7 +96,9 @@ public static class DbSeeder
                 var admin = new AppUser
                 {
                     UserName = adminUsername,
-                    Email = $"{adminUsername}@hedu.local",
+                    // Không sinh email ảo — tài khoản đăng nhập bằng username. Admin gốc cũng KHÔNG bị
+                    // ép đổi mật khẩu (miễn trừ bootstrap, tránh tự khóa hệ thống khi cài đặt lần đầu).
+                    Email = null,
                     FullName = "Administrator",
                     EmailConfirmed = true
                 };
@@ -178,20 +192,4 @@ public static class DbSeeder
         }
     }
 
-    /// <summary>Loại tài liệu mặc định cho Kho tài liệu — chỉ seed khi bảng trống hoàn toàn (kể cả đã xóa mềm).</summary>
-    private static async Task SeedMaterialCategoriesAsync(AppDbContext context, ILogger logger)
-    {
-        if (await context.MaterialCategories.IgnoreQueryFilters().AnyAsync())
-            return;
-
-        var defaults = new (string Name, int SortOrder)[]
-        {
-            ("Giáo trình", 1), ("Lý thuyết", 2), ("Đề kiểm tra", 3), ("Bài tập", 4), ("Từ vựng", 5), ("Video", 6)
-        };
-        foreach (var (name, sort) in defaults)
-            context.MaterialCategories.Add(new MaterialCategory { Name = name, SortOrder = sort });
-
-        await context.SaveChangesAsync();
-        logger.LogInformation("Seeded default material categories");
-    }
 }

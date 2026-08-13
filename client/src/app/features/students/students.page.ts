@@ -19,14 +19,15 @@ import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { AuthService } from '../../core/auth.service';
 import { BranchesService } from '../../core/branches.service';
+import { ClassesService } from '../../core/classes.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
 import { GradesService } from '../../core/grades.service';
-import { Branch, Grade, ROLE_USER, Student, StudentRequest, Subject, TeacherProfile, UserListItem } from '../../core/models';
+import { Branch, BulkProvisionItem, ClassListItem, Grade, Student, StudentRequest, Subject, TeacherProfile, UnlinkedStudentUser } from '../../core/models';
 import { StudentsService } from '../../core/students.service';
 import { SubjectsService } from '../../core/subjects.service';
 import { TeachersService } from '../../core/teachers.service';
-import { UsersService } from '../../core/users.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
+import { AccountHandoverModal } from '../../shared/account-handover-modal';
 import { PageHeader } from '../../shared/page-header';
 import { StudentHomeworkModal } from '../../shared/student-homework-modal';
 import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
@@ -38,7 +39,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
     DatePipe, DecimalPipe, FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings, TableDragScroll,
     NzButtonModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
     NzModalModule, NzPopconfirmModule, NzPopoverModule, NzSelectModule, NzTableModule,
-    NzTagModule, NzCheckboxModule, NzAlertModule, NzTooltipModule, StudentHomeworkModal
+    NzTagModule, NzCheckboxModule, NzAlertModule, NzTooltipModule, StudentHomeworkModal, AccountHandoverModal
   ],
   template: `
     <app-page-header title="Học viên" subtitle="Hồ sơ học viên và lớp đang theo học" icon="idcard">
@@ -67,6 +68,9 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
           @for (t of teachers(); track t.id) { <nz-option [nzValue]="t.id" [nzLabel]="t.fullName" /> }
         </nz-select>
       }
+      <nz-select nzAllowClear nzShowSearch nzPlaceHolder="Lớp" [(ngModel)]="classId">
+        @for (c of classOptions(); track c.id) { <nz-option [nzValue]="c.id" [nzLabel]="c.name" /> }
+      </nz-select>
       <input nz-input placeholder="Tên, mã, SĐT học viên, SĐT phụ huynh" [(ngModel)]="search" (keyup.enter)="applyFilters()" />
     </div>
     <div class="filter-actions">
@@ -107,7 +111,9 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
                   @case ('note') { {{ s.note || '—' }} }
                   @case ('account') {
                     @if (!s.userName) {
-                      <nz-tag>Chưa cấp</nz-tag>
+                      <nz-tag nzColor="warning">⚠ Chưa có tài khoản</nz-tag>
+                      <button nz-button nzSize="small" nzType="primary" style="margin-left:6px"
+                              (click)="$event.stopPropagation(); provisionOne(s)">Cấp ngay</button>
                     } @else if (s.isLocked) {
                       <nz-tag nzColor="error" nz-tooltip [nzTooltipTitle]="s.userName">Đã khóa</nz-tag>
                     } @else {
@@ -245,9 +251,13 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
     <app-student-homework-modal [(open)]="homeworkOpen"
       [studentId]="homeworkStudentId()" [studentName]="homeworkStudentName()" />
+
+    <app-account-handover-modal
+      [visible]="handoverOpen()" [title]="handoverTitle()" [items]="handoverItems()"
+      (closed)="handoverOpen.set(false)" />
   `,
   styles: `
-    .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
     .filter-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
     .filter-actions .spacer { flex: 1; }
     .clickable { cursor: pointer; }
@@ -277,16 +287,21 @@ export class StudentsPage {
   private readonly subjectsService = inject(SubjectsService);
   private readonly gradesService = inject(GradesService);
   private readonly teachersService = inject(TeachersService);
-  private readonly usersService = inject(UsersService);
+  private readonly classesService = inject(ClassesService);
   private readonly message = inject(NzMessageService);
   protected readonly auth = inject(AuthService);
-  protected readonly ROLE_USER = ROLE_USER;
 
   protected readonly students = signal<Student[]>([]);
   protected readonly branches = signal<Branch[]>([]);
   protected readonly subjects = signal<Subject[]>([]);
   protected readonly grades = signal<Grade[]>([]);
   protected readonly teachers = signal<TeacherProfile[]>([]);
+  protected readonly classOptions = signal<ClassListItem[]>([]);
+
+  // Bảng bàn giao sau khi cấp tài khoản (kèm mật khẩu để phát cho học viên).
+  protected readonly handoverOpen = signal(false);
+  protected readonly handoverTitle = signal('Bàn giao tài khoản');
+  protected readonly handoverItems = signal<BulkProvisionItem[]>([]);
   protected readonly loading = signal(false);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
@@ -298,6 +313,7 @@ export class StudentsPage {
   protected subjectId: string | null = null;
   protected gradeId: string | null = null;
   protected teacherProfileId: string | null = null;
+  protected classId: string | null = null;
 
   // Cột cấu hình được (ngoài STT cố định đầu & Thao tác cố định cuối).
   protected readonly COLUMNS: ColumnDef[] = [
@@ -339,7 +355,7 @@ export class StudentsPage {
   protected readonly accountOpen = signal(false);
   protected readonly accountStudent = signal<Student | null>(null);
   protected readonly accBusy = signal(false);
-  protected readonly unlinkedUsers = signal<UserListItem[]>([]);
+  protected readonly unlinkedUsers = signal<UnlinkedStudentUser[]>([]);
   protected accPassword = '';
   protected linkUserId: string | null = null;
   protected readonly form = new FormGroup({
@@ -364,9 +380,11 @@ export class StudentsPage {
       page: this.page(), pageSize: this.pageSize(), search: this.search,
       branchId: this.branchId ?? undefined, subjectId: this.subjectId ?? undefined,
       gradeId: this.gradeId ?? undefined,
-      teacherProfileId: this.auth.isAdmin() ? (this.teacherProfileId ?? undefined) : undefined
+      teacherProfileId: this.auth.isAdmin() ? (this.teacherProfileId ?? undefined) : undefined,
+      classId: this.classId ?? undefined
     }).subscribe({
-      next: r => { this.students.set(r.items); this.total.set(r.totalCount); this.checked.set(new Set()); this.loading.set(false); },
+      // KHÔNG xóa lựa chọn khi đổi trang/lọc — cấp tài khoản cho cả lớp thường phải qua nhiều trang.
+      next: r => { this.students.set(r.items); this.total.set(r.totalCount); this.loading.set(false); },
       error: () => this.loading.set(false)
     });
   }
@@ -382,6 +400,7 @@ export class StudentsPage {
     this.subjectId = null;
     this.gradeId = null;
     this.teacherProfileId = null;
+    this.classId = null;
     this.page.set(1);
     this.load();
   }
@@ -390,6 +409,7 @@ export class StudentsPage {
     this.branchesService.getAll().subscribe(x => this.branches.set(x));
     this.subjectsService.getAll().subscribe(x => this.subjects.set(x));
     this.gradesService.getAll().subscribe(x => this.grades.set(x));
+    this.classesService.getPaged({ page: 1, pageSize: 200 }).subscribe(x => this.classOptions.set(x.items));
     if (this.auth.isAdmin())
       this.teachersService.getPaged({ page: 1, pageSize: 500 }).subscribe(x => this.teachers.set(x.items));
   }
@@ -412,25 +432,27 @@ export class StudentsPage {
   protected save(): void {
     if (this.form.invalid) return;
     const v = this.form.getRawValue();
+    const editingSource = this.editing();
     const req: StudentRequest = {
       studentCode: v.studentCode || null,
       fullName: v.fullName,
       dateOfBirth: toDateOnlyOrNull(v.dateOfBirth),
-      school: null,
-      gradeLevel: null,
+      // Form này không sửa các trường dưới ⇒ GỬI LẠI GIÁ TRỊ HIỆN CÓ, nếu gửi null sẽ xóa trắng dữ liệu.
+      school: editingSource?.school ?? null,
+      gradeLevel: editingSource?.gradeLevel ?? null,
       phone: v.phone,
-      parentName: null,
+      parentName: editingSource?.parentName ?? null,
       parentPhone: v.parentPhone,
       address: v.address,
       email: v.email,
       note: v.note,
-      enrollmentDate: null,
-      englishLevel: null,
-      learningGoal: null,
-      curriculum: null,
-      isActive: true
+      enrollmentDate: editingSource?.enrollmentDate ?? null,
+      englishLevel: editingSource?.englishLevel ?? null,
+      learningGoal: editingSource?.learningGoal ?? null,
+      curriculum: editingSource?.curriculum ?? null,
+      isActive: editingSource?.isActive ?? true
     };
-    const editing = this.editing();
+    const editing = editingSource;
     const op = editing ? this.studentsService.update(editing.id, req) : this.studentsService.create(req);
     op.subscribe({ next: () => { this.message.success('Đã lưu học viên.'); this.modalOpen.set(false); this.load(); }, error: err => this.showError(err, 'Lưu học viên thất bại.') });
   }
@@ -469,8 +491,10 @@ export class StudentsPage {
     this.studentsService.bulkProvision(ids).subscribe({
       next: r => {
         this.bulkBusy.set(false);
-        if (r.failed === 0) this.message.success(`Đã cấp tài khoản cho ${r.succeeded} học viên.`);
-        else this.message.warning(`Cấp ${r.succeeded} thành công, ${r.failed} thất bại.`);
+        this.handoverTitle.set('Bàn giao tài khoản học viên');
+        this.handoverItems.set(r.items);
+        this.handoverOpen.set(true);
+        this.checked.set(new Set());
         this.load();
       },
       error: err => { this.bulkBusy.set(false); this.showError(err, 'Cấp tài khoản hàng loạt thất bại.'); }
@@ -487,9 +511,10 @@ export class StudentsPage {
   }
 
   private loadUnlinkedStudentUsers(): void {
-    // Tài khoản role Học sinh để liên kết thủ công (1-1 enforce ở server).
-    this.usersService.getPaged(1, 200).subscribe({
-      next: r => this.unlinkedUsers.set(r.items.filter(u => !u.isDeleted && u.roles.includes(this.ROLE_USER))),
+    // Tài khoản role Học sinh CHƯA gắn hồ sơ nào — server đã loại sẵn tài khoản đã liên kết
+    // (trước đây lấy 200 user đầu rồi lọc client nên chọn xong hay nhận 409).
+    this.studentsService.getUnlinkedUsers().subscribe({
+      next: list => this.unlinkedUsers.set(list),
       error: () => this.unlinkedUsers.set([])
     });
   }
@@ -503,9 +528,36 @@ export class StudentsPage {
   protected provision(s: Student): void {
     this.accBusy.set(true);
     this.studentsService.provisionAccount(s.id, { password: this.accPassword || null }).subscribe({
-      next: r => { this.accBusy.set(false); this.message.success(`Đã cấp tài khoản "${r.userName}".`); this.accPassword = ''; this.refreshAccount(s.id); },
+      next: r => {
+        this.accBusy.set(false);
+        this.accPassword = '';
+        this.accountOpen.set(false);
+        this.showHandover('Đã cấp tài khoản học viên', [
+          { id: s.id, success: true, code: s.studentCode, fullName: s.fullName, userName: r.userName, password: r.password, error: null }
+        ]);
+        this.refreshAccount(s.id);
+      },
       error: err => { this.accBusy.set(false); this.showError(err, 'Cấp tài khoản thất bại.'); }
     });
+  }
+
+  /** Cấp nhanh ngay trên dòng danh sách — không phải mở modal quản lý tài khoản. */
+  protected provisionOne(s: Student): void {
+    this.studentsService.provisionAccount(s.id, {}).subscribe({
+      next: r => {
+        this.showHandover('Đã cấp tài khoản học viên', [
+          { id: s.id, success: true, code: s.studentCode, fullName: s.fullName, userName: r.userName, password: r.password, error: null }
+        ]);
+        this.load();
+      },
+      error: err => this.showError(err, 'Cấp tài khoản thất bại.')
+    });
+  }
+
+  private showHandover(title: string, items: BulkProvisionItem[]): void {
+    this.handoverTitle.set(title);
+    this.handoverItems.set(items);
+    this.handoverOpen.set(true);
   }
 
   protected linkExisting(s: Student): void {

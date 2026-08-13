@@ -391,7 +391,7 @@ export class QuestionBankTab {
     if (this.materialId) {
       this.examService.listByMaterial(this.materialId, 1, 50).subscribe(r => this.examOptions.set(r.items));
     } else if (this.subjectId) {
-      this.examService.listBySubject(this.subjectId, null, 1, 50).subscribe(r => this.examOptions.set(r.items));
+      this.examService.list({ subjectId: this.subjectId }, 1, 50).subscribe(r => this.examOptions.set(r.items));
     } else {
       this.examOptions.set([]);
     }
@@ -547,7 +547,7 @@ export class QuestionBankTab {
   protected loadAddExams(): void {
     this.addExamId = null;
     if (!this.addSubjectId) { this.addExamOptions.set([]); return; }
-    this.examService.listBySubject(this.addSubjectId, 'Draft', 1, 50).subscribe(r => this.addExamOptions.set(r.items));
+    this.examService.list({ subjectId: this.addSubjectId, status: 'Draft' }, 1, 50).subscribe(r => this.addExamOptions.set(r.items));
   }
 
   protected saveAdd(): void {

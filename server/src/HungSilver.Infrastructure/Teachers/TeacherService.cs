@@ -213,32 +213,31 @@ public sealed class TeacherService(
         return Result.Success();
     }
 
+    // Link/Unlink đi qua AccountProvisioningService — nguồn sự thật duy nhất cho vòng đời tài khoản
+    // (kiểm role, 1-1, bắt DbUpdateException do đua). Ở đây chỉ nạp lại DTO cho client.
     public async Task<Result<TeacherProfileDto>> LinkAccountAsync(Guid teacherId, LinkAccountRequest request, CancellationToken ct = default)
     {
-        var teacher = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.Id == teacherId, ct);
-        if (teacher is null)
-            return Result.Failure<TeacherProfileDto>(NotFoundError);
+        var link = await accountProvisioning.LinkTeacherAsync(teacherId, request.UserId, ct);
+        if (link.IsFailure)
+            return Result.Failure<TeacherProfileDto>(link.Error);
 
-        if (teacher.UserId is not null)
-            return Result.Failure<TeacherProfileDto>(Error.Conflict("Teacher.AlreadyLinked", "Giáo viên này đã có tài khoản."));
-
-        var userCheck = await ValidateUserLinkAsync(request.UserId, teacherId, ct);
-        if (userCheck.IsFailure)
-            return Result.Failure<TeacherProfileDto>(userCheck.Error);
-
-        teacher.UserId = request.UserId;
-        await context.SaveChangesAsync(ct);
-        return (await ToDtosAsync([teacher], ct))[0];
+        return await ReloadDtoAsync(teacherId, ct);
     }
 
     public async Task<Result<TeacherProfileDto>> UnlinkAccountAsync(Guid teacherId, CancellationToken ct = default)
     {
+        var unlink = await accountProvisioning.UnlinkTeacherAsync(teacherId, ct);
+        if (unlink.IsFailure)
+            return Result.Failure<TeacherProfileDto>(unlink.Error);
+
+        return await ReloadDtoAsync(teacherId, ct);
+    }
+
+    private async Task<Result<TeacherProfileDto>> ReloadDtoAsync(Guid teacherId, CancellationToken ct)
+    {
         var teacher = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.Id == teacherId, ct);
         if (teacher is null)
             return Result.Failure<TeacherProfileDto>(NotFoundError);
-
-        teacher.UserId = null;
-        await context.SaveChangesAsync(ct);
         return (await ToDtosAsync([teacher], ct))[0];
     }
 

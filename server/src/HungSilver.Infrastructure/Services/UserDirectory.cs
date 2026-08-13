@@ -49,7 +49,7 @@ public sealed class UserDirectory(AppDbContext context) : IUserDirectory
          join ur in context.UserRoles on u.Id equals ur.UserId
          join r in context.Roles on ur.RoleId equals r.Id
          where r.Name == role
-         select new UserSummary(u.Id, u.Email!, u.FullName)).ToListAsync(ct);
+         select new UserSummary(u.Id, u.Email, u.FullName)).ToListAsync(ct);
 
     public async Task<IReadOnlyList<string>> GetRolesAsync(Guid userId, CancellationToken ct = default) =>
         await (from ur in context.UserRoles

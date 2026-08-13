@@ -44,11 +44,11 @@ public sealed class AccountProvisioningService(
         if (userResult.IsFailure)
             return Result.Failure<AccountProvisionResultDto>(userResult.Error);
 
-        var user = userResult.Value;
+        var (user, password) = userResult.Value;
         student.UserId = user.Id;
         await context.SaveChangesAsync(ct);
 
-        return new AccountProvisionResultDto(user.Id, user.UserName!, user.MustChangePassword);
+        return new AccountProvisionResultDto(user.Id, user.UserName!, password, user.MustChangePassword);
     }
 
     public async Task<BulkProvisionResultDto> ProvisionStudentsAsync(
@@ -57,10 +57,12 @@ public sealed class AccountProvisioningService(
         var items = new List<BulkProvisionItemDto>(studentIds.Count);
         foreach (var id in studentIds.Distinct())
         {
+            var profile = await context.Students.AsNoTracking()
+                .Where(s => s.Id == id).Select(s => new { s.StudentCode, s.FullName }).FirstOrDefaultAsync(ct);
             var r = await ProvisionStudentAsync(id, options, ct);
             items.Add(r.IsSuccess
-                ? new BulkProvisionItemDto(id, true, r.Value.UserName, null)
-                : new BulkProvisionItemDto(id, false, null, r.Error.Message));
+                ? new BulkProvisionItemDto(id, true, profile?.StudentCode, profile?.FullName, r.Value.UserName, r.Value.Password, null)
+                : new BulkProvisionItemDto(id, false, profile?.StudentCode, profile?.FullName, null, null, r.Error.Message));
         }
         return Summarize(items);
     }
@@ -151,13 +153,14 @@ public sealed class AccountProvisioningService(
         if (userResult.IsFailure)
             return Result.Failure<AccountProvisionResultDto>(userResult.Error);
 
-        var user = userResult.Value;
+        var (user, password) = userResult.Value;
         teacher.UserId = user.Id;
-        if (string.IsNullOrWhiteSpace(teacher.Email) && !user.Email!.EndsWith(await LocalEmailDomainAsync(ct), StringComparison.OrdinalIgnoreCase))
+        // Hồ sơ chưa có email mà tài khoản được cấp email thật (do người dùng nhập) ⇒ chép ngược về hồ sơ.
+        if (string.IsNullOrWhiteSpace(teacher.Email) && !string.IsNullOrWhiteSpace(user.Email))
             teacher.Email = user.Email;
         await context.SaveChangesAsync(ct);
 
-        return new AccountProvisionResultDto(user.Id, user.UserName!, user.MustChangePassword);
+        return new AccountProvisionResultDto(user.Id, user.UserName!, password, user.MustChangePassword);
     }
 
     public async Task<BulkProvisionResultDto> ProvisionTeachersAsync(
@@ -166,12 +169,55 @@ public sealed class AccountProvisioningService(
         var items = new List<BulkProvisionItemDto>(teacherProfileIds.Count);
         foreach (var id in teacherProfileIds.Distinct())
         {
+            var profile = await context.TeacherProfiles.AsNoTracking()
+                .Where(t => t.Id == id).Select(t => new { t.TeacherCode, t.FullName }).FirstOrDefaultAsync(ct);
             var r = await ProvisionTeacherAsync(id, options, ct);
             items.Add(r.IsSuccess
-                ? new BulkProvisionItemDto(id, true, r.Value.UserName, null)
-                : new BulkProvisionItemDto(id, false, null, r.Error.Message));
+                ? new BulkProvisionItemDto(id, true, profile?.TeacherCode, profile?.FullName, r.Value.UserName, r.Value.Password, null)
+                : new BulkProvisionItemDto(id, false, profile?.TeacherCode, profile?.FullName, null, null, r.Error.Message));
         }
         return Summarize(items);
+    }
+
+    public async Task<Result> UnlinkTeacherAsync(Guid teacherProfileId, CancellationToken ct = default)
+    {
+        var teacher = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.Id == teacherProfileId, ct);
+        if (teacher is null)
+            return Result.Failure(TeacherNotFound);
+
+        teacher.UserId = null; // KHÔNG xóa AppUser — tài khoản còn đó, chỉ rời hồ sơ
+        await context.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    public async Task<Result> LinkTeacherAsync(Guid teacherProfileId, Guid userId, CancellationToken ct = default)
+    {
+        var teacher = await context.TeacherProfiles.FirstOrDefaultAsync(t => t.Id == teacherProfileId, ct);
+        if (teacher is null)
+            return Result.Failure(TeacherNotFound);
+        if (teacher.UserId is not null)
+            return Result.Failure(Error.Conflict("Teacher.AlreadyLinked", "Giáo viên này đã có tài khoản."));
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+            return Result.Failure(Error.NotFound("Users.NotFound", "Không tìm thấy tài khoản người dùng."));
+        if (!await userManager.IsInRoleAsync(user, AppRoles.Teacher))
+            return Result.Failure(Error.Validation("Teacher.UserNotTeacher", "Tài khoản liên kết phải có vai trò Giáo viên."));
+
+        if (await context.TeacherProfiles.IgnoreQueryFilters().AnyAsync(t => t.UserId == userId && t.Id != teacherProfileId, ct))
+            return Result.Failure(Error.Conflict("Teacher.UserAlreadyLinked", "Tài khoản này đã liên kết với giáo viên khác."));
+
+        teacher.UserId = userId;
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // Lưới an toàn cho đua check-then-set: partial unique index trên TeacherProfile.UserId chặn trùng.
+            return Result.Failure(Error.Conflict("Teacher.UserAlreadyLinked", "Tài khoản này đã liên kết với giáo viên khác."));
+        }
+        return Result.Success();
     }
 
     public async Task<Result> ResetTeacherPasswordAsync(Guid teacherProfileId, string? newPassword = null, CancellationToken ct = default)
@@ -195,17 +241,17 @@ public sealed class AccountProvisioningService(
     // ---------------------------------------------------------------- Lõi dùng chung
 
     /// <summary>Tạo AppUser mới gắn role + username=code + email theo quy tắc + mật khẩu mặc định/nhập.</summary>
-    private async Task<Result<AppUser>> CreateLinkedUserAsync(
+    private async Task<Result<(AppUser User, string Password)>> CreateLinkedUserAsync(
         string code, string? fullName, string? profileEmail, string role, ProvisionAccountOptions? options, CancellationToken ct)
     {
         var userName = code.Trim();
         if (string.IsNullOrWhiteSpace(userName))
-            return Result.Failure<AppUser>(Error.Validation("Account.NoCode", "Chưa có mã định danh để làm tên đăng nhập."));
+            return Result.Failure<(AppUser, string)>(Error.Validation("Account.NoCode", "Chưa có mã định danh để làm tên đăng nhập."));
 
         if (await context.Users.IgnoreQueryFilters().AnyAsync(u => u.NormalizedUserName == userManager.NormalizeName(userName), ct))
-            return Result.Failure<AppUser>(Error.Conflict("Account.UserNameTaken", $"Tên đăng nhập '{userName}' đã tồn tại."));
+            return Result.Failure<(AppUser, string)>(Error.Conflict("Account.UserNameTaken", $"Tên đăng nhập '{userName}' đã tồn tại."));
 
-        var email = await ResolveLoginEmailAsync(code, profileEmail, options?.LoginEmail, ct);
+        var email = await ResolveLoginEmailAsync(profileEmail, options?.LoginEmail, ct);
         var password = await ResolvePasswordAsync(options?.Password, ct);
 
         var user = new AppUser
@@ -214,18 +260,18 @@ public sealed class AccountProvisioningService(
             Email = email,
             EmailConfirmed = true,
             FullName = fullName,
-            MustChangePassword = options?.MustChangePassword ?? true
+            MustChangePassword = options?.MustChangePassword ?? await ForceChangePasswordAsync(ct)
         };
 
         var created = await userManager.CreateAsync(user, password);
         if (!created.Succeeded)
-            return Result.Failure<AppUser>(Error.Validation("Account.CreateFailed", string.Join(" | ", created.Errors.Select(e => e.Description))));
+            return Result.Failure<(AppUser, string)>(Error.Validation("Account.CreateFailed", string.Join(" | ", created.Errors.Select(e => e.Description))));
 
         var addRole = await userManager.AddToRoleAsync(user, role);
         if (!addRole.Succeeded)
-            return Result.Failure<AppUser>(Error.Failure("Account.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
+            return Result.Failure<(AppUser, string)>(Error.Failure("Account.AssignRoleFailed", string.Join(" | ", addRole.Errors.Select(e => e.Description))));
 
-        return user;
+        return (user, password);
     }
 
     private async Task<Result> ResetPasswordCoreAsync(Guid? userId, string? newPassword, CancellationToken ct)
@@ -256,7 +302,7 @@ public sealed class AccountProvisioningService(
         if (!added.Succeeded)
             return Result.Failure(Error.Validation("Account.ResetPasswordFailed", string.Join(" | ", added.Errors.Select(e => e.Description))));
 
-        user.MustChangePassword = true;
+        user.MustChangePassword = await ForceChangePasswordAsync(ct);
         await userManager.UpdateAsync(user);
 
         await RevokeRefreshTokensAsync(user.Id, ct);
@@ -292,24 +338,18 @@ public sealed class AccountProvisioningService(
             await context.SaveChangesAsync(ct);
     }
 
-    /// <summary>Chọn email đăng nhập: ưu tiên LoginEmail tùy chọn → email hồ sơ → email ảo theo mã. Đảm bảo duy nhất.</summary>
-    private async Task<string> ResolveLoginEmailAsync(string code, string? profileEmail, string? optionEmail, CancellationToken ct)
+    /// <summary>
+    /// Email đăng nhập: ưu tiên LoginEmail tùy chọn → email thật trên hồ sơ. KHÔNG có email thật ⇒ trả null.
+    /// Bỏ hẳn cơ chế "email ảo" (Identity đã tắt RequireUniqueEmail) — người dùng đăng nhập bằng MÃ (username).
+    /// </summary>
+    private async Task<string?> ResolveLoginEmailAsync(string? profileEmail, string? optionEmail, CancellationToken ct)
     {
         foreach (var candidate in new[] { Clean(optionEmail), Clean(profileEmail) })
         {
             if (candidate is not null && candidate.Contains('@') && !await EmailTakenAsync(candidate, ct))
                 return candidate;
         }
-
-        var domain = await LocalEmailDomainAsync(ct);
-        var local = SanitizeLocalPart(code);
-        if (local.Length == 0) local = "user";
-        var synthetic = $"{local}@{domain}";
-        if (!await EmailTakenAsync(synthetic, ct))
-            return synthetic;
-
-        // Hiếm: hai mã sau khi "làm sạch" trùng nhau ⇒ dùng email theo GUID (luôn duy nhất).
-        return $"acc{Guid.NewGuid():N}@{domain}";
+        return null;
     }
 
     private async Task<bool> EmailTakenAsync(string email, CancellationToken ct) =>
@@ -323,15 +363,13 @@ public sealed class AccountProvisioningService(
         return string.IsNullOrWhiteSpace(configured) ? SettingKeys.Defaults[SettingKeys.AccountDefaultPassword] : configured;
     }
 
-    private async Task<string> LocalEmailDomainAsync(CancellationToken ct)
+    /// <summary>Có bắt đổi mật khẩu ở lần đăng nhập đầu không (cấu hình Admin, mặc định bật).</summary>
+    private async Task<bool> ForceChangePasswordAsync(CancellationToken ct)
     {
-        var configured = await settingsResolver.GetEffectiveValueAsync(SettingKeys.AccountLocalEmailDomain, ct: ct);
-        return string.IsNullOrWhiteSpace(configured) ? SettingKeys.Defaults[SettingKeys.AccountLocalEmailDomain] : configured.Trim();
+        var configured = await settingsResolver.GetEffectiveValueAsync(SettingKeys.AccountForceChangePassword, ct: ct);
+        return !bool.TryParse(configured?.Trim(), out var force) || force;
     }
 
-    // Chỉ giữ chữ/số cho phần local-part của email ảo (mã GV có thể chứa '@', dấu...).
-    private static string SanitizeLocalPart(string code) =>
-        new(code.Where(char.IsLetterOrDigit).ToArray());
 
     private static BulkProvisionResultDto Summarize(List<BulkProvisionItemDto> items)
     {

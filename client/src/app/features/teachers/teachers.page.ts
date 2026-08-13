@@ -17,9 +17,10 @@ import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
 import { BranchesService } from '../../core/branches.service';
 import { toDateOnlyOrNull } from '../../core/date-util';
-import { Branch, ClassListItem, CreateTeacherAccountRequest, TeacherProfile, TeacherRequest, UnlinkedUser } from '../../core/models';
+import { Branch, BulkProvisionItem, ClassListItem, CreateTeacherAccountRequest, TeacherProfile, TeacherRequest, UnlinkedUser } from '../../core/models';
 import { TeachersService } from '../../core/teachers.service';
 import { ColumnDef, ColumnSettings } from '../../shared/column-settings';
+import { AccountHandoverModal } from '../../shared/account-handover-modal';
 import { PageHeader } from '../../shared/page-header';
 import { PAGE_SIZE_OPTIONS, TABLE_SCROLL_Y } from '../../shared/table';
 import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
@@ -29,7 +30,8 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
   imports: [
     FormsModule, ReactiveFormsModule, PageHeader, ColumnSettings, TableDragScroll,
     NzAlertModule, NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzFormModule, NzIconModule, NzInputModule,
-    NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule, NzTagModule, NzTooltipModule
+    NzModalModule, NzPopconfirmModule, NzSelectModule, NzTableModule, NzTagModule, NzTooltipModule,
+    AccountHandoverModal
   ],
   template: `
     <app-page-header title="Giáo viên" subtitle="Hồ sơ giáo viên và tài khoản đăng nhập" icon="team">
@@ -39,7 +41,6 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
         <button nz-button (click)="bulkProvision()" [nzLoading]="bulkBusy()"><nz-icon nzType="key" /> Cấp tài khoản ({{ selectedCount() }})</button>
       }
       <button nz-button nzType="primary" (click)="openForm()"><nz-icon nzType="plus" /> Thêm giáo viên</button>
-      <button nz-button (click)="openAccountForm()"><nz-icon nzType="user-add" /> Tạo tài khoản GV</button>
     </app-page-header>
 
     <div class="table-toolbar">
@@ -74,7 +75,11 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
                   @case ('phone') { {{ t.phone || '—' }} }
                   @case ('email') { {{ t.email || '—' }} }
                   @case ('account') {
-                    @if (!t.userName) { <nz-tag>Chưa gắn</nz-tag> }
+                    @if (!t.userName) {
+                      <nz-tag nzColor="warning">⚠ Chưa có tài khoản</nz-tag>
+                      <button nz-button nzSize="small" nzType="primary" style="margin-left:6px"
+                              (click)="$event.stopPropagation(); provisionOne(t)">Cấp ngay</button>
+                    }
                     @else if (t.isLocked) { <nz-tag nzColor="error" nz-tooltip [nzTooltipTitle]="t.userName">Đã khóa</nz-tag> }
                     @else {
                       <nz-tag nzColor="success">{{ t.userName }}</nz-tag>
@@ -212,6 +217,10 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
         }
       </ng-container>
     </nz-modal>
+
+    <app-account-handover-modal
+      [visible]="handoverOpen()" [title]="handoverTitle()" [items]="handoverItems()"
+      (closed)="handoverOpen.set(false)" />
   `,
   styles: `
     .search { width: 260px; }
@@ -297,6 +306,11 @@ export class TeachersPage {
   // Modal quản lý tài khoản 1 giáo viên.
   protected readonly accountManageOpen = signal(false);
   protected readonly accountTeacher = signal<TeacherProfile | null>(null);
+
+  // Bảng bàn giao sau khi cấp tài khoản (kèm mật khẩu để phát cho giáo viên).
+  protected readonly handoverOpen = signal(false);
+  protected readonly handoverTitle = signal('Bàn giao tài khoản');
+  protected readonly handoverItems = signal<BulkProvisionItem[]>([]);
   protected readonly accBusy = signal(false);
   protected accPassword = '';
 
@@ -398,8 +412,8 @@ export class TeachersPage {
     this.service.bulkProvision(ids).subscribe({
       next: r => {
         this.bulkBusy.set(false);
-        if (r.failed === 0) this.message.success(`Đã cấp tài khoản cho ${r.succeeded} giáo viên.`);
-        else this.message.warning(`Cấp ${r.succeeded} thành công, ${r.failed} thất bại.`);
+        this.showHandover('Bàn giao tài khoản giáo viên', r.items);
+        this.checked.set(new Set());
         this.load();
       },
       error: err => { this.bulkBusy.set(false); this.showError(err, 'Cấp tài khoản hàng loạt thất bại.'); }
@@ -419,9 +433,36 @@ export class TeachersPage {
   protected provision(t: TeacherProfile): void {
     this.accBusy.set(true);
     this.service.provisionAccount(t.id, { password: this.accPassword || null }).subscribe({
-      next: r => { this.accBusy.set(false); this.message.success(`Đã cấp tài khoản "${r.userName}".`); this.accPassword = ''; this.refreshAccountTeacher(t.id); },
+      next: r => {
+        this.accBusy.set(false);
+        this.accPassword = '';
+        this.accountManageOpen.set(false);
+        this.showHandover('Đã cấp tài khoản giáo viên', [
+          { id: t.id, success: true, code: t.teacherCode, fullName: t.fullName, userName: r.userName, password: r.password, error: null }
+        ]);
+        this.refreshAccountTeacher(t.id);
+      },
       error: err => { this.accBusy.set(false); this.showError(err, 'Cấp tài khoản thất bại.'); }
     });
+  }
+
+  /** Cấp nhanh ngay trên dòng danh sách — không phải mở modal quản lý tài khoản. */
+  protected provisionOne(t: TeacherProfile): void {
+    this.service.provisionAccount(t.id, {}).subscribe({
+      next: r => {
+        this.showHandover('Đã cấp tài khoản giáo viên', [
+          { id: t.id, success: true, code: t.teacherCode, fullName: t.fullName, userName: r.userName, password: r.password, error: null }
+        ]);
+        this.load();
+      },
+      error: err => this.showError(err, 'Cấp tài khoản thất bại.')
+    });
+  }
+
+  private showHandover(title: string, items: BulkProvisionItem[]): void {
+    this.handoverTitle.set(title);
+    this.handoverItems.set(items);
+    this.handoverOpen.set(true);
   }
   protected resetPassword(t: TeacherProfile): void {
     this.accBusy.set(true);

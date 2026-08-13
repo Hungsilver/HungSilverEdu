@@ -1,5 +1,7 @@
 using HungSilver.Application.Exams;
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Common;
+using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
 using HungSilver.Domain.Enums;
 using HungSilver.Infrastructure.Persistence;
@@ -38,6 +40,8 @@ public sealed class ExamServiceTests : IDisposable
         new Repository<ExamQuestion>(_context),
         new Repository<LearningMaterial>(_context),
         new Repository<ExamAssignment>(_context),
+        new Repository<StoredFile>(_context),
+        new AdminGuard(),
         new FakeUserDirectory(),
         new UnitOfWork(_context));
 
@@ -178,7 +182,8 @@ public sealed class ExamServiceTests : IDisposable
         _context.Exams.Add(exam);
         await _context.SaveChangesAsync();
 
-        var list = await Service().GetPagedByMaterialAsync(material.Id, new HungSilver.Application.Common.Models.PagedRequest());
+        var list = await Service().GetPagedAsync(
+            new ExamListFilter(MaterialId: material.Id), new HungSilver.Application.Common.Models.PagedRequest());
         Assert.True(list.IsSuccess);
         Assert.Equal("Cô Hương", list.Value.Items.Single().CreatedByName);
 
@@ -219,6 +224,16 @@ public sealed class ExamServiceTests : IDisposable
         Assert.True(detail.IsSuccess);
         Assert.Equal($"/api/files/{uploadedFileId}", detail.Value.SourceFileUrl);
         Assert.Equal($"/api/files/{uploadedFileId}/preview", detail.Value.SourceFilePreviewUrl);
+    }
+
+    private sealed class AdminGuard : IClassAccessGuard
+    {
+        public bool IsAdmin => true;
+        public Task<Guid?> GetTeacherScopeIdAsync(CancellationToken ct = default) => Task.FromResult<Guid?>(null);
+        public Task<List<Guid>> GetOwnedClassIdsAsync(CancellationToken ct = default) => Task.FromResult(new List<Guid>());
+        public Task<Result> EnsureCanAccessClassAsync(Guid classId, CancellationToken ct = default) => Task.FromResult(Result.Success());
+        public Task<bool> CanAccessClassAsync(Guid classId, CancellationToken ct = default) => Task.FromResult(true);
+        public Task<Result> EnsureCanAccessStudentAsync(Guid studentId, CancellationToken ct = default) => Task.FromResult(Result.Success());
     }
 
     private sealed class FakeUserDirectory : IUserDirectory

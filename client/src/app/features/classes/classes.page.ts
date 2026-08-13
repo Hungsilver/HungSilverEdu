@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
@@ -156,77 +156,12 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
 
       @if (auth.isAdmin()) {
       <nz-tab nzTitle="Danh mục">
-        <div class="catalog-grid">
-          <section>
-            <h3>Môn học</h3>
-            <form nz-form nzLayout="inline">
-              <input nz-input placeholder="Tên môn" [(ngModel)]="subjectName" name="subjectName" />
-              <nz-input-number [(ngModel)]="subjectIndex" name="subjectIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
-              <button nz-button nzType="primary" (click)="saveSubject()">{{ editingSubject() ? 'Cập nhật' : 'Thêm' }}</button>
-              @if (editingSubject()) { <button nz-button (click)="resetSubject()">Hủy</button> }
-            </form>
-            <nz-table [nzData]="subjects()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th nzWidth="64px" style="white-space: nowrap">STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
-              <tbody>
-                @for (s of subjects(); track s.id; let i = $index) {
-                  <tr><td>{{ i + 1 }}</td><td>{{ s.code }}</td><td>{{ s.name }}</td><td>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa môn" aria-label="Sửa môn" (click)="editSubject(s)"><nz-icon nzType="edit" /></button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa môn" aria-label="Xóa môn"
-                      nz-popconfirm nzPopconfirmTitle="Xóa môn?" (nzOnConfirm)="deleteSubject(s)"><nz-icon nzType="delete" /></button>
-                  </td></tr>
-                }
-              </tbody>
-            </nz-table>
-          </section>
-
-          <section>
-            <h3>Khối</h3>
-            <form nz-form nzLayout="inline">
-              <input nz-input placeholder="Tên khối" [(ngModel)]="gradeName" name="gradeName" />
-              <nz-input-number [(ngModel)]="gradeIndex" name="gradeIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
-              <button nz-button nzType="primary" (click)="saveGrade()">{{ editingGrade() ? 'Cập nhật' : 'Thêm' }}</button>
-              @if (editingGrade()) { <button nz-button (click)="resetGrade()">Hủy</button> }
-            </form>
-            <nz-table [nzData]="grades()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th nzWidth="64px" style="white-space: nowrap">STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
-              <tbody>
-                @for (g of grades(); track g.id; let i = $index) {
-                  <tr><td>{{ i + 1 }}</td><td>{{ g.code }}</td><td>{{ g.name }}</td><td>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa khối" aria-label="Sửa khối" (click)="editGrade(g)"><nz-icon nzType="edit" /></button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa khối" aria-label="Xóa khối"
-                      nz-popconfirm nzPopconfirmTitle="Xóa khối?" (nzOnConfirm)="deleteGrade(g)"><nz-icon nzType="delete" /></button>
-                  </td></tr>
-                }
-              </tbody>
-            </nz-table>
-          </section>
-
-          <section>
-            <h3>Cơ sở</h3>
-            <form nz-form nzLayout="inline">
-              <input nz-input placeholder="Tên cơ sở" [(ngModel)]="branchName" name="branchName" />
-              <nz-input-number [(ngModel)]="branchIndex" name="branchIndex" [nzMin]="0" nzPlaceHolder="Thứ tự" />
-              <button nz-button nzType="primary" (click)="saveBranch()">{{ editingBranch() ? 'Cập nhật' : 'Thêm' }}</button>
-              @if (editingBranch()) { <button nz-button (click)="resetBranch()">Hủy</button> }
-            </form>
-            <nz-table [nzData]="branches()" [nzFrontPagination]="false" nzSize="small">
-              <thead><tr><th nzWidth="64px" style="white-space: nowrap">STT</th><th>Mã</th><th>Tên</th><th>Thao tác</th></tr></thead>
-              <tbody>
-                @for (b of branches(); track b.id; let i = $index) {
-                  <tr><td>{{ i + 1 }}</td><td>{{ b.code }}</td><td>{{ b.name }}</td><td>
-                    <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa cơ sở" aria-label="Sửa cơ sở" (click)="editBranch(b)"><nz-icon nzType="edit" /></button>
-                    <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa cơ sở" aria-label="Xóa cơ sở"
-                      nz-popconfirm nzPopconfirmTitle="Xóa cơ sở?" (nzOnConfirm)="deleteBranch(b)"><nz-icon nzType="delete" /></button>
-                  </td></tr>
-                }
-              </tbody>
-            </nz-table>
-          </section>
-        </div>
-      </nz-tab>
-
-      <nz-tab nzTitle="Cấu hình">
-        <nz-empty nzNotFoundContent="Chưa có cấu hình" />
+        <!-- Môn/Khối/Cơ sở đã chuyển sang Cấu hình hệ thống để đứng cùng chỗ với tiền tố mã giáo viên. -->
+        <nz-empty nzNotFoundContent="Quản lý Môn học · Khối · Cơ sở tại Cấu hình hệ thống ▸ Danh mục.">
+          <div nz-empty-footer>
+            <button nz-button nzType="primary" (click)="goCatalogSettings()">Mở Cấu hình ▸ Danh mục</button>
+          </div>
+        </nz-empty>
       </nz-tab>
       }
     </nz-tabs>
@@ -364,6 +299,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
   `
 })
 export class ClassesPage {
+  private readonly router = inject(Router);
   private readonly classesService = inject(ClassesService);
   private readonly branchesService = inject(BranchesService);
   private readonly subjectsService = inject(SubjectsService);
@@ -423,15 +359,6 @@ export class ClassesPage {
   protected readonly importInvalid = computed(() =>
     this.editClasses().filter(c => !c.isValid).length + this.editStudents().filter(s => !s.isValid).length);
 
-  protected readonly editingSubject = signal<Subject | null>(null);
-  protected subjectName = '';
-  protected subjectIndex = 0;
-  protected readonly editingGrade = signal<Grade | null>(null);
-  protected gradeName = '';
-  protected gradeIndex = 0;
-  protected readonly editingBranch = signal<Branch | null>(null);
-  protected branchName = '';
-  protected branchIndex = 0;
 
   constructor() {
     this.loadLookups();
@@ -617,38 +544,10 @@ export class ClassesPage {
     this.revalidateImport();
   }
 
-  protected saveSubject(): void {
-    const req: SubjectRequest = { name: this.subjectName.trim(), description: null, indexOrder: this.subjectIndex, isActive: true };
-    if (!req.name) return;
-    const editing = this.editingSubject();
-    const op = editing ? this.subjectsService.update(editing.id, req) : this.subjectsService.create(req);
-    op.subscribe({ next: () => { this.resetSubject(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu môn thất bại.') });
+  /** Danh mục Môn/Khối/Cơ sở đã chuyển sang Cấu hình hệ thống — điều hướng sang đó. */
+  protected goCatalogSettings(): void {
+    this.router.navigate(['/settings'], { queryParams: { tab: 'catalog' } });
   }
-  protected editSubject(s: Subject): void { this.editingSubject.set(s); this.subjectName = s.name; this.subjectIndex = s.indexOrder; }
-  protected resetSubject(): void { this.editingSubject.set(null); this.subjectName = ''; this.subjectIndex = 0; }
-  protected deleteSubject(s: Subject): void { this.subjectsService.delete(s.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa môn thất bại.') }); }
-
-  protected saveGrade(): void {
-    const req: GradeRequest = { name: this.gradeName.trim(), indexOrder: this.gradeIndex, isActive: true };
-    if (!req.name) return;
-    const editing = this.editingGrade();
-    const op = editing ? this.gradesService.update(editing.id, req) : this.gradesService.create(req);
-    op.subscribe({ next: () => { this.resetGrade(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu khối thất bại.') });
-  }
-  protected editGrade(g: Grade): void { this.editingGrade.set(g); this.gradeName = g.name; this.gradeIndex = g.indexOrder; }
-  protected resetGrade(): void { this.editingGrade.set(null); this.gradeName = ''; this.gradeIndex = 0; }
-  protected deleteGrade(g: Grade): void { this.gradesService.delete(g.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa khối thất bại.') }); }
-
-  protected saveBranch(): void {
-    const req: BranchRequest = { name: this.branchName.trim(), address: null, phone: null, teacherCodePrefix: this.editingBranch()?.teacherCodePrefix ?? null, indexOrder: this.branchIndex, isActive: true };
-    if (!req.name) return;
-    const editing = this.editingBranch();
-    const op = editing ? this.branchesService.update(editing.id, req) : this.branchesService.create(req);
-    op.subscribe({ next: () => { this.resetBranch(); this.loadLookups(); }, error: err => this.showError(err, 'Lưu cơ sở thất bại.') });
-  }
-  protected editBranch(b: Branch): void { this.editingBranch.set(b); this.branchName = b.name; this.branchIndex = b.indexOrder; }
-  protected resetBranch(): void { this.editingBranch.set(null); this.branchName = ''; this.branchIndex = 0; }
-  protected deleteBranch(b: Branch): void { this.branchesService.delete(b.id).subscribe({ next: () => this.loadLookups(), error: err => this.showError(err, 'Xóa cơ sở thất bại.') }); }
 
   private showError(err: HttpErrorResponse, fallback: string): void {
     this.message.error(err.error?.message ?? err.message ?? fallback);

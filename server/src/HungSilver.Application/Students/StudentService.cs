@@ -12,14 +12,22 @@ namespace HungSilver.Application.Students;
 
 public interface IStudentService
 {
-    Task<Result<PagedResult<StudentDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? branchId = null, Guid? subjectId = null, Guid? gradeId = null, Guid? teacherProfileId = null, CancellationToken ct = default);
+    Task<Result<PagedResult<StudentDto>>> GetPagedAsync(PagedRequest request, bool includeDeleted = false, Guid? branchId = null, Guid? subjectId = null, Guid? gradeId = null, Guid? teacherProfileId = null, Guid? classId = null, CancellationToken ct = default);
     Task<Result<StudentDto>> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Result<StudentDto>> CreateAsync(CreateStudentRequest request, CancellationToken ct = default);
     Task<Result<StudentDto>> UpdateAsync(Guid id, UpdateStudentRequest request, CancellationToken ct = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken ct = default);
     Task<Result> RestoreAsync(Guid id, CancellationToken ct = default);
     Task<Result> LinkUserAsync(Guid studentId, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Tài khoản role Học sinh CHƯA gắn hồ sơ nào — nguồn cho dropdown "liên kết tài khoản có sẵn".
+    /// (Trước đây FE tự lấy 200 user đầu rồi lọc client, không loại được tài khoản đã gắn HS khác ⇒ chọn là 409.)
+    /// </summary>
+    Task<Result<List<UnlinkedStudentUserDto>>> GetUnlinkedUsersAsync(CancellationToken ct = default);
 }
+
+public sealed record UnlinkedStudentUserDto(Guid Id, string UserName, string? FullName);
 
 public sealed class StudentService(
     IRepository<Student> students,
@@ -42,9 +50,10 @@ public sealed class StudentService(
         Guid? subjectId = null,
         Guid? gradeId = null,
         Guid? teacherProfileId = null,
+        Guid? classId = null,
         CancellationToken ct = default)
     {
-        var scopedStudentIds = await ResolveFilteredStudentIdsAsync(branchId, subjectId, gradeId, teacherProfileId, ct);
+        var scopedStudentIds = await ResolveFilteredStudentIdsAsync(branchId, subjectId, gradeId, teacherProfileId, classId, ct);
         var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
         if (scopeId is not null)
         {
@@ -205,13 +214,35 @@ public sealed class StudentService(
         // (kiểm vai trò + enforce 1-1 + lưới an toàn unique index).
         accountProvisioning.LinkStudentAsync(studentId, userId, ct);
 
-    private async Task<HashSet<Guid>?> ResolveFilteredStudentIdsAsync(Guid? branchId, Guid? subjectId, Guid? gradeId, Guid? teacherProfileId, CancellationToken ct)
+    public async Task<Result<List<UnlinkedStudentUserDto>>> GetUnlinkedUsersAsync(CancellationToken ct = default)
     {
-        if (branchId is null && subjectId is null && gradeId is null && teacherProfileId is null)
+        var candidates = await userDirectory.GetUsersInRoleAsync(AppRoles.User, ct);
+        if (candidates.Count == 0) return new List<UnlinkedStudentUserDto>();
+
+        // Loại tài khoản đã gắn hồ sơ HS — tránh gợi ý rồi nhận 409 "tài khoản đã liên kết học sinh khác".
+        var candidateIds = candidates.Select(u => u.Id).ToList();
+        var linked = (await students.FindAsync(s => s.UserId != null && candidateIds.Contains(s.UserId.Value), ct))
+            .Select(s => s.UserId!.Value)
+            .ToHashSet();
+
+        var infos = await userDirectory.GetAccountInfosAsync(candidateIds, ct);
+        return candidates
+            .Where(u => !linked.Contains(u.Id))
+            .Select(u => new UnlinkedStudentUserDto(
+                u.Id, infos.TryGetValue(u.Id, out var info) ? info.UserName : (u.Email ?? u.Id.ToString()), u.FullName))
+            .OrderBy(u => u.UserName, StringComparer.CurrentCulture)
+            .ToList();
+    }
+
+    private async Task<HashSet<Guid>?> ResolveFilteredStudentIdsAsync(
+        Guid? branchId, Guid? subjectId, Guid? gradeId, Guid? teacherProfileId, Guid? classId, CancellationToken ct)
+    {
+        if (branchId is null && subjectId is null && gradeId is null && teacherProfileId is null && classId is null)
             return null;
 
         var classList = await classes.FindAsync(c =>
-            (branchId == null || c.BranchId == branchId)
+            (classId == null || c.Id == classId)
+            && (branchId == null || c.BranchId == branchId)
             && (subjectId == null || c.SubjectId == subjectId)
             && (gradeId == null || c.GradeId == gradeId)
             && (teacherProfileId == null || c.TeacherProfileId == teacherProfileId), ct);

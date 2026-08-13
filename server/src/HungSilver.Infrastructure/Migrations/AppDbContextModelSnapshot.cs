@@ -480,10 +480,6 @@ namespace HungSilver.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("Language")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<Guid?>("MaterialId")
                         .HasColumnType("uuid");
 
@@ -840,12 +836,6 @@ namespace HungSilver.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CategoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ClassId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -892,27 +882,17 @@ namespace HungSilver.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
                     b.Property<Guid?>("UnitId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<Guid?>("UploadedByUserId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Url")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
-
-                    b.HasIndex("ClassId");
 
                     b.HasIndex("Code")
                         .IsUnique();
@@ -1012,43 +992,6 @@ namespace HungSilver.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("MaterialAssignmentViews");
-                });
-
-            modelBuilder.Entity("HungSilver.Domain.Entities.MaterialCategory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SortOrder");
-
-                    b.ToTable("MaterialCategories");
                 });
 
             modelBuilder.Entity("HungSilver.Domain.Entities.MaterialFolder", b =>

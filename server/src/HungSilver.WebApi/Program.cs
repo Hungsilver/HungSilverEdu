@@ -106,6 +106,8 @@ if (app.Environment.IsDevelopment())
 app.UseCors("Client");
 app.UseAuthentication();
 app.UseAuthorization();
+// Chặn thật ở server khi tài khoản chưa đổi mật khẩu lần đầu (claim "mcp") — xem MustChangePasswordMiddleware.
+app.UseMustChangePasswordGate();
 app.UseRateLimiter();
 
 app.MapControllers();

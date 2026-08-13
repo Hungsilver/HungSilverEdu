@@ -132,10 +132,33 @@ export enum SettingScope {
   User = 'User'
 }
 
-export enum FileStorageMode {
+/** Cách nạp tài liệu vào kho (khớp MaterialSource của backend). */
+export enum MaterialUploadSource {
   ExternalUrl = 'ExternalUrl',
-  Server = 'Server'
+  ServerFile = 'ServerFile'
 }
+
+/** Cấu hình cách nạp tài liệu — đọc từ Settings, quyết định hình dạng form thêm tài liệu. */
+export interface MaterialUploadPolicy {
+  allowServerUpload: boolean;
+  allowExternalUrl: boolean;
+  defaultSource: MaterialUploadSource;
+  /** Chỉ bật đúng 1 cách ⇒ form ẩn hẳn phần chọn nguồn cho gọn. */
+  singleMode: boolean;
+}
+
+/** Khóa cấu hình hệ thống dùng ở FE (khớp SettingKeys phía server). */
+export const SETTING_KEYS = {
+  allowServerUpload: 'FileStorage.AllowServerUpload',
+  allowExternalUrl: 'FileStorage.AllowExternalUrl',
+  defaultSource: 'FileStorage.DefaultSource',
+  defaultPassword: 'Account.DefaultPassword',
+  forceChangePassword: 'Account.ForceChangePasswordOnFirstLogin',
+  tuitionDueSoonDays: 'Tuition.DueSoonDays',
+  warningScoreDrop: 'Warning.ScoreDropThreshold',
+  centerCodePrefix: 'Center.CodePrefix',
+  scheduleShifts: 'Schedule.Shifts'
+} as const;
 
 /** Mức truy cập file khi tải xuống (phân tầng theo độ nhạy cảm). */
 export enum FileVisibility {
@@ -440,14 +463,26 @@ export interface ProvisionAccountRequest {
 export interface AccountProvisionResult {
   userId: string;
   userName: string;
+  /** Mật khẩu vừa đặt — chỉ trả về đúng lúc cấp, không đọc lại được. */
+  password: string;
   mustChangePassword: boolean;
 }
 
 export interface BulkProvisionItem {
   id: string;
   success: boolean;
+  code: string | null;
+  fullName: string | null;
   userName: string | null;
+  password: string | null;
   error: string | null;
+}
+
+/** Tài khoản role Học sinh chưa gắn hồ sơ — nguồn cho dropdown liên kết. */
+export interface UnlinkedStudentUser {
+  id: string;
+  userName: string;
+  fullName: string | null;
 }
 
 export interface BulkProvisionResult {
@@ -960,12 +995,9 @@ export const TUITION_STATUS_COLORS: Record<TuitionStatus, string> = {
 export interface Material {
   id: string;
   code: string;
-  classId: string | null;
   folderId: string | null;
   /** Unit chứa tài liệu (chỉ có nghĩa khi thuộc bộ); null = chưa thuộc Unit. */
   unitId: string | null;
-  categoryId: string | null;
-  categoryName: string | null;
   subjectId: string | null;
   subjectName: string | null;
   gradeBand: string | null;
@@ -977,11 +1009,12 @@ export interface Material {
   coverFileId: string | null;
   description: string | null;
   downloadUrl: string;
+  /** Số đề đã sinh từ tài liệu này — badge "N đề" trong Kho tài liệu. */
+  examCount: number;
   createdAt: string;
 }
 
 export interface CreateMaterialRequest {
-  categoryId: string | null;
   subjectId: string | null;
   gradeBand: string | null;
   title: string;
@@ -997,7 +1030,6 @@ export interface CreateMaterialRequest {
 }
 
 export interface UpdateMaterialRequest {
-  categoryId: string | null;
   subjectId: string | null;
   gradeBand: string | null;
   title: string;
@@ -1040,6 +1072,8 @@ export interface MaterialFolder {
   description: string | null;
   materialCount: number;
   unitCount: number;
+  /** Tổng đề sinh từ các tài liệu trong bộ. */
+  examCount: number;
   createdAt: string;
 }
 
@@ -1060,6 +1094,7 @@ export interface MaterialSubjectSummary {
   subjectName: string;
   folderCount: number;
   materialCount: number;
+  examCount: number;
 }
 
 // ---- Unit/Chương trong bộ (MaterialUnit) — Bộ → Unit → Tài liệu ----
@@ -1078,6 +1113,8 @@ export interface MaterialUnit {
   unitNo: number;
   sortOrder: number;
   materialCount: number;
+  /** Tổng đề sinh từ tài liệu trong unit — hiện ở mục lục. */
+  examCount: number;
   createdAt: string;
 }
 
@@ -1153,19 +1190,6 @@ export interface ClassImportResult {
   enrollmentsCreated: number;
   skipped: number;
   errors: string[];
-}
-
-export interface MaterialCategory {
-  id: string;
-  name: string;
-  description: string | null;
-  sortOrder: number;
-}
-
-export interface MaterialCategoryRequest {
-  name: string;
-  description: string | null;
-  sortOrder: number;
 }
 
 // ----------------- Giao tài liệu cho lớp + theo dõi đã xem (2026-07-16) -----------------
@@ -1277,6 +1301,10 @@ export interface ExamListItem {
   status: ExamStatus;
   source: ExamGenSource;
   questionCount: number;
+  /** Tên tài liệu nguồn (live) — null khi tài liệu đã bị xóa khỏi Kho. */
+  materialTitle: string | null;
+  /** Số lượt giao NHÌN THẤY ĐƯỢC (Admin: tất cả; GV: chỉ lớp mình phụ trách). */
+  assignmentCount: number;
   createdByName: string | null;
   createdAt: string;
 }
@@ -1317,6 +1345,10 @@ export interface ExamDetail {
   source: ExamGenSource;
   sourceFileUrl: string | null;
   sourceFilePreviewUrl: string | null;
+  /** Tên tài liệu đề được gắn vào (chỗ đứng trong Kho). */
+  materialTitle: string | null;
+  /** Tên file AI thực sự đã đọc — chỉ có khi KHÁC file của tài liệu (chọn tài liệu khác / tải file riêng). */
+  questionSourceName: string | null;
   groups: ExamGroup[];
   questions: ExamQuestion[];
   createdByName: string | null;
@@ -1331,6 +1363,18 @@ export interface GenerateExamRequest {
   difficulty: string | null;
   instructions: string | null;
   verify: boolean;
+  /** Tài liệu KHÁC trong cùng bộ dùng làm nguồn câu hỏi cho AI đọc; null = đọc chính tài liệu này. */
+  questionSourceMaterialId?: string | null;
+}
+
+/** Bộ lọc danh sách đề ở màn "Đề & Bài tập". */
+export interface ExamListFilter {
+  subjectId?: string | null;
+  materialId?: string | null;
+  gradeBand?: string | null;
+  status?: ExamStatus | null;
+  search?: string | null;
+  assignedOnly?: boolean;
 }
 
 export interface ExamGenerationResult {

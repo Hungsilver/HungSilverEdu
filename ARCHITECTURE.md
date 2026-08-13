@@ -95,14 +95,14 @@ E:\MyProject\
 - `Persistence/Repositories/Repository.cs` — hiện thực `IRepository<T>`. `Query(includeDeleted)` chọn có/không `IgnoreQueryFilters()`. `SoftDelete` = `Remove()` (interceptor sẽ đổi thành UPDATE). `ApplySort` build OrderBy động qua reflection theo `sortBy` (fallback `CreatedAt desc`). **`FindAsync` cũng mặc định `OrderByDescending(CreatedAt)`** (mới nhất trước, đồng bộ `GetPagedAsync`) — caller cần thứ tự khác (vd danh mục theo `IndexOrder`) tự sắp lại sau khi nhận list.
 - `Persistence/Interceptors/AuditSaveChangesInterceptor.cs` — **trái tim của audit + soft delete**: `Added→CreatedAt`; `Modified→UpdatedAt`; `Deleted + ISoftDeletable → chuyển state về Modified, set IsDeleted=true, DeletedAt=now`. Dùng `DateTime.Now` (giờ local). Đăng ký **Singleton**.
 - `Persistence/UnitOfWork.cs` — wrap `context.SaveChangesAsync`.
-- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + Settings mặc định (`FileStorage.Mode=Server`) + **auto-seed admin** nếu chưa có ai role Admin VÀ có config `Admin:Username`/`Admin:Password` (env `Admin__Username`/`Admin__Password`). **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
+- `Persistence/DbSeeder.cs` — `MigrateAndSeedAsync`: chạy `Database.MigrateAsync()` + seed roles (`Admin`,`Teacher`,`User`) + Settings mặc định (seed từng khóa nếu thiếu, dọn khóa đã bỏ — xem §15.18) + **auto-seed admin** nếu chưa có ai role Admin VÀ có config `Admin:Username`/`Admin:Password` (env `Admin__Username`/`Admin__Password`). **Không seed dữ liệu demo** (admin tự tạo GV; GV tự tạo lớp & HS). Gọi 1 lần lúc app khởi động.
 - `Identity/AppUser.cs` — `IdentityUser<Guid>` + `FullName?, AvatarUrl?` + audit + soft delete.
 - `Identity/AppRole.cs` — `IdentityRole<Guid>`.
 - `Auth/AuthService.cs` — hiện thực `IAuthService` (cần `UserManager`/`SignInManager` nên ở Infrastructure). Xem [§5](#5-luồng-xác-thực-authentication).
 - `Auth/JwtTokenService.cs` — tạo JWT HS256 (claims `sub, email, name, jti, role[]`); refresh token = 64 byte random base64; hash = SHA-256 hex.
 - `Auth/GoogleAuthVerifier.cs` — verify Google ID token qua `Google.Apis.Auth` (`GoogleJsonWebSignature.ValidateAsync`, audience = ClientId). Chưa cấu hình ClientId → trả lỗi `Google.NotConfigured`.
 - `Auth/AuthOptions.cs` — `JwtOptions` (Issuer, Audience, Secret, AccessTokenMinutes=15, RefreshTokenDays=7), `GoogleOptions` (ClientId), `AuthFeatureOptions` (`AllowRegistration`, mặc định **false** — khóa đăng ký).
-- `Account/ProfileService.cs` — trang cá nhân: upload ảnh đại diện (qua `IFileService`, bỏ qua FileStorage.Mode) + tự đổi mật khẩu. `Students/StudentAccountService.cs` — GV tạo HS + tài khoản trong lớp (guard theo lớp) + đổi mật khẩu HS (guard theo HS).
+- `Account/ProfileService.cs` — trang cá nhân: upload ảnh đại diện (qua `IFileService`, `enforceStorageMode:false`) + tự đổi mật khẩu. `Students/StudentAccountService.cs` — GV tạo HS + tài khoản trong lớp (guard theo lớp) + đổi mật khẩu HS (guard theo HS).
 - `Services/CurrentUser.cs` — đọc claim từ `IHttpContextAccessor`.
 - `Users/UserAdminService.cs` — quản trị user: list (kèm user đã xóa để khôi phục; DTO kèm `PhoneNumber/IsLocked/LinkedType` — liên kết hồ sơ HS/GV), **sửa thông tin cơ bản** (username/email/họ tên/SĐT — tài khoản liên kết hồ sơ KHÔNG đổi được username, giữ bất biến "username = mã"), **đổi/đặt lại mật khẩu** (trống ⇒ mật khẩu mặc định; validate password TRƯỚC khi gỡ mật khẩu cũ để tránh kẹt tài khoản; cờ `MustChangePassword` tùy chọn; thu hồi refresh token), **khóa/mở khóa đăng nhập** (không tự khóa mình; khóa ⇒ thu hồi token), gán role, soft delete (kèm thu hồi refresh token), restore. **Guard "admin cuối cùng"** + **không tự xóa chính mình** + **không tự reset mật khẩu mình** (đi qua trang Hồ sơ).
 - `DependencyInjection.cs` — `AddInfrastructure(config)`: Options, `AppDbContext` (Npgsql + interceptor), IdentityCore (password ≥8, unique email, lockout 5 lần/5'), repo/UoW/các service.
@@ -210,11 +210,11 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `/api/files/{id}/preview` | GET | Public/Auth theo `Visibility` | Xem trước file: PDF trả inline; Word/ODT/RTF/TXT chuyển PDF bằng LibreOffice; file không hỗ trợ trả lỗi, không ép tải |
 | `/api/ai-credential` | GET/PUT/DELETE | User | Cấu hình API Key Gemini của **chính mình** (đã che) — xem §15.13 |
 | `/api/ai-credential/validate` | POST | User | Kiểm tra live key đang lưu với Google |
-| `/api/materials` | GET | Teacher/Admin | Danh sách tài liệu (paged) — lọc `subjectId/categoryId/gradeBand/folderId/generalOnly/unitId/noUnit` + search Mã/Tên |
-| `/api/materials/cover-image` | POST | Teacher/Admin | Upload ảnh bìa (chỉ ảnh jpg/png/gif/webp, 10MB, lưu server `Visibility=Public` bất kể FileStorage.Mode — mirror avatar; dùng cho cả tài liệu lẫn bộ tài liệu) |
+| `/api/materials` | GET | Teacher/Admin | Danh sách tài liệu (paged) — lọc `subjectId/gradeBand/folderId/generalOnly/unitId/noUnit` + search Mã/Tên; DTO kèm `examCount` |
+| `/api/materials/cover-image` | POST | Teacher/Admin | Upload ảnh bìa (chỉ ảnh jpg/png/gif/webp, 10MB, lưu server `Visibility=Public` bất kể cấu hình cách nạp — mirror avatar; dùng cho cả tài liệu lẫn bộ tài liệu) |
 | `/api/material-folders` (+`/subjects-summary`, `GET /{id}`) | GET/POST/PUT/DELETE | Teacher/Admin | **Bộ tài liệu** (Môn → Bộ → Unit → Tài liệu): GET `?subjectId` + GET `/{id}` (deep-link màn chi tiết) kèm materialCount/unitCount · summary mức 1 (môn + số bộ/tài liệu) · CRUD (xóa chặn khi còn tài liệu `InUse` / còn Unit `HasUnits`) — xem §15.7 |
 | `/api/material-units` (+`PUT /reorder`) | GET/POST/PUT/DELETE | Teacher/Admin | **Unit/Chương trong bộ** (kiểu Sách Mềm): GET `?folderId` đã sort + đánh số derive (Unit 1/2…, Review 1/2… đếm riêng theo vị trí) kèm materialCount · CRUD (Kind Unit\|Review, tên Review được trống; xóa chặn khi còn tài liệu `MaterialUnit.InUse`) · reorder cả bộ 1 call (orderedIds phải khớp chính xác tập unit) — xem §15.7 |
-| `/api/exams` · `/generate/{materialId}` · `/generate-upload/{sourceMaterialId}` · `/generation-jobs/{jobId}` | GET · POST · POST · GET | Teacher/Admin | Danh sách đề (theo môn/tài liệu, paged) · bắt đầu job sinh đề bằng AI từ tài liệu hiện có hoặc file upload trực tiếp (đề gắn vào tài liệu nguồn, KHÔNG tạo tài liệu mới trong Kho) · poll trạng thái job |
+| `/api/exams` · `/generate/{materialId}` · `/generate-upload/{sourceMaterialId}` · `/generation-jobs/{jobId}` | GET · POST · POST · GET | Teacher/Admin | Danh sách đề toàn trung tâm (lọc `subjectId/materialId/gradeBand/status/assignedOnly` + search, paged; DTO kèm `materialTitle`/`assignmentCount`) · bắt đầu job sinh đề AI — nguồn câu hỏi là chính tài liệu, **tài liệu khác cùng bộ** (`questionSourceMaterialId`) hoặc **file upload dùng một lần** (không nhập kho) · poll trạng thái job — xem §15.18 |
 | `/api/exams/{id}` (+`/publish`,`/questions*`) | GET/PUT/DELETE/POST | Teacher/Admin | Chi tiết/sửa/xóa/phát hành đề + CRUD câu hỏi — xem §15.14 |
 | `/api/exams/questions` (+`/ids`) | GET | Teacher/Admin | **Ngân hàng câu hỏi**: mọi câu từ mọi đề, lọc Môn/Khối/Tài liệu/Đề/Loại/Trạng thái + search; `/ids` = chọn-tất-cả theo filter (cap 1000) — xem §15.14 |
 | `/api/exams/from-questions` · `/api/exams/{id}/duplicate` | POST | Teacher/Admin | Tạo đề thủ công từ câu đã chọn (copy) · nhân bản nguyên trạng đề thành Draft — xem §15.14 |
@@ -224,7 +224,8 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `/api/portal/exams` (+`/{id}/start`, `/attempts/{id}/answer\|submit\|review`) | GET/POST/PUT | User | HS làm đề hẹn giờ, tự chấm, xem lại — xem §15.15 |
 | `/api/materials/{id}/assign` (+`/assignments/by-class/{classId}`,`/assignments/by-session/{sessionId}`,`DELETE /assignments/{id}`,`/assignments/{id}/viewers`) | POST/GET/DELETE | Teacher/Admin | **Giao tài liệu cho lớp** (tùy chọn gắn buổi), danh sách theo lớp/buổi, thu hồi, trạng thái đã-xem per-student — xem §15.17 |
 | `/api/portal/materials` (+`POST /{assignmentId}/view`) | GET/POST | User | HS xem tài liệu được giao (các lớp đang học) + đánh dấu đã xem (idempotent) — xem §15.17 |
-| `/api/users` | GET | **Admin** | List user (kèm đã xóa), tìm theo username/email/tên |
+| `/api/exams/assignments` | GET | Teacher/Admin | Mọi lượt giao trong phạm vi người dùng (tab "Đã giao cho lớp") — lọc `classId/status` + search, paged |
+| `/api/students/unlinked-users` | GET | **Admin** | Tài khoản role Học sinh chưa gắn hồ sơ — nguồn dropdown liên kết || `/api/users` | GET | **Admin** | List user (kèm đã xóa), tìm theo username/email/tên — siết AdminOnly 2026-08-14 |
 | `/api/users` | POST | **Admin** | Tạo tài khoản Admin/Giáo viên (`CreateUserRequest`) |
 | `/api/users/{id}` | PUT | **Admin** | Sửa thông tin cơ bản (`UpdateUserRequest` — username chỉ đổi được khi KHÔNG liên kết hồ sơ HS/GV) |
 | `/api/users/{id}/reset-password` | POST | **Admin** | Đổi/đặt lại mật khẩu (trống ⇒ mặc định; `mustChangePassword`; + thu hồi token; không tự reset mình) |
@@ -247,7 +248,7 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 
 - **Bootstrap:** `main.ts` → `bootstrapApplication(App, appConfig)`. **Zoneless** (Angular 21 mặc định, không Zone.js), standalone components, **signals** xuyên suốt.
 - **`app.config.ts`:** providers — router, **HttpClient + apiResponseInterceptor + authInterceptor**, ng-zorro i18n `vi_VN`, đăng ký icon, `LOCALE_ID='vi'`, `provideAppInitializer(tryRestoreSession)`.
-- **Routing (`app.routes.ts`):** lazy `loadComponent`. `/login` (guestGuard) ngoài shell; còn lại nằm trong `Shell` (authGuard): `/classes`, `/students`, `/teachers`, `/tuition`, `/admin/users` (roleGuard Admin)… `**` → `/`.
+- **Routing (`app.routes.ts`):** lazy `loadComponent`. `/login` (guestGuard) ngoài shell; còn lại nằm trong `Shell` (authGuard): `/classes`, `/students`, `/teachers`, `/tuition`, `/materials`, `/exams` (Đề & Bài tập), `/admin/users` (roleGuard Admin)… `**` → `/`.
 - **`core/` (singleton):**
   - `auth.service.ts` — phiên đăng nhập (xem §5).
   - `auth.interceptor.ts` — Bearer + single-flight refresh on 401.
@@ -281,7 +282,7 @@ Base path `/api`. Lỗi luôn dạng `ProblemDetails { status, title=Error.Code,
 | `Jwt:AccessTokenMinutes` / `RefreshTokenDays` | — | — | 15' / 7 ngày |
 | `Google:ClientId` | `Google__ClientId` | `GOOGLE_CLIENT_ID` | Trống ⇒ ẩn Google Login |
 | `Cors:Origins` | `Cors__Origins__0` | — | Dev: `http://localhost:4200` |
-| `FileStorage:*` | `FileStorage__*` | — | `RootPath=/app/uploads` (volume prod), `MaxSizeBytes` 20MB, `PerUserQuotaBytes` 200MB, `CleanupRetentionDays` 30, `OrphanGracePeriodHours` 24 (file upload không gắn vào đâu sau 24h ⇒ rác), `AllowedExtensions` (đuôi cơ bản); mode `Server` (DbSeeder) |
+| `FileStorage:*` | `FileStorage__*` | — | `RootPath=/app/uploads` (volume prod), `MaxSizeBytes` 20MB, `PerUserQuotaBytes` 200MB, `CleanupRetentionDays` 30, `OrphanGracePeriodHours` 24 (file upload không gắn vào đâu sau 24h ⇒ rác), `AllowedExtensions` (đuôi cơ bản). Cách nạp tài liệu nằm ở Settings, không phải appsettings — xem §15.18 |
 | `Ai:Gemini:BaseUrl` / `DefaultModel` | `Ai__Gemini__*` | — | Endpoint Google Generative Language + model mặc định (`gemini-3.5-flash` — model free tốt nhất 07/2026) — xem §15.13 |
 | `DataProtection:KeysPath` | `DataProtection__KeysPath` | — | Thư mục lưu khóa mã hóa key AI; **trống ⇒ mặc định `<FileStorage:RootPath>/dpkeys`** (đi cùng volume uploads). ⚠️ Mất thư mục ⇒ key đã lưu không giải mã được |
 | `DocumentConversion:SofficePath` | `DocumentConversion__SofficePath` | — | Đường dẫn `soffice` (LibreOffice) để convert Word→PDF khi sinh đề; **trống ⇒ dùng PATH** (image API đã cài) — xem §15.14 |
@@ -364,7 +365,7 @@ Tài khoản admin: **tự tạo khi khởi động** nếu chưa có admin + c�
 ### 15.1 Quy ước riêng
 - **3 role:** `Admin` (toàn quyền + cấu hình/tài khoản quan trọng), `Teacher` (CRUD nghiệp vụ trong phạm vi lớp của tài khoản giáo viên liên kết), `User` = **học sinh** (portal xem-chỉ-đọc → GĐ2). Policy `TeacherOrAdmin` (Program.cs).
 - **KHÔNG khóa ngoại** trên mọi bảng nghiệp vụ mới: chỉ `Guid` + index; join thủ công trong service Infrastructure; tồn tại tham chiếu validate ở tầng app (`IUserDirectory`, `IClassAccessGuard`).
-- **Quan hệ hiện hành phải cleanup khi parent soft-delete:** không để bảng nối/trạng thái "đang hiệu lực" tiếp tục active nếu parent đã bị xóa mềm. `ICurrentRelationCleanupService` xử lý các ca chung: soft-delete `Enrollment` active + set `IsActive=false`/`WithdrawnOn`, **xóa lớp luôn được phép** và tự rút sạch **mọi** enrollment active của lớp (không chặn khi còn học sinh đang học), unlink `Student.UserId`/`TeacherProfile.UserId` khi xóa user, null `Assignment.MaterialId` khi xóa học liệu, xóa lớp rút luôn lượt giao tài liệu (`MaterialAssignment`) của lớp, và chặn xóa `MaterialCategory` còn học liệu đang dùng. Lịch sử phát sinh thật (điểm danh, điểm, học phí, báo cáo) vẫn giữ.
+- **Quan hệ hiện hành phải cleanup khi parent soft-delete:** không để bảng nối/trạng thái "đang hiệu lực" tiếp tục active nếu parent đã bị xóa mềm. `ICurrentRelationCleanupService` xử lý các ca chung: soft-delete `Enrollment` active + set `IsActive=false`/`WithdrawnOn`, **xóa lớp luôn được phép** và tự rút sạch **mọi** enrollment active của lớp (không chặn khi còn học sinh đang học), unlink `Student.UserId`/`TeacherProfile.UserId` khi xóa user, null `Assignment.MaterialId` khi xóa học liệu, xóa lớp rút luôn lượt giao tài liệu (`MaterialAssignment`) của lớp, và null `Assignment.MaterialId` khi xóa học liệu. (Guard `MaterialCategory` đã gỡ cùng bảng — §15.18.) Lịch sử phát sinh thật (điểm danh, điểm, học phí, báo cáo) vẫn giữ.
 - **AutoMapper 14.x**: map entity↔DTO phẳng (Student/Setting/Journal…); DTO tổng hợp có field computed (ClassDto, Dashboard…) map tay. `AddAutoMapper(assembly)` ở `Application/DependencyInjection`. 14.0.0 dính advisory **GHSA-rvv3-g6hj-g44x** (đã suppress đúng advisory ở `server/Directory.Build.props`).
 - **Enum serialize string** toàn API (`JsonStringEnumConverter` ở Program.cs).
 - **Phân quyền nghiệp vụ** (`Application/Common/ClassAccessGuard`): Admin truy cập toàn bộ dữ liệu vận hành; Teacher truy cập theo lớp gắn với tài khoản giáo viên (`ClassRoom.TeacherId` = `AppUser.Id` liên kết từ `TeacherProfile.UserId`); User chỉ portal riêng. Các cấu hình/tài khoản nhạy cảm vẫn chặn bằng `AdminOnly`.
@@ -377,8 +378,8 @@ Tài khoản admin: **tự tạo khi khởi động** nếu chưa có admin + c�
 ### 15.3 Services (vị trí theo quy tắc §3)
 - **Application** (IRepository): `Students/StudentService`, `Journals/TeacherJournalService`, `Common/ClassAccessGuard`.
 - **Infrastructure** (AppDbContext join/aggregate): `Classes/ClassService`, `Schedule/ScheduleService`, `Sessions/SessionService`, `Dashboard/DashboardService`, `Reports/SessionReportService`, `Settings/SettingsService`, `Services/UserDirectory`, `Storage/{LocalDiskFileStorage,FileService}`, `Notifications/*`.
-- **Cấu hình phân tầng (Settings):** `ISettingsResolver`/`ISettingsService` (1 impl `SettingsService`). Giải theo **User → Class → Role → System → Default**. `SettingKeys`: `FileStorage.Mode`, `Tuition.DueSoonDays`, `Warning.ScoreDropThreshold`, `Center.TimeZone`.
-- **Module upload file (`Storage/`):** `IFileStorage` (local disk, `FileStorageOptions`) + setting `FileStorage.Mode` (`Server`|`ExternalUrl`; mặc định **Server**) — `FileService` từ chối upload khi mode=`ExternalUrl`. **Validate**: dung lượng (`MaxSizeBytes` 20MB), **allowlist phần mở rộng** (`AllowedExtensions` — loại cơ bản: ảnh/pdf/office/txt/csv/zip), **chữ ký nội dung magic-byte** (`FileSignatureValidator` — chống đổi đuôi giả mạo), **hạn mức/user** (`PerUserQuotaBytes` 200MB, miễn Admin); **dedup theo SHA-256** (file trùng nội dung dùng lại 1 bản vật lý). `StoredFile` thêm cột `Sha256` + `Visibility`. **Tải xuống phân tầng** theo `Visibility`: `Public` (ẩn danh, ảnh đại diện) / `Authenticated` (mặc định upload, cần đăng nhập) / `Restricted` (uploader hoặc Teacher/Admin) — kèm ETag + Cache-Control + `nosniff`, hỗ trợ 304. **Dọn rác:** `FileCleanupService` (BackgroundService, 24h/lần) **2 pha**: (1) **mark** — `ReconcileOrphansCoreAsync` dò file rác = `StoredFile` đang sống mà **không còn ai tham chiếu** (gom mọi `LearningMaterial.StoredFileId` + `LearningMaterial.CoverFileId` + `MaterialFolder.CoverFileId` (ảnh bìa bộ, 2026-07-07) + `Exam.SourceStoredFileId` (file nguồn sinh đề, 2026-07-14) + Guid trong `AppUser.AvatarUrl`, bằng `IgnoreQueryFilters` để giữ cả tham chiếu từ bản ghi đã xóa mềm — bảo thủ) và đã quá hạn ân hạn `OrphanGracePeriodHours` (mặc định 24h) → đánh dấu xóa mềm; (2) **sweep** — hard-delete file vật lý đã xóa mềm quá `CleanupRetentionDays` (refcount theo StoragePath). _Lưu ý: nếu sau này thêm rich-text nhúng `<img src="/api/files/{id}">`, phải bổ sung quét các field content vào tập tham chiếu._
+- **Cấu hình phân tầng (Settings):** `ISettingsResolver`/`ISettingsService` (1 impl `SettingsService`). Giải theo **User → Class → Role → System → Default**. `SettingKeys` (whitelist, validate theo từng khóa, snapshot per-request, `SystemOnly` chỉ giải scope System): `FileStorage.AllowServerUpload`/`AllowExternalUrl`/`DefaultSource`, `Tuition.DueSoonDays`, `Warning.ScoreDropThreshold`, `Center.CodePrefix`, `Account.DefaultPassword`, `Account.ForceChangePasswordOnFirstLogin`, `Schedule.Shifts`.
+- **Module upload file (`Storage/`):** `IFileStorage` (local disk, `FileStorageOptions`) + setting `FileStorage.AllowServerUpload` (mặc định **true**) — `FileService` từ chối upload khi tắt; luồng KHÔNG nhập kho (avatar, ảnh bìa, file nguồn sinh đề) dùng `enforceStorageMode:false`. **Validate**: dung lượng (`MaxSizeBytes` 20MB), **allowlist phần mở rộng** (`AllowedExtensions` — loại cơ bản: ảnh/pdf/office/txt/csv/zip), **chữ ký nội dung magic-byte** (`FileSignatureValidator` — chống đổi đuôi giả mạo), **hạn mức/user** (`PerUserQuotaBytes` 200MB, miễn Admin); **dedup theo SHA-256** (file trùng nội dung dùng lại 1 bản vật lý). `StoredFile` thêm cột `Sha256` + `Visibility`. **Tải xuống phân tầng** theo `Visibility`: `Public` (ẩn danh, ảnh đại diện) / `Authenticated` (mặc định upload, cần đăng nhập) / `Restricted` (uploader hoặc Teacher/Admin) — kèm ETag + Cache-Control + `nosniff`, hỗ trợ 304. **Dọn rác:** `FileCleanupService` (BackgroundService, 24h/lần) **2 pha**: (1) **mark** — `ReconcileOrphansCoreAsync` dò file rác = `StoredFile` đang sống mà **không còn ai tham chiếu** (gom mọi `LearningMaterial.StoredFileId` + `LearningMaterial.CoverFileId` + `MaterialFolder.CoverFileId` (ảnh bìa bộ, 2026-07-07) + `Exam.SourceStoredFileId` (file nguồn sinh đề, 2026-07-14) + Guid trong `AppUser.AvatarUrl`, bằng `IgnoreQueryFilters` để giữ cả tham chiếu từ bản ghi đã xóa mềm — bảo thủ) và đã quá hạn ân hạn `OrphanGracePeriodHours` (mặc định 24h) → đánh dấu xóa mềm; (2) **sweep** — hard-delete file vật lý đã xóa mềm quá `CleanupRetentionDays` (refcount theo StoragePath). _Lưu ý: nếu sau này thêm rich-text nhúng `<img src="/api/files/{id}">`, phải bổ sung quét các field content vào tập tham chiếu._
 - **Thông báo:** `INotificationSender`/`INotificationDispatcher`; Email thật (MailKit, `SmtpOptions`); Zalo/Messenger stub → `Manual` (GĐ2 tích hợp API). `DispatchAsync` trả `DispatchOutcome(Status, Error)` — khi Email gửi lỗi (SMTP) thì lý do lỗi được lưu vào `NotificationDelivery.ErrorMessage` để chẩn đoán.
 - **Điểm thưởng** = sổ cái `PointEntry`; số dư = SUM(reward) − SUM(penalty) − SUM(redeem). Quy đổi = `RewardRedemption`.
 
@@ -406,7 +407,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 ### 15.7 Giai đoạn 2 (đã hiện thực)
 - **Học phí** (`Tuition*`): CRUD + đánh dấu đã đóng, status tính lại theo `DueDate/PaidOn` + `DueSoonDays`.
 - **Kho tài liệu** (`Material*`): link ngoài hoặc file server (`StoredFile`/`IFileStorage`); **mã tự sinh `TL0001`** (cột `Code`
-  unique kể cả soft-deleted); "Loại tài liệu" = `MaterialCategory` (CRUD, chặn xóa khi đang dùng); Khối snapshot tên từ `GradeCategory`;
+  unique kể cả soft-deleted); ~~"Loại tài liệu" = `MaterialCategory`~~ (**đã gỡ 2026-08-14 — §15.18**); Khối snapshot tên từ `GradeCategory`;
   ảnh bìa (`CoverFileId`, upload `POST /api/materials/cover-image` Public; Tài liệu chung dùng 16:9, Bộ tài liệu môn học dùng bìa sách 3:4 qua `avatar-crop-modal` đã tham số hóa;
   validate cover tồn tại + là ảnh `Materials.CoverNotFound/CoverNotImage`; đổi/xóa ảnh không xóa file cũ — orphan cleanup lo).
   **Tái cấu trúc 2026-07-07 — 2 nhánh tài liệu:** (1) **Tài liệu môn học** phân cấp **Môn → Bộ tài liệu → Tài liệu**: entity mới
@@ -422,7 +423,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   queryParams — F5/share URL/back giữ đúng vị trí): **Tài liệu môn học** (`subject-materials.tab.ts` — 3 mức + breadcrumb tự dựng:
   lưới Môn (card + số bộ/tài liệu) → lưới Bộ (card bìa sách 3:4/placeholder folder-open, CRUD + crop ảnh bìa) → bảng tài liệu trong bộ
   (STT/Mã/Tên/Nguồn/Ngày + Xem/Download/**Đề**/Sửa/Xóa, search + phân trang; icon mắt mở **trình xem FULL màn hình dùng chung `shared/document-preview.ts`** (2026-07-10, thay modal 1000px lặp ở 2 tab): nz-modal `nzWrapClassName="hs-modal-fullscreen"` 100vw×100dvh (style global `styles.scss`), PDF/Word/ODT/RTF/TXT qua `/api/files/{id}/preview` (iframe), **ảnh** tải blob thường hiện `<img>` (fix ảnh trước bị đẩy nhầm vào /preview), loại khác hiện thông báo + nút Tải xuống; header tên tài liệu + nút Tải xuống; race-guard + revoke objectURL; exam-detail có nút **"Phóng to"** trên panel tài liệu gốc mở cùng trình xem qua `previewUrl`)) · **Tài liệu chung** (`general-materials.tab.ts` —
-  lưới card như cũ, lọc `generalOnly`) · **Danh mục** (chỉ Loại tài liệu — Môn/Khối quản ở Lớp học) · **Quản lí câu hỏi**
+  lưới card như cũ, lọc `generalOnly`) · ~~**Danh mục**~~ (đã gỡ) · ~~**Quản lí câu hỏi**~~ (chuyển sang `/exams` — §15.18)
   (`question-bank.tab.ts`, lazy — §15.14). Chuỗi back exam-detail → exam-list → `/materials` **chuyển tiếp ngữ cảnh**
   `tab/subjectId/folderId` qua queryParams (exam-list/exam-detail nhận input alias). `ClassId` trên entity chỉ còn legacy.
   **Redesign 2026-07-18 — thêm cấp Unit + giao diện "sách giáo khoa" (kiểu Sách Mềm), phân cấp thành Môn → Bộ → Unit → Tài liệu:**
@@ -478,7 +479,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 - **Nguyên tắc:** mỗi `Student`/`TeacherProfile` ↔ tối đa **một** `AppUser`; **tên đăng nhập = mã** (`StudentCode`/`TeacherCode`, tự sinh, ổn định). Đăng nhập vẫn chấp nhận username **hoặc** email (`AuthService.LoginAsync`).
 - **Service thống nhất** `IAccountProvisioningService` (`Application/Accounts`) / `AccountProvisioningService` (`Infrastructure/Accounts`) là **nguồn sự thật duy nhất** cho vòng đời tài khoản: cấp (`ProvisionStudent/TeacherAsync`), cấp hàng loạt (`Provision*sAsync`), đặt lại mật khẩu (`Reset*PasswordAsync`), khóa/mở (`Set*LockedAsync` qua Identity lockout), gỡ/liên kết (`Unlink/LinkStudentAsync`). Các luồng cũ (`StudentAccountService.CreateInClassAsync`, `TeacherService.CreateAccountAsync`, `StudentImportService`, `StudentService.LinkUserAsync`) **gọi service này** thay cho logic riêng ⇒ xóa mọi điểm không nhất quán (username/mật khẩu/email-ảo/1-1).
 - **Mật khẩu mặc định cấu hình được** (Settings `Account.DefaultPassword`, mặc định `Hocvien@123`) + cờ **`AppUser.MustChangePassword`**: tài khoản vừa cấp/đặt lại bị **buộc đổi mật khẩu ở lần đăng nhập đầu**. `UserDto.MustChangePassword` đổ ra FE; `ProfileService.ChangePasswordAsync` gỡ cờ + thu hồi refresh token. FE: `mustChangePasswordGuard` ép sang màn `/must-change-password` trước khi vào hệ thống.
-- **Email ảo** (Identity bắt `RequireUniqueEmail`): một quy tắc `sanitize(mã)@{Account.LocalEmailDomain}` (mặc định `hs.local`), fallback theo GUID nếu trùng — thay 3 domain cũ.
+- ~~**Email ảo**~~ — **đã bỏ 2026-08-14** (§15.18): `RequireUniqueEmail=false`, tài khoản không có email thật để trống email và đăng nhập bằng mã.
 - **1-1 chặt ở DB:** partial unique index trên `Student.UserId` (đồng bộ `TeacherProfile.UserId` đã có) lọc `WHERE "UserId" IS NOT NULL AND NOT "IsDeleted"` — migration `AddAccountProvisioning` (+ cột `MustChangePassword`). App vẫn kiểm trước + bắt `DbUpdateException` làm lưới an toàn.
 - **Trang Người dùng** (`UserAdminService.CreateUserAsync`) **chỉ tạo tài khoản Admin** (bỏ nhánh tạo GV `GV{base36}` lệch chuẩn); GV cấp ở trang Giáo viên, HS ở trang Học viên.
 - **DTO trạng thái:** `StudentDto`/`RosterItemDto`/`TeacherProfileDto` thêm `UserName`/`IsLocked`/`MustChangePassword` (nạp qua `IUserDirectory.GetAccountInfosAsync`). FE: cột **"Tài khoản"** (badge Đã cấp/Chưa cấp/Đã khóa) + nút **Quản lý tài khoản** (cấp/đặt lại/khóa/gỡ/liên kết) + **cấp hàng loạt** (checkbox) ở trang Học viên & Giáo viên.
@@ -547,7 +548,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   ngữ cảnh Môn/Khối), snapshot vào `Exam.SourceStoredFileId`; tên đề mặc định = tên file bỏ đuôi; detail ưu tiên snapshot này cho
   `SourceFileUrl/SourceFilePreviewUrl` (fallback tra tài liệu cho đề cũ); nhân bản đề copy cả `SourceStoredFileId`;
   `GET /generation-jobs/{jobId}` trả `Queued/Running/Succeeded/Failed` + result khi xong.
-- **FE:** `core/exam.service.ts`; Kho tài liệu có nút **Đề** trên từng tài liệu; `features/exams/exam-list.page.ts`
+- **FE:** `core/exam.service.ts`; Kho tài liệu có badge **"N đề"** + nút **⚡ Sinh đề** trên từng tài liệu; ~~`features/exams/exam-list.page.ts`~~ (đã thay bằng module `/exams` — §15.18)
   (bảng đề có cột **Người tạo** + modal "Tạo đề bằng AI" Extract/Generate + modal **Tạo đề từ file upload** — 2026-07-14: bỏ field
   "Tên tài liệu mới", "Tên đề" auto-fill theo tên file, start job + polling trạng thái) → `exam-detail.page.ts` (trình sửa đầy đủ 4 loại câu + giải thích + **Lưu vào bộ đề**;
   2026-07-04: **không tự tải PDF gốc** — nút "Xem tài liệu gốc" dùng `SourceFilePreviewUrl`/`/api/files/{id}/preview` để xem inline
@@ -567,7 +568,7 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
   đọc câu live, không snapshot); chỉnh sửa ⇒ dùng Nhân bản. **Thêm/xóa câu tự chia lại điểm toàn đề** về TotalPoints
   (`UpsertQuestionRequest` **bỏ tham số Points** — trước đây câu thêm tay bị 0 điểm, xóa câu làm tổng <10). FE: editor 4 loại câu trích
   thành **`features/exams/question-editor.ts`** (component `app-question-editor` + helpers `emptyEditQuestion/toEditQuestion/
-  toUpsertRequest/buildQuestionView`) dùng chung exam-detail + tab **"Quản lí câu hỏi"** (`features/materials/question-bank.tab.ts`,
+  toUpsertRequest/buildQuestionView`) dùng chung exam-detail + tab **"Ngân hàng câu hỏi"** (`features/exams/question-bank.tab.ts` — chuyển từ Kho tài liệu 2026-08-14,
   tab 3 của `/materials`, lazy): bộ lọc đủ + search, bảng checkbox **chọn giữ-qua-trang** + "Chọn tất cả N câu" (qua `/ids`),
   thanh chọn nổi → modal "Tạo đề từ câu đã chọn" → navigate `/exams/{id}`; preview/sửa/xóa/thêm câu tại chỗ (sửa câu đề Published
   có confirm cảnh báo); nút **Nhân bản** ở exam-detail + exam-list. Responsive card mobile. Quyền: TeacherOrAdmin, không giới hạn
@@ -677,9 +678,64 @@ Migration `AddTeachingDomain` tạo toàn bộ bảng (**0 FK** — đã kiểm)
 
 ---
 
+### 15.18 Redesign Kho tài liệu · Đề & Bài tập · Cấu hình · Tài khoản (2026-08-14)
+
+- **Kho tài liệu (`/materials`) còn 2 tab**: *Tài liệu môn học* · *Tài liệu chung*. Tab **Danh mục** bị bỏ hẳn
+  (kèm dọn schema), tab **Quản lí câu hỏi** chuyển sang module Đề. Form thêm/sửa tài liệu gộp về một bản dùng
+  chung **`features/materials/material-form.modal.ts`** (trước là 2 bản sao gần giống hệt).
+- **Màn bộ tài liệu (`folder-detail.page.ts`) thiết kế lại**: bỏ palette cam/xanh lá riêng, dùng design system
+  Indigo (scope `.hs-mat-theme` → `.hs-book`, khối CSS riêng trong `styles.scss` đã xóa). **Mục lục Unit là lưới
+  thẻ tự xuống dòng kèm TÊN Unit** + đếm `N tài liệu · N đề` — thấy hết cùng lúc, không cuộn ngang; chọn Unit đổi
+  luôn danh sách bên dưới (**gộp 2 mức cũ thành 1 màn**). Tài liệu chưa thuộc Unit là một thẻ trong mục lục
+  (thay sidebar "Tài nguyên khác"). Mỗi tài liệu là **thẻ** có icon theo loại file, **badge "N đề" bấm được**,
+  nút **Xem** · **Giao cho lớp** · **⚡ Sinh đề** · menu ⋮ (Tải xuống/Sửa/Xóa).
+- **Module `/exams` "Đề & Bài tập"** — menu riêng ngang hàng Kho tài liệu, 3 tab: **Bộ đề** (mọi đề, lọc
+  Môn/Khối/trạng thái/đang-giao/từ khóa; nút Tạo đề mới chọn tài liệu nguồn) · **Đã giao cho lớp**
+  (`GET /api/exams/assignments` phân trang, guard theo lớp GV) · **Ngân hàng câu hỏi** (chuyển từ Kho tài liệu).
+  Route `materials/:materialId/exams` và `exam-list.page.ts` đã bỏ; badge "N đề" mở
+  **`exams-of-material.modal.ts`** để duyệt/giao từng đề tại chỗ.
+- **Sinh đề chọn được NGUỒN CÂU HỎI** (`exam-generate.modal.ts`) — tách bạch "đề gắn vào tài liệu nào" và
+  "AI đọc file nào": *chính tài liệu này* · *một tài liệu khác trong cùng bộ*
+  (`GenerateExamRequest.QuestionSourceMaterialId`, controller validate cùng bộ + phải là ServerFile ⇒
+  `Exam.QuestionSourceInvalid`/`Exam.QuestionSourceNotFile`/`Exam.QuestionSourceNotFound`) · *tải lên file chỉ có
+  câu hỏi* (dùng lại `generate-upload`, file KHÔNG nhập kho). Lý do: file bài học lẫn cả lý thuyết lẫn bài tập
+  khiến AI bắt nhầm. `ExamDetailDto` thêm `MaterialTitle`/`QuestionSourceName` để GV biết AI đã đọc file nào.
+  **Lõi sinh đề AI giữ nguyên** (`ExamGenerationService`, prompt, 3 lớp kiểm chứng).
+- **Cách nạp tài liệu cấu hình được**: bỏ `FileStorage.Mode`, thay bằng `FileStorage.AllowServerUpload` +
+  `AllowExternalUrl` + `DefaultSource`. Không được tắt cả hai (`Settings.NoUploadMethod`); chỉ bật một cách ⇒
+  form ẩn hẳn phần chọn nguồn. `ExamsController.GenerateFromUpload` truyền `enforceStorageMode: false` —
+  file nguồn sinh đề là file tạm cho AI đọc, tắt upload vẫn phải sinh đề được.
+- **Cấu hình hệ thống 5 tab** (`?tab=account|materials|catalog|schedule|grading`), mỗi tab một nút Lưu đúng phạm
+  vi. Tab **Danh mục** gom Môn/Khối/Cơ sở (chuyển từ trang Lớp học) đứng cùng chỗ với tiền tố mã GV. `SettingsService`
+  thêm **whitelist khóa** (`Settings.UnknownKey`), **validate theo từng khóa**, **snapshot bảng Settings trong một
+  request** (trước mỗi lần đọc là một lần quét cả bảng), và `SettingKeys.SystemOnly` — khóa toàn hệ thống chỉ giải
+  ở scope System (chặn bản ghi scope User ghi đè chính sách chung).
+- **Tài khoản**: mọi đường tạo tài khoản (kể cả `UserAdminService.CreateUserAsync`) dùng `Account.DefaultPassword`
+  khi bỏ trống và ép `MustChangePassword` theo `Account.ForceChangePasswordOnFirstLogin`; **chặn thật ở server**
+  bằng claim `mcp` + `MustChangePasswordMiddleware` (403, allowlist: đổi mật khẩu/me/refresh/logout/login) — trước
+  đây chỉ chặn ở giao diện. Google login **gỡ cờ** (người dùng external không biết mật khẩu tạm nên sẽ kẹt).
+  **Bỏ email ảo**: `RequireUniqueEmail=false`, `ResolveLoginEmailAsync` trả null khi không có email thật,
+  `UserSummary.Email` thành nullable. `AccountProvisionResultDto`/`BulkProvisionItemDto` **trả mật khẩu vừa cấp**
+  (chỉ tại thời điểm cấp) → **`shared/account-handover-modal.ts`**: bảng Họ tên · Mã · Tên đăng nhập · Mật khẩu ·
+  Kết quả + Copy (TSV) / Xuất CSV / In. FE: badge `⚠ Chưa có tài khoản` + nút **Cấp ngay** trên dòng (Học viên &
+  Giáo viên), trang Học viên thêm **lọc Lớp** (`GET /api/students?classId=`) và **giữ lựa chọn qua trang**, banner
+  cấp hàng loạt ở Chi tiết lớp, `GET /api/students/unlinked-users` thay cách lọc 200 user ở client,
+  `TeacherService.Link/UnlinkAccountAsync` đi qua `IAccountProvisioningService`, `GET /api/users` siết **AdminOnly**.
+  Vá bug: sửa học viên từ trang Học viên trước đây **xóa trắng 7 trường** (School/GradeLevel/ParentName/…).
+- **Component dùng chung mới**: `shared/assign-to-class.modal.ts` (giao **tài liệu** hoặc **đề** cho lớp, phản ánh
+  ràng buộc InClass bắt buộc có giờ / không-giới-hạn chỉ cho Homework và bắt buộc hạn nộp).
+- **Dọn schema** — migration `CleanupMaterialSchema`: `DROP TABLE MaterialCategories`;
+  `LearningMaterials` bỏ `CategoryId`, `Type`, `ClassId`, `UploadedByUserId` (+2 index); `Exams` bỏ `Language`.
+  Enum `MaterialType`, `FileStorageMode` và `EnsureMaterialCategoryNotInUseAsync` đã gỡ.
+  `MaterialDto`/`MaterialUnitDto`/`MaterialFolderDto`/`MaterialSubjectSummaryDto` thêm `ExamCount`
+  (đếm gom qua `MaterialExamCounter`), `ExamListItemDto` thêm `MaterialTitle` + `AssignmentCount`.
+---
+
 ## 16. Changelog
 
 > Ghi lại mỗi thay đổi đáng kể (entity/endpoint/luồng/config/hạ tầng) theo định dạng: `ngày — mô tả — file chính`.
+
+- **2026-08-14** — **Redesign Kho tài liệu · Đề & Bài tập · Cấu hình · Luồng tài khoản** (xem §15.18): (1) **Kho tài liệu** còn 2 tab (bỏ Danh mục, chuyển Ngân hàng câu hỏi sang module Đề); màn bộ tài liệu đổi từ palette cam/xanh lá sang design system Indigo (`.hs-mat-theme` → `.hs-book`), **mục lục Unit thành lưới thẻ có TÊN** (thấy hết cùng lúc, gộp 2 mức thành 1 màn), mỗi tài liệu là thẻ có **badge "N đề" bấm được** + nút **Giao cho lớp** + **Sinh đề**; form tài liệu gộp 1 bản dùng chung `material-form.modal.ts`. (2) **Module `/exams` "Đề & Bài tập"** ngang hàng Kho tài liệu, 3 tab (Bộ đề · Đã giao cho lớp · Ngân hàng câu hỏi); bỏ route `materials/:materialId/exams`. (3) **Sinh đề chọn được nguồn câu hỏi**: chính tài liệu / tài liệu khác cùng bộ (`GenerateExamRequest.QuestionSourceMaterialId`) / file tải lên một lần — file bài học lẫn lý thuyết + bài tập làm AI trích sai. (4) **Cách nạp tài liệu cấu hình được**: `FileStorage.Mode` → 3 khóa `AllowServerUpload`/`AllowExternalUrl`/`DefaultSource`, chặn tắt cả hai; `generate-upload` dùng `enforceStorageMode:false`. (5) **Cấu hình 5 tab** + gom Môn/Khối/Cơ sở từ trang Lớp học; `SettingsService` thêm whitelist khóa + validate theo khóa + snapshot per-request + `SystemOnly`. (6) **Tài khoản**: mọi tài khoản mới dùng mật khẩu mặc định + ép đổi lần đầu **chặn thật ở server** (claim `mcp` + `MustChangePasswordMiddleware` → 403), Google login gỡ cờ, **bỏ email ảo** (`RequireUniqueEmail=false`), DTO trả mật khẩu vừa cấp → **bảng bàn giao** (Copy/CSV/In), badge "Cấp ngay" trên dòng, lọc Lớp + giữ lựa chọn qua trang, banner cấp hàng loạt ở Chi tiết lớp, `GET /api/users` siết về AdminOnly. (7) **Dọn schema** (migration `CleanupMaterialSchema`): drop bảng `MaterialCategories`, cột `LearningMaterials.CategoryId/Type/ClassId/UploadedByUserId`, `Exams.Language`. Build BE/FE sạch, **202/202 test** (+20: `SettingsValidationTests`, `ExamQuestionSourceTests`, `MustChangePasswordGateTests`). — `server/src/**` (`Settings`, `Materials`, `Exams`, `Accounts`, `Users`, `Auth`, `WebApi/Common/MustChangePasswordMiddleware`), migration `20260813163542_CleanupMaterialSchema`, `client/src/app/**` (`features/{materials,exams,settings,students,teachers,classes}`, `shared/{assign-to-class.modal,account-handover-modal}`, `core/{models,settings.service,exam.service,materials.service,students.service}`, `layout/shell`, `app.routes`, `app.config`), `client/src/styles.scss`, `ARCHITECTURE.md`.
 
 - **2026-07-20** — **Kho tài liệu: bìa bộ tài liệu môn học chuyển sang tỉ lệ sách**: FE đổi card/preview/crop ảnh bìa trong tab **Tài liệu môn học** từ 16:9 sang 3:4 để upload trang bìa sách dễ căn và hiển thị đúng dáng bìa; `avatar-crop-modal` hỗ trợ crop ảnh không tròn theo tỉ lệ ngang/dọc truyền vào, giữ nguyên crop avatar. Không đổi API/schema. — `client/src/app/features/materials/subject-materials.tab.ts`, `client/src/app/shared/avatar-crop-modal.ts`, `ARCHITECTURE.md`.
 - **2026-07-19** — **Luồng HS làm bài: cố định thanh tiến độ/thời gian/nộp bài + panel câu hỏi ẩn/hiện** (§15.15): `exam-take.page` tách page header khỏi thanh làm bài, thêm toolbar sticky chứa progress, đồng hồ/hạn nộp, nút mở danh sách câu và nút nộp bài; danh sách câu đã làm/chưa làm chuyển sang panel cạnh phải có nút ẩn/hiện (mobile/tablet hiển thị dạng overlay), giúp giữ không gian chính cho câu hỏi. Không đổi API/schema. Build FE sạch. — `client/src/app/features/portal/exam-take.page.ts`, `ARCHITECTURE.md`.

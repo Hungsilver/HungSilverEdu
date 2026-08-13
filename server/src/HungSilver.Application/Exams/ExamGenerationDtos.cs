@@ -15,7 +15,10 @@ public sealed record GenerateExamRequest(
     int? MaxQuestions,        // Generate: số câu mong muốn; Extract: bỏ qua (lấy hết)
     string? Difficulty,       // Generate: dễ/trung bình/khó…
     string? Instructions,     // ghi chú thêm cho AI (tùy chọn)
-    bool Verify = true);      // bật Lớp 2 (AI đối chiếu bản trích vs nguồn)
+    bool Verify = true,       // bật Lớp 2 (AI đối chiếu bản trích vs nguồn)
+    // Tài liệu KHÁC trong cùng bộ dùng làm nguồn câu hỏi cho AI đọc (đề vẫn gắn vào tài liệu ở route).
+    // Dùng khi file bài học lẫn lý thuyết + bài tập: trỏ AI sang đúng file bài tập cho chính xác.
+    Guid? QuestionSourceMaterialId = null);
 
 /// <summary>Kết quả sinh đề: id đề nháp + số câu + số câu bị bỏ + cảnh báo (cho GV rà).</summary>
 public sealed record ExamGenerationResult(

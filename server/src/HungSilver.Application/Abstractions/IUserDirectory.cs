@@ -21,6 +21,7 @@ public interface IUserDirectory
     Task<Guid?> GetRoleIdAsync(string role, CancellationToken ct = default);
 }
 
-public sealed record UserSummary(Guid Id, string Email, string? FullName);
+/// <summary>Email có thể null — tài khoản HS/GV đăng nhập bằng mã, hệ thống không sinh email ảo.</summary>
+public sealed record UserSummary(Guid Id, string? Email, string? FullName);
 
 public sealed record AccountInfo(string UserName, bool IsLocked, bool MustChangePassword);

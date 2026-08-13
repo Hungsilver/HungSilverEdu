@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using AutoMapper;
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
@@ -18,6 +20,17 @@ public sealed class SettingsService(
     IClassAccessGuard classAccessGuard,
     IMapper mapper) : ISettingsService, ISettingsResolver
 {
+    // Snapshot bảng Settings dùng lại trong CÙNG một request (service đăng ký Scoped).
+    // Trước đây mỗi lần đọc cấu hình là một lần quét cả bảng, mà Dashboard/Tuition/Warnings
+    // đọc nhiều lần trong một request. Ghi cấu hình sẽ xóa snapshot để lần đọc sau lấy giá trị mới.
+    private List<AppSetting>? _snapshot;
+    private readonly Dictionary<Guid, List<Guid>> _roleCache = [];
+
+    private async Task<List<AppSetting>> SnapshotAsync(CancellationToken ct) =>
+        _snapshot ??= await context.Settings.AsNoTracking().ToListAsync(ct);
+
+    private void InvalidateSnapshot() => _snapshot = null;
+
     // ---------------- ISettingsResolver ----------------
 
     public async Task<string?> GetEffectiveValueAsync(string key, Guid? classId = null, Guid? userId = null, CancellationToken ct = default)
@@ -25,8 +38,8 @@ public sealed class SettingsService(
         var uid = userId ?? currentUser.UserId;
         var roleIds = uid is null ? [] : await GetUserRoleIdsAsync(uid.Value, ct);
 
-        var candidates = await context.Settings.Where(s => s.Key == key).ToListAsync(ct);
-        var value = PickByPriority(candidates, classId, uid, roleIds);
+        var candidates = (await SnapshotAsync(ct)).Where(s => s.Key == key).ToList();
+        var value = PickByPriority(key, candidates, classId, uid, roleIds);
 
         if (value is not null) return value;
         return SettingKeys.Defaults.TryGetValue(key, out var def) ? def : null;
@@ -39,10 +52,9 @@ public sealed class SettingsService(
 
         var result = new Dictionary<string, string>(SettingKeys.Defaults);
 
-        var all = await context.Settings.ToListAsync(ct);
-        foreach (var grp in all.GroupBy(s => s.Key))
+        foreach (var grp in (await SnapshotAsync(ct)).GroupBy(s => s.Key))
         {
-            var val = PickByPriority(grp.ToList(), classId, uid, roleIds);
+            var val = PickByPriority(grp.Key, grp.ToList(), classId, uid, roleIds);
             if (val is not null)
                 result[grp.Key] = val;
         }
@@ -50,30 +62,39 @@ public sealed class SettingsService(
         return result;
     }
 
-    private static string? PickByPriority(List<AppSetting> candidates, Guid? classId, Guid? userId, List<Guid> roleIds)
+    private static string? PickByPriority(string key, List<AppSetting> candidates, Guid? classId, Guid? userId, List<Guid> roleIds)
     {
-        if (userId is not null)
+        // Khóa toàn hệ thống chỉ nhận scope System — không cho bản ghi User/Class/Role ghi đè chính sách chung.
+        if (!SettingKeys.SystemOnly.Contains(key))
         {
-            var user = candidates.FirstOrDefault(s => s.Scope == SettingScope.User && s.ScopeId == userId);
-            if (user is not null) return user.Value;
-        }
+            if (userId is not null)
+            {
+                var user = candidates.FirstOrDefault(s => s.Scope == SettingScope.User && s.ScopeId == userId);
+                if (user is not null) return user.Value;
+            }
 
-        if (classId is not null)
-        {
-            var cls = candidates.FirstOrDefault(s => s.Scope == SettingScope.Class && s.ScopeId == classId);
-            if (cls is not null) return cls.Value;
-        }
+            if (classId is not null)
+            {
+                var cls = candidates.FirstOrDefault(s => s.Scope == SettingScope.Class && s.ScopeId == classId);
+                if (cls is not null) return cls.Value;
+            }
 
-        var role = candidates.FirstOrDefault(s =>
-            s.Scope == SettingScope.Role && s.ScopeId != null && roleIds.Contains(s.ScopeId.Value));
-        if (role is not null) return role.Value;
+            var role = candidates.FirstOrDefault(s =>
+                s.Scope == SettingScope.Role && s.ScopeId != null && roleIds.Contains(s.ScopeId.Value));
+            if (role is not null) return role.Value;
+        }
 
         var system = candidates.FirstOrDefault(s => s.Scope == SettingScope.System);
         return system?.Value;
     }
 
-    private Task<List<Guid>> GetUserRoleIdsAsync(Guid userId, CancellationToken ct) =>
-        (from ur in context.UserRoles where ur.UserId == userId select ur.RoleId).ToListAsync(ct);
+    private async Task<List<Guid>> GetUserRoleIdsAsync(Guid userId, CancellationToken ct)
+    {
+        if (_roleCache.TryGetValue(userId, out var cached)) return cached;
+        var ids = await (from ur in context.UserRoles where ur.UserId == userId select ur.RoleId).ToListAsync(ct);
+        _roleCache[userId] = ids;
+        return ids;
+    }
 
     // ---------------- ISettingsService ----------------
 
@@ -102,25 +123,37 @@ public sealed class SettingsService(
         if (string.IsNullOrWhiteSpace(request.Key))
             return Result.Failure<SettingDto>(Error.Validation("Settings.KeyRequired", "Thiếu khóa cấu hình."));
 
-        // Chuẩn hóa: scope User mà không truyền ScopeId thì mặc định là chính user hiện tại.
-        var scopeId = request.Scope == SettingScope.User && request.ScopeId is null
-            ? currentUser.UserId
-            : request.ScopeId;
+        var key = request.Key.Trim();
+        if (!SettingKeys.All.Contains(key))
+            return Result.Failure<SettingDto>(Error.Validation(
+                "Settings.UnknownKey", $"Khóa cấu hình \"{key}\" không được hỗ trợ."));
 
-        var permission = await CheckScopePermissionAsync(request.Scope, scopeId, ct);
+        var validation = await ValidateValueAsync(key, request.Value, ct);
+        if (validation.IsFailure)
+            return Result.Failure<SettingDto>(validation.Error);
+
+        // Khóa toàn hệ thống chỉ được ghi ở scope System (đọc cũng chỉ đọc scope này).
+        var scope = SettingKeys.SystemOnly.Contains(key) ? SettingScope.System : request.Scope;
+
+        // Chuẩn hóa: scope User mà không truyền ScopeId thì mặc định là chính user hiện tại.
+        var scopeId = scope == SettingScope.User && request.ScopeId is null
+            ? currentUser.UserId
+            : scope == SettingScope.System ? null : request.ScopeId;
+
+        var permission = await CheckScopePermissionAsync(scope, scopeId, ct);
         if (permission.IsFailure)
             return Result.Failure<SettingDto>(permission.Error);
 
         var existing = await context.Settings.FirstOrDefaultAsync(
-            s => s.Scope == request.Scope && s.ScopeId == scopeId && s.Key == request.Key, ct);
+            s => s.Scope == scope && s.ScopeId == scopeId && s.Key == key, ct);
 
         if (existing is null)
         {
             existing = new AppSetting
             {
-                Key = request.Key.Trim(),
+                Key = key,
                 Value = request.Value,
-                Scope = request.Scope,
+                Scope = scope,
                 ScopeId = scopeId,
                 DataType = request.DataType,
                 Description = request.Description
@@ -136,6 +169,7 @@ public sealed class SettingsService(
         }
 
         await context.SaveChangesAsync(ct);
+        InvalidateSnapshot();
         return mapper.Map<SettingDto>(existing);
     }
 
@@ -151,8 +185,96 @@ public sealed class SettingsService(
 
         context.Settings.Remove(setting); // interceptor → soft delete
         await context.SaveChangesAsync(ct);
+        InvalidateSnapshot();
         return Result.Success();
     }
+
+    // ---------------- validate theo từng khóa ----------------
+
+    /// <summary>Giá trị hiệu lực ở scope System (bỏ qua mọi scope hẹp hơn) — dùng khi kiểm ràng buộc chéo khóa.</summary>
+    private async Task<string> SystemValueAsync(string key, CancellationToken ct)
+    {
+        var row = (await SnapshotAsync(ct)).FirstOrDefault(s => s.Key == key && s.Scope == SettingScope.System);
+        return row?.Value ?? SettingKeys.Defaults.GetValueOrDefault(key, string.Empty);
+    }
+
+    private async Task<Result> ValidateValueAsync(string key, string? value, CancellationToken ct)
+    {
+        var raw = value?.Trim() ?? string.Empty;
+
+        switch (key)
+        {
+            case SettingKeys.FileStorageAllowServerUpload:
+            case SettingKeys.FileStorageAllowExternalUrl:
+            {
+                if (!TryParseBool(raw, out var enabled))
+                    return Invalid("Giá trị phải là true hoặc false.");
+
+                // Không được tắt cả hai cách nạp tài liệu — nếu không sẽ không thêm được tài liệu nào.
+                if (!enabled)
+                {
+                    var otherKey = key == SettingKeys.FileStorageAllowServerUpload
+                        ? SettingKeys.FileStorageAllowExternalUrl
+                        : SettingKeys.FileStorageAllowServerUpload;
+                    if (!TryParseBool(await SystemValueAsync(otherKey, ct), out var otherEnabled) || !otherEnabled)
+                        return Result.Failure(Error.Validation("Settings.NoUploadMethod",
+                            "Phải bật ít nhất một cách nạp tài liệu (tải file lên server hoặc dán đường dẫn ngoài)."));
+                }
+                return Result.Success();
+            }
+
+            case SettingKeys.FileStorageDefaultSource:
+            {
+                if (raw is not (SettingKeys.SourceServerFile or SettingKeys.SourceExternalUrl))
+                    return Invalid("Cách nạp mặc định phải là ServerFile hoặc ExternalUrl.");
+
+                var needKey = raw == SettingKeys.SourceServerFile
+                    ? SettingKeys.FileStorageAllowServerUpload
+                    : SettingKeys.FileStorageAllowExternalUrl;
+                if (!TryParseBool(await SystemValueAsync(needKey, ct), out var on) || !on)
+                    return Result.Failure(Error.Validation("Settings.DefaultSourceDisabled",
+                        "Cách nạp mặc định đang bị tắt. Hãy bật cách đó trước khi chọn làm mặc định."));
+                return Result.Success();
+            }
+
+            case SettingKeys.AccountForceChangePassword:
+                return TryParseBool(raw, out _) ? Result.Success() : Invalid("Giá trị phải là true hoặc false.");
+
+            case SettingKeys.TuitionDueSoonDays:
+                return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) && days is >= 0 and <= 365
+                    ? Result.Success()
+                    : Invalid("Số ngày phải là số nguyên từ 0 đến 365.");
+
+            case SettingKeys.WarningScoreDropThreshold:
+                return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var th) && th is >= 0 and <= 10
+                    ? Result.Success()
+                    : Invalid("Ngưỡng điểm phải là số từ 0 đến 10.");
+
+            case SettingKeys.CenterCodePrefix:
+                return raw.Length is > 0 and <= 30 ? Result.Success() : Invalid("Tiền tố mã phải từ 1 đến 30 ký tự.");
+
+            case SettingKeys.AccountDefaultPassword:
+                return IsStrongPassword(raw)
+                    ? Result.Success()
+                    : Invalid("Mật khẩu mặc định phải từ 8 ký tự, có chữ hoa, chữ thường và số.");
+
+            case SettingKeys.ScheduleShifts:
+                try { using var _ = JsonDocument.Parse(raw); return Result.Success(); }
+                catch (JsonException) { return Invalid("Khung ca học phải là JSON hợp lệ."); }
+
+            default:
+                return Result.Success();
+        }
+
+        Result Invalid(string message) => Result.Failure(Error.Validation("Settings.InvalidValue", message));
+    }
+
+    private static bool TryParseBool(string? raw, out bool value) =>
+        bool.TryParse(raw?.Trim(), out value);
+
+    /// <summary>Khớp chính sách Identity đang cấu hình (≥8, có hoa/thường/số; không bắt ký tự đặc biệt).</summary>
+    private static bool IsStrongPassword(string raw) =>
+        raw.Length >= 8 && raw.Any(char.IsUpper) && raw.Any(char.IsLower) && raw.Any(char.IsDigit);
 
     private async Task<Result> CheckScopePermissionAsync(SettingScope scope, Guid? scopeId, CancellationToken ct)
     {

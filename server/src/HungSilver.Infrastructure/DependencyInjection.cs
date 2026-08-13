@@ -80,7 +80,10 @@ public static class DependencyInjection
 
         services.AddIdentityCore<AppUser>(options =>
             {
-                options.User.RequireUniqueEmail = true;
+                // Tài khoản HS/GV đăng nhập bằng MÃ (username) và có thể không có email thật.
+                // Bật RequireUniqueEmail sẽ bắt buộc email khác rỗng ⇒ buộc phải sinh "email ảo".
+                // Đã bỏ email ảo nên tắt cờ này; trùng email vẫn được kiểm ở tầng service khi có nhập.
+                options.User.RequireUniqueEmail = false;
                 options.Password.RequiredLength = 8;
                 options.Password.RequireNonAlphanumeric = false;
                 options.Lockout.MaxFailedAccessAttempts = 5;

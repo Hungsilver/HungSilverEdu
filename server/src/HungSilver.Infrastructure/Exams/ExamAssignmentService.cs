@@ -1,5 +1,6 @@
 using HungSilver.Application.Abstractions;
 using HungSilver.Application.Common;
+using HungSilver.Application.Common.Models;
 using HungSilver.Application.Exams;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
@@ -93,6 +94,46 @@ public sealed class ExamAssignmentService(
 
         var assignments = await query.OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
         return await ToDtosAsync(assignments, ct);
+    }
+
+    public async Task<Result<PagedResult<ExamAssignmentDto>>> GetPagedAsync(
+        Guid? classId, ExamAssignmentStatus? status, PagedRequest paging, CancellationToken ct = default)
+    {
+        var query = context.ExamAssignments.AsNoTracking();
+
+        if (classId is Guid cid)
+        {
+            var access = await accessGuard.EnsureCanAccessClassAsync(cid, ct);
+            if (access.IsFailure) return Result.Failure<PagedResult<ExamAssignmentDto>>(access.Error);
+            query = query.Where(a => a.ClassId == cid);
+        }
+        else if (!accessGuard.IsAdmin)
+        {
+            // Không lọc lớp cụ thể ⇒ GV chỉ thấy lượt giao của lớp mình phụ trách (mirror ListByExamAsync).
+            var ownedClassIds = await accessGuard.GetOwnedClassIdsAsync(ct);
+            query = query.Where(a => ownedClassIds.Contains(a.ClassId));
+        }
+
+        if (status is not null) query = query.Where(a => a.Status == status);
+
+        var term = string.IsNullOrWhiteSpace(paging.Search) ? null : paging.Search.Trim().ToLower();
+        if (term is not null)
+            query = query.Where(a => a.ExamTitle != null && a.ExamTitle.ToLower().Contains(term));
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((paging.Page - 1) * paging.PageSize)
+            .Take(paging.PageSize)
+            .ToListAsync(ct);
+
+        return new PagedResult<ExamAssignmentDto>
+        {
+            Items = await ToDtosAsync(items, ct),
+            Page = paging.Page,
+            PageSize = paging.PageSize,
+            TotalCount = total
+        };
     }
 
     public async Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default)

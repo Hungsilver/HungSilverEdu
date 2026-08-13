@@ -2,14 +2,12 @@ using HungSilver.Domain.Enums;
 
 namespace HungSilver.Application.Materials;
 
+/// <summary><paramref name="ExamCount"/> = số đề đã sinh từ tài liệu này (badge "N đề" ở Kho tài liệu).</summary>
 public sealed record MaterialDto(
     Guid Id,
     string Code,
-    Guid? ClassId,
     Guid? FolderId,
     Guid? UnitId,
-    Guid? CategoryId,
-    string? CategoryName,
     Guid? SubjectId,
     string? SubjectName,
     string? GradeBand,
@@ -21,12 +19,12 @@ public sealed record MaterialDto(
     Guid? CoverFileId,
     string? Description,
     string DownloadUrl,
+    int ExamCount,
     DateTime CreatedAt);
 
-/// <summary>Có FolderId ⇒ tài liệu thuộc bộ: Môn/Khối snapshot TỪ BỘ (bỏ qua giá trị client gửi), Loại không bắt buộc.
+/// <summary>Có FolderId ⇒ tài liệu thuộc bộ: Môn/Khối snapshot TỪ BỘ (bỏ qua giá trị client gửi).
 /// UnitId chỉ có nghĩa khi có FolderId và unit phải thuộc đúng bộ đó.</summary>
 public sealed record CreateMaterialRequest(
-    Guid? CategoryId,
     Guid? SubjectId,
     string? GradeBand,
     string Title,
@@ -39,7 +37,6 @@ public sealed record CreateMaterialRequest(
     Guid? UnitId = null);
 
 public sealed record UpdateMaterialRequest(
-    Guid? CategoryId,
     Guid? SubjectId,
     string? GradeBand,
     string Title,
@@ -56,7 +53,6 @@ public sealed record UpdateMaterialRequest(
 public sealed class MaterialListFilter
 {
     public Guid? SubjectId { get; set; }
-    public Guid? CategoryId { get; set; }
     public string? GradeBand { get; set; }
     public Guid? FolderId { get; set; }
     public bool GeneralOnly { get; set; }
@@ -68,7 +64,7 @@ public sealed class MaterialListFilter
 
 public sealed record MaterialFolderDto(
     Guid Id, Guid SubjectId, string SubjectName, string Name, string? GradeBand,
-    Guid? CoverFileId, string? Description, int MaterialCount, int UnitCount, DateTime CreatedAt);
+    Guid? CoverFileId, string? Description, int MaterialCount, int UnitCount, int ExamCount, DateTime CreatedAt);
 
 public sealed record CreateMaterialFolderRequest(
     Guid SubjectId, string Name, string? GradeBand, Guid? CoverFileId, string? Description);
@@ -78,15 +74,16 @@ public sealed record UpdateMaterialFolderRequest(
     string Name, string? GradeBand, Guid? CoverFileId, string? Description);
 
 /// <summary>Mức 1 "Tài liệu môn học": mỗi môn kèm số bộ + số tài liệu trong các bộ.</summary>
-public sealed record MaterialSubjectSummaryDto(Guid SubjectId, string SubjectName, int FolderCount, int MaterialCount);
+public sealed record MaterialSubjectSummaryDto(Guid SubjectId, string SubjectName, int FolderCount, int MaterialCount, int ExamCount);
 
 // ----------------- Unit/Chương trong bộ (MaterialUnit) -----------------
 
 /// <summary>UnitNo derive server-side theo vị trí SortOrder, đếm riêng từng Kind
-/// (Unit đếm 1,2,3…; Review đếm 1,2… độc lập) — không lưu DB nên reorder/xóa không bao giờ lệch số.</summary>
+/// (Unit đếm 1,2,3…; Review đếm 1,2… độc lập) — không lưu DB nên reorder/xóa không bao giờ lệch số.
+/// <paramref name="ExamCount"/> = tổng đề sinh từ các tài liệu trong unit (hiện ở mục lục).</summary>
 public sealed record MaterialUnitDto(
     Guid Id, Guid FolderId, MaterialUnitKind Kind, string Name,
-    int UnitNo, int SortOrder, int MaterialCount, DateTime CreatedAt);
+    int UnitNo, int SortOrder, int MaterialCount, int ExamCount, DateTime CreatedAt);
 
 public sealed record CreateMaterialUnitRequest(Guid FolderId, MaterialUnitKind Kind, string? Name);
 
@@ -95,11 +92,3 @@ public sealed record UpdateMaterialUnitRequest(MaterialUnitKind Kind, string? Na
 
 /// <summary>OrderedIds phải khớp CHÍNH XÁC tập unit đang có của bộ (không thiếu, không thừa, không trùng).</summary>
 public sealed record ReorderMaterialUnitsRequest(Guid FolderId, List<Guid> OrderedIds);
-
-// ----------------- Danh mục học liệu (thư viện) -----------------
-
-public sealed record MaterialCategoryDto(Guid Id, string Name, string? Description, int SortOrder);
-
-public sealed record CreateMaterialCategoryRequest(string Name, string? Description, int SortOrder);
-
-public sealed record UpdateMaterialCategoryRequest(string Name, string? Description, int SortOrder);

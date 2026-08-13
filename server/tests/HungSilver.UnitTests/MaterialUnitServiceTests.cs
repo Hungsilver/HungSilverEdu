@@ -58,6 +58,7 @@ public sealed class MaterialUnitServiceTests : IDisposable
         new Repository<MaterialUnit>(_context),
         new Repository<MaterialFolder>(_context),
         new Repository<LearningMaterial>(_context),
+        new Repository<Exam>(_context),
         new UnitOfWork(_context),
         new CreateMaterialUnitRequestValidator(),
         new UpdateMaterialUnitRequestValidator(),
@@ -69,21 +70,20 @@ public sealed class MaterialUnitServiceTests : IDisposable
         new Repository<MaterialUnit>(_context),
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
+        new Repository<Exam>(_context),
         new UnitOfWork(_context),
         new CreateMaterialFolderRequestValidator(),
         new UpdateMaterialFolderRequestValidator());
 
     private MaterialService NewMaterialService() => new(
         new Repository<LearningMaterial>(_context),
-        new Repository<MaterialCategory>(_context),
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
         new Repository<MaterialFolder>(_context),
         new Repository<MaterialUnit>(_context),
-        new AdminGuard(),
+        new Repository<Exam>(_context),
         new CurrentRelationCleanupService(_context),
         new UnitOfWork(_context),
-        new FakeCurrentUser(),
         new CreateMaterialRequestValidator(),
         new UpdateMaterialRequestValidator());
 
@@ -211,32 +211,24 @@ public sealed class MaterialUnitServiceTests : IDisposable
 
         // Unit thuộc bộ khác ⇒ từ chối.
         var wrongFolder = await materialSvc.CreateAsync(new CreateMaterialRequest(
-            null, null, null, "Getting Started", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null,
+            null, null, "Getting Started", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null,
             FolderId: otherFolder.Id, UnitId: unit.Id));
         Assert.Equal("Material.UnitNotInFolder", wrongFolder.Error.Code);
 
         // Đúng bộ ⇒ lưu UnitId.
         var ok = await materialSvc.CreateAsync(new CreateMaterialRequest(
-            null, null, null, "Getting Started", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null,
+            null, null, "Getting Started", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null,
             FolderId: _folderId, UnitId: unit.Id));
         Assert.True(ok.IsSuccess);
         Assert.Equal(unit.Id, ok.Value.UnitId);
 
         // Tài liệu chung (không bộ) ⇒ UnitId bị ép null dù client gửi.
         var general = await materialSvc.CreateAsync(new CreateMaterialRequest(
-            SeedCategory(), _subjectId, null,
+            _subjectId, null,
             "Tài liệu chung", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null,
             FolderId: null, UnitId: unit.Id));
         Assert.True(general.IsSuccess);
         Assert.Null(general.Value.UnitId);
-    }
-
-    private Guid SeedCategory()
-    {
-        var cat = new MaterialCategory { Name = "Đề kiểm tra", SortOrder = 1 };
-        _context.MaterialCategories.Add(cat);
-        _context.SaveChanges();
-        return cat.Id;
     }
 
     // ----- Fakes -----

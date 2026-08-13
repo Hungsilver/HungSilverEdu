@@ -23,7 +23,6 @@ public static class DependencyInjection
         services.AddScoped<IClassAccessGuard, ClassAccessGuard>();
         services.AddScoped<ITeacherJournalService, TeacherJournalService>();
         services.AddScoped<IMaterialService, MaterialService>();
-        services.AddScoped<IMaterialCategoryService, MaterialCategoryService>();
         services.AddScoped<IMaterialFolderService, MaterialFolderService>();
         services.AddScoped<IMaterialUnitService, MaterialUnitService>();
         services.AddScoped<IExamService, ExamService>();

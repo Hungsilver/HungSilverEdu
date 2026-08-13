@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   AssignMaterialRequest, CreateMaterialFolderRequest, CreateMaterialRequest, CreateMaterialUnitRequest, Material,
-  MaterialAssignment, MaterialAssignmentViewer, MaterialCategory, MaterialCategoryRequest, MaterialFolder,
+  MaterialAssignment, MaterialAssignmentViewer, MaterialFolder,
   MaterialPagedFilter, MaterialSubjectSummary, MaterialUnit, PagedResult, StoredFile, UpdateMaterialFolderRequest,
   UpdateMaterialRequest, UpdateMaterialUnitRequest
 } from './models';
@@ -13,16 +13,14 @@ import {
 export class MaterialsService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/materials`;
-  private readonly catUrl = `${environment.apiUrl}/material-categories`;
   private readonly folderUrl = `${environment.apiUrl}/material-folders`;
   private readonly unitUrl = `${environment.apiUrl}/material-units`;
 
-  /** Danh sách tất cả tài liệu (phân trang) — lọc theo môn/loại/khối + search Mã/Tên. */
+  /** Danh sách tất cả tài liệu (phân trang) — lọc theo môn/khối/bộ/unit + search Mã/Tên. */
   getPaged(filter: MaterialPagedFilter): Observable<PagedResult<Material>> {
     let params = new HttpParams().set('page', filter.page).set('pageSize', filter.pageSize);
     if (filter.search?.trim()) params = params.set('search', filter.search.trim());
     if (filter.subjectId) params = params.set('subjectId', filter.subjectId);
-    if (filter.categoryId) params = params.set('categoryId', filter.categoryId);
     if (filter.gradeBand) params = params.set('gradeBand', filter.gradeBand);
     if (filter.folderId) params = params.set('folderId', filter.folderId);
     if (filter.generalOnly) params = params.set('generalOnly', 'true');
@@ -127,22 +125,5 @@ export class MaterialsService {
   /** Sắp xếp lại toàn bộ unit của bộ trong 1 call — orderedIds phải khớp chính xác tập unit hiện có. */
   reorderUnits(folderId: string, orderedIds: string[]): Observable<MaterialUnit[]> {
     return this.http.put<MaterialUnit[]>(`${this.unitUrl}/reorder`, { folderId, orderedIds });
-  }
-
-  // ---- Loại tài liệu (MaterialCategory) ----
-  getCategories(): Observable<MaterialCategory[]> {
-    return this.http.get<MaterialCategory[]>(this.catUrl);
-  }
-
-  createCategory(request: MaterialCategoryRequest): Observable<MaterialCategory> {
-    return this.http.post<MaterialCategory>(this.catUrl, request);
-  }
-
-  updateCategory(id: string, request: MaterialCategoryRequest): Observable<MaterialCategory> {
-    return this.http.put<MaterialCategory>(`${this.catUrl}/${id}`, request);
-  }
-
-  deleteCategory(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.catUrl}/${id}`);
   }
 }

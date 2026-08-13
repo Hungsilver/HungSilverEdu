@@ -142,6 +142,14 @@ public sealed class AuthService(
                 new UserLoginInfo(GoogleProvider, info.Subject, GoogleProvider));
         }
 
+        // Đăng nhập bằng Google thì người dùng KHÔNG biết mật khẩu tạm, mà màn "đổi mật khẩu lần đầu"
+        // lại bắt nhập mật khẩu hiện tại ⇒ sẽ kẹt cứng. Xác thực qua Google coi như đã đủ, gỡ cờ.
+        if (user.MustChangePassword)
+        {
+            user.MustChangePassword = false;
+            await userManager.UpdateAsync(user);
+        }
+
         return await IssueTokensAsync(user, ct);
     }
 
@@ -217,7 +225,7 @@ public sealed class AuthService(
         var roles = await userManager.GetRolesAsync(user);
         // Tài khoản chỉ có username (vd học sinh do GV cấp) thì Email có thể null ⇒ dùng UserName.
         var identity = user.Email ?? user.UserName!;
-        var access = tokenService.CreateAccessToken(user.Id, identity, user.FullName, roles);
+        var access = tokenService.CreateAccessToken(user.Id, identity, user.FullName, roles, user.MustChangePassword);
 
         var refreshRaw = tokenService.CreateRefreshToken();
         var refreshExpiresAt = DateTime.Now.AddDays(jwtOptions.Value.RefreshTokenDays);

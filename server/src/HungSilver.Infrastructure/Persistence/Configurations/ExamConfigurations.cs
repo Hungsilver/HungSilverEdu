@@ -12,7 +12,6 @@ public sealed class ExamConfiguration : IEntityTypeConfiguration<Exam>
         e.Property(x => x.Description).HasMaxLength(2000);
         e.Property(x => x.GradeBand).HasMaxLength(100);
         e.Property(x => x.SubjectName).HasMaxLength(150);
-        e.Property(x => x.Language).HasMaxLength(20);
         e.Property(x => x.TotalPoints).HasPrecision(6, 2);
         e.HasIndex(x => x.MaterialId);
         e.HasIndex(x => x.SubjectId);

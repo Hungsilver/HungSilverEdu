@@ -3,10 +3,10 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
-  AssignExamRequest, CreateExamFromQuestionsRequest, CreateExamFromQuestionsResult, ExamAssignment, ExamDetail,
-  ExamGenerationJob, ExamGenerationJobStartResult, ExamListItem, ExamQuestion, ExamQuestionBankFilter,
-  ExamQuestionBankItem, ExamQuestionIdsResult, ExamReport, ExamStatus, GenerateExamRequest, PagedResult,
-  StudentHomework, TeacherAttemptReview, UpdateExamRequest, UpsertQuestionRequest
+  AssignExamRequest, CreateExamFromQuestionsRequest, CreateExamFromQuestionsResult, ExamAssignment,
+  ExamAssignmentStatus, ExamDetail, ExamGenerationJob, ExamGenerationJobStartResult, ExamListFilter, ExamListItem,
+  ExamQuestion, ExamQuestionBankFilter, ExamQuestionBankItem, ExamQuestionIdsResult, ExamReport,
+  GenerateExamRequest, PagedResult, StudentHomework, TeacherAttemptReview, UpdateExamRequest, UpsertQuestionRequest
 } from './models';
 
 /** Bộ đề trắc nghiệm: sinh từ tài liệu bằng AI, duyệt/sửa, phát hành. */
@@ -27,15 +27,32 @@ export class ExamService {
     return this.http.get<ExamGenerationJob>(`${this.apiUrl}/generation-jobs/${jobId}`);
   }
 
-  listByMaterial(materialId: string, page = 1, pageSize = 50): Observable<PagedResult<ExamListItem>> {
-    const params = new HttpParams().set('materialId', materialId).set('page', page).set('pageSize', pageSize);
+  /** Danh sách đề toàn trung tâm — lọc Môn/Tài liệu/Khối/Trạng thái/từ khóa/đang giao. */
+  list(filter: ExamListFilter, page = 1, pageSize = 20): Observable<PagedResult<ExamListItem>> {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (filter.subjectId) params = params.set('subjectId', filter.subjectId);
+    if (filter.materialId) params = params.set('materialId', filter.materialId);
+    if (filter.gradeBand) params = params.set('gradeBand', filter.gradeBand);
+    if (filter.status) params = params.set('status', filter.status);
+    if (filter.search?.trim()) params = params.set('search', filter.search.trim());
+    if (filter.assignedOnly) params = params.set('assignedOnly', 'true');
     return this.http.get<PagedResult<ExamListItem>>(this.apiUrl, { params });
   }
 
-  listBySubject(subjectId: string, status: ExamStatus | null, page = 1, pageSize = 20): Observable<PagedResult<ExamListItem>> {
-    let params = new HttpParams().set('subjectId', subjectId).set('page', page).set('pageSize', pageSize);
-    if (status) params = params.set('status', status);
-    return this.http.get<PagedResult<ExamListItem>>(this.apiUrl, { params });
+  /** Đề sinh từ một tài liệu — dùng cho modal "N đề" trong Kho tài liệu. */
+  listByMaterial(materialId: string, page = 1, pageSize = 50): Observable<PagedResult<ExamListItem>> {
+    return this.list({ materialId }, page, pageSize);
+  }
+
+  /** Mọi lượt giao trong phạm vi người dùng (tab "Đã giao cho lớp") — phân trang. */
+  listAssignmentsPaged(
+    filter: { classId?: string | null; status?: ExamAssignmentStatus | null; search?: string | null },
+    page = 1, pageSize = 20): Observable<PagedResult<ExamAssignment>> {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (filter.classId) params = params.set('classId', filter.classId);
+    if (filter.status) params = params.set('status', filter.status);
+    if (filter.search?.trim()) params = params.set('search', filter.search.trim());
+    return this.http.get<PagedResult<ExamAssignment>>(`${this.apiUrl}/assignments`, { params });
   }
 
   detail(id: string): Observable<ExamDetail> {

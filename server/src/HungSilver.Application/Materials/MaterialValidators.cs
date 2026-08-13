@@ -7,13 +7,10 @@ public sealed class CreateMaterialRequestValidator : AbstractValidator<CreateMat
 {
     public CreateMaterialRequestValidator()
     {
-        // Tài liệu trong bộ (có FolderId): Môn/Khối snapshot từ bộ, Loại không bắt buộc.
+        // Tài liệu trong bộ (có FolderId): Môn/Khối snapshot từ bộ nên không bắt nhập.
         RuleFor(x => x.SubjectId).Must(id => id.HasValue && id != Guid.Empty)
             .When(x => x.FolderId is null || x.FolderId == Guid.Empty)
             .WithMessage("Chọn môn học cho tài liệu.");
-        RuleFor(x => x.CategoryId).Must(id => id.HasValue && id != Guid.Empty)
-            .When(x => x.FolderId is null || x.FolderId == Guid.Empty)
-            .WithMessage("Chọn loại tài liệu.");
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Url).NotEmpty().MaximumLength(1000).When(x => x.Source == MaterialSource.ExternalUrl);
         RuleFor(x => x.StoredFileId).NotEmpty().When(x => x.Source == MaterialSource.ServerFile);
@@ -28,9 +25,6 @@ public sealed class UpdateMaterialRequestValidator : AbstractValidator<UpdateMat
         RuleFor(x => x.SubjectId).Must(id => id.HasValue && id != Guid.Empty)
             .When(x => x.FolderId is null || x.FolderId == Guid.Empty)
             .WithMessage("Chọn môn học cho tài liệu.");
-        RuleFor(x => x.CategoryId).Must(id => id.HasValue && id != Guid.Empty)
-            .When(x => x.FolderId is null || x.FolderId == Guid.Empty)
-            .WithMessage("Chọn loại tài liệu.");
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Url).NotEmpty().MaximumLength(1000).When(x => x.Source == MaterialSource.ExternalUrl);
         RuleFor(x => x.StoredFileId).NotEmpty().When(x => x.Source == MaterialSource.ServerFile);

@@ -31,8 +31,6 @@ public class Exam : BaseEntity
     public ExamStatus Status { get; set; } = ExamStatus.Draft;
     public ExamGenSource Source { get; set; } = ExamGenSource.Extracted;
 
-    /// <summary>Ngôn ngữ nội dung đề (mặc định tiếng Anh).</summary>
-    public string? Language { get; set; } = "en";
 
     public Guid? CreatedByUserId { get; set; }
 }

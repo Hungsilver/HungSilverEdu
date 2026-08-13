@@ -9,12 +9,6 @@ public class LearningMaterial : BaseEntity
     /// <summary>Mã tài liệu tự sinh dạng TL0001, duy nhất (kể cả bản ghi đã xóa mềm — không tái cấp).</summary>
     public string Code { get; set; } = string.Empty;
 
-    /// <summary>Lớp gắn học liệu (legacy — thiết kế mới không dùng, giữ cho dữ liệu cũ).</summary>
-    public Guid? ClassId { get; set; }
-
-    /// <summary>Loại tài liệu (đề kiểm tra, lý thuyết... — trỏ MaterialCategory, không khóa ngoại).</summary>
-    public Guid? CategoryId { get; set; }
-
     /// <summary>Bộ tài liệu chứa tài liệu này (MaterialFolder.Id, không khóa ngoại). Null = "Tài liệu chung".</summary>
     public Guid? FolderId { get; set; }
 
@@ -29,7 +23,6 @@ public class LearningMaterial : BaseEntity
     public string? SubjectName { get; set; }
 
     public string Title { get; set; } = string.Empty;
-    public MaterialType Type { get; set; }
     public MaterialSource Source { get; set; } = MaterialSource.ExternalUrl;
 
     /// <summary>Dùng khi Source = ExternalUrl.</summary>
@@ -42,5 +35,4 @@ public class LearningMaterial : BaseEntity
     public Guid? CoverFileId { get; set; }
 
     public string? Description { get; set; }
-    public Guid? UploadedByUserId { get; set; }
 }

@@ -24,11 +24,18 @@ public class StudentsController(
         [FromQuery] Guid? subjectId = null,
         [FromQuery] Guid? gradeId = null,
         [FromQuery] Guid? teacherProfileId = null,
+        [FromQuery] Guid? classId = null,
         CancellationToken ct = default)
     {
         var canSeeDeleted = includeDeleted && User.IsInRole(AppRoles.Admin);
-        return (await studentService.GetPagedAsync(request, canSeeDeleted, branchId, subjectId, gradeId, teacherProfileId, ct)).ToActionResult();
+        return (await studentService.GetPagedAsync(request, canSeeDeleted, branchId, subjectId, gradeId, teacherProfileId, classId, ct)).ToActionResult();
     }
+
+    /// <summary>Tài khoản role Học sinh chưa gắn hồ sơ nào — nguồn cho dropdown "liên kết tài khoản có sẵn".</summary>
+    [HttpGet("unlinked-users")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult<List<UnlinkedStudentUserDto>>> UnlinkedUsers(CancellationToken ct) =>
+        (await studentService.GetUnlinkedUsersAsync(ct)).ToActionResult();
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<StudentDto>> GetStudent(Guid id, CancellationToken ct) =>

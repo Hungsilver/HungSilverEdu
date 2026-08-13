@@ -21,27 +21,24 @@ public interface IMaterialService
 
 public sealed class MaterialService(
     IRepository<LearningMaterial> materials,
-    IRepository<MaterialCategory> categories,
     IRepository<Subject> subjects,
     IRepository<StoredFile> storedFiles,
     IRepository<MaterialFolder> folders,
     IRepository<MaterialUnit> units,
-    IClassAccessGuard accessGuard,
+    IRepository<Exam> exams,
     ICurrentRelationCleanupService relationCleanup,
     IUnitOfWork unitOfWork,
-    ICurrentUser currentUser,
     IValidator<CreateMaterialRequest> createValidator,
     IValidator<UpdateMaterialRequest> updateValidator) : IMaterialService
 {
     private static readonly Error NotFoundError = Error.NotFound("Material.NotFound", "Không tìm thấy tài liệu.");
     private static readonly Error FolderNotFound = Error.Validation("Material.FolderNotFound", "Không tìm thấy bộ tài liệu.");
 
-    /// <summary>Danh sách tài liệu (phân trang) — lọc môn/loại/khối/bộ hoặc chỉ tài liệu chung + search Mã/Tên, mới nhất trước.</summary>
+    /// <summary>Danh sách tài liệu (phân trang) — lọc môn/khối/bộ/unit hoặc chỉ tài liệu chung + search Mã/Tên, mới nhất trước.</summary>
     public async Task<Result<PagedResult<MaterialDto>>> GetPagedAsync(
         MaterialListFilter filter, PagedRequest paging, CancellationToken ct = default)
     {
         var subj = Normalize(filter.SubjectId);
-        var cat = Normalize(filter.CategoryId);
         var band = CleanBand(filter.GradeBand);
         var folderId = Normalize(filter.FolderId);
         var generalOnly = folderId == null && filter.GeneralOnly; // FolderId cụ thể thì bỏ qua GeneralOnly
@@ -51,7 +48,6 @@ public sealed class MaterialService(
 
         var paged = await materials.GetPagedAsync(paging.Page, paging.PageSize,
             m => (subj == null || m.SubjectId == subj)
-                 && (cat == null || m.CategoryId == cat)
                  && (band == null || m.GradeBand == band)
                  && (folderId == null || m.FolderId == folderId)
                  && (!generalOnly || m.FolderId == null)
@@ -59,9 +55,9 @@ public sealed class MaterialService(
                  && (!noUnit || m.UnitId == null)
                  && (term == null || m.Title.ToLower().Contains(term) || m.Code.ToLower().Contains(term)), ct: ct);
 
-        var categoryNames = await LoadCategoryNamesAsync(paged.Items, ct);
         var fileNames = await LoadFileNamesAsync(paged.Items, ct);
-        return paged.Map(m => ToDto(m, Lookup(categoryNames, m.CategoryId), Lookup(fileNames, m.StoredFileId)));
+        var examCounts = await MaterialExamCounter.CountByMaterialAsync(exams, paged.Items.Select(m => m.Id), ct);
+        return paged.Map(m => ToDto(m, Lookup(fileNames, m.StoredFileId), examCounts.GetValueOrDefault(m.Id)));
     }
 
     public async Task<Result<MaterialDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -70,7 +66,7 @@ public sealed class MaterialService(
         if (material is null)
             return Result.Failure<MaterialDto>(NotFoundError);
 
-        return ToDto(material, await CategoryNameAsync(material.CategoryId, ct), await FileNameAsync(material.StoredFileId, ct));
+        return ToDto(material, await FileNameAsync(material.StoredFileId, ct), await ExamCountAsync(id, ct));
     }
 
     public async Task<Result<MaterialDto>> CreateAsync(CreateMaterialRequest request, CancellationToken ct = default)
@@ -97,23 +93,20 @@ public sealed class MaterialService(
             Code = await NextCodeAsync(ct),
             FolderId = folderId,
             UnitId = unitId.Value,
-            CategoryId = Normalize(request.CategoryId),
             SubjectId = subjectId,
             SubjectName = subjectName,
             GradeBand = gradeBand,
             Title = request.Title.Trim(),
-            Type = MaterialType.Pdf, // enum legacy — UI không dùng nữa, giữ giá trị mặc định
             Source = request.Source,
             Url = request.Source == MaterialSource.ExternalUrl ? request.Url?.Trim() : null,
             StoredFileId = request.Source == MaterialSource.ServerFile ? request.StoredFileId : null,
             CoverFileId = cover.Value,
-            Description = request.Description?.Trim(),
-            UploadedByUserId = currentUser.UserId
+            Description = request.Description?.Trim()
         };
 
         await materials.AddAsync(material, ct);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(material, await CategoryNameAsync(material.CategoryId, ct), await FileNameAsync(material.StoredFileId, ct));
+        return ToDto(material, await FileNameAsync(material.StoredFileId, ct), 0);
     }
 
     public async Task<Result<MaterialDto>> UpdateAsync(Guid id, UpdateMaterialRequest request, CancellationToken ct = default)
@@ -125,14 +118,6 @@ public sealed class MaterialService(
         var material = await materials.GetByIdAsync(id, ct: ct);
         if (material is null)
             return Result.Failure<MaterialDto>(NotFoundError);
-
-        // Bản ghi cũ còn gắn lớp ⇒ vẫn kiểm quyền lớp (thiết kế mới không tạo ClassId nữa).
-        if (material.ClassId is not null)
-        {
-            var access = await accessGuard.EnsureCanAccessClassAsync(material.ClassId.Value, ct);
-            if (access.IsFailure)
-                return Result.Failure<MaterialDto>(access.Error);
-        }
 
         var context = await ResolveFolderContextAsync(request.FolderId, request.SubjectId, request.GradeBand, ct);
         if (context.IsFailure)
@@ -149,7 +134,6 @@ public sealed class MaterialService(
 
         material.FolderId = folderId;
         material.UnitId = unitId.Value;
-        material.CategoryId = Normalize(request.CategoryId);
         material.SubjectId = subjectId;
         material.SubjectName = subjectName;
         material.GradeBand = gradeBand;
@@ -159,11 +143,11 @@ public sealed class MaterialService(
         material.StoredFileId = request.Source == MaterialSource.ServerFile ? request.StoredFileId : null;
         material.CoverFileId = cover.Value; // đổi/xóa ảnh KHÔNG xóa file cũ — orphan để FileCleanupService dọn
         material.Description = request.Description?.Trim();
-        // Code/Type giữ nguyên — mã không cho sửa.
+        // Code giữ nguyên — mã không cho sửa.
 
         materials.Update(material);
         await unitOfWork.SaveChangesAsync(ct);
-        return ToDto(material, await CategoryNameAsync(material.CategoryId, ct), await FileNameAsync(material.StoredFileId, ct));
+        return ToDto(material, await FileNameAsync(material.StoredFileId, ct), await ExamCountAsync(id, ct));
     }
 
     public async Task<Result> DeleteAsync(Guid id, CancellationToken ct = default)
@@ -171,13 +155,6 @@ public sealed class MaterialService(
         var material = await materials.GetByIdAsync(id, ct: ct);
         if (material is null)
             return Result.Failure(NotFoundError);
-
-        if (material.ClassId is not null)
-        {
-            var access = await accessGuard.EnsureCanAccessClassAsync(material.ClassId.Value, ct);
-            if (access.IsFailure)
-                return access;
-        }
 
         await relationCleanup.NullAssignmentsForMaterialAsync(id, ct);
         materials.SoftDelete(material);
@@ -239,14 +216,6 @@ public sealed class MaterialService(
 
     private static string? CleanBand(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    private async Task<Dictionary<Guid, string>> LoadCategoryNamesAsync(IEnumerable<LearningMaterial> items, CancellationToken ct)
-    {
-        var ids = items.Where(m => m.CategoryId.HasValue).Select(m => m.CategoryId!.Value).Distinct().ToList();
-        if (ids.Count == 0) return [];
-        var cats = await categories.FindAsync(c => ids.Contains(c.Id), ct);
-        return cats.ToDictionary(c => c.Id, c => c.Name);
-    }
-
     private async Task<Dictionary<Guid, string>> LoadFileNamesAsync(IEnumerable<LearningMaterial> items, CancellationToken ct)
     {
         var ids = items.Where(m => m.StoredFileId.HasValue).Select(m => m.StoredFileId!.Value).Distinct().ToList();
@@ -255,8 +224,8 @@ public sealed class MaterialService(
         return files.ToDictionary(f => f.Id, f => f.FileName);
     }
 
-    private async Task<string?> CategoryNameAsync(Guid? categoryId, CancellationToken ct) =>
-        categoryId is null ? null : (await categories.GetByIdAsync(categoryId.Value, ct: ct))?.Name;
+    private async Task<int> ExamCountAsync(Guid materialId, CancellationToken ct) =>
+        (await MaterialExamCounter.CountByMaterialAsync(exams, [materialId], ct)).GetValueOrDefault(materialId);
 
     private async Task<string?> FileNameAsync(Guid? storedFileId, CancellationToken ct) =>
         storedFileId is null ? null : (await storedFiles.GetByIdAsync(storedFileId.Value, ct: ct))?.FileName;
@@ -267,12 +236,12 @@ public sealed class MaterialService(
     private static string? Lookup(Dictionary<Guid, string> map, Guid? id) =>
         id.HasValue && map.TryGetValue(id.Value, out var name) ? name : null;
 
-    private static MaterialDto ToDto(LearningMaterial m, string? categoryName, string? fileName)
+    private static MaterialDto ToDto(LearningMaterial m, string? fileName, int examCount)
     {
         var downloadUrl = m.Source == MaterialSource.ServerFile && m.StoredFileId is not null
             ? $"/api/files/{m.StoredFileId}"
             : m.Url ?? string.Empty;
-        return new MaterialDto(m.Id, m.Code, m.ClassId, m.FolderId, m.UnitId, m.CategoryId, categoryName, m.SubjectId, m.SubjectName, m.GradeBand,
-            m.Title, m.Source, m.Url, m.StoredFileId, fileName, m.CoverFileId, m.Description, downloadUrl, m.CreatedAt);
+        return new MaterialDto(m.Id, m.Code, m.FolderId, m.UnitId, m.SubjectId, m.SubjectName, m.GradeBand,
+            m.Title, m.Source, m.Url, m.StoredFileId, fileName, m.CoverFileId, m.Description, downloadUrl, examCount, m.CreatedAt);
     }
 }

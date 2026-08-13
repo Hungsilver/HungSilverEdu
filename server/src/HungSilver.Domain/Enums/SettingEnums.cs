@@ -8,10 +8,3 @@ public enum SettingScope
     Class = 2,   // Theo lớp (Teacher)
     User = 3     // Theo người dùng
 }
-
-/// <summary>Chế độ lưu file: upload lên server hay chỉ lưu link ngoài. Do Admin cấu hình.</summary>
-public enum FileStorageMode
-{
-    ExternalUrl = 0,  // Chỉ lưu link/URL ngoài
-    Server = 1        // Upload trực tiếp lên server
-}

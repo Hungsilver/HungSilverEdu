@@ -336,7 +336,7 @@ export class SessionExams implements OnInit {
     const subjectId = this.subjectId();
     if (!subjectId) return;
     this.examsLoading.set(true);
-    this.examService.listBySubject(subjectId, 'Published', 1, 100).subscribe({
+    this.examService.list({ subjectId, status: 'Published' }, 1, 100).subscribe({
       next: r => { this.examOptions.set(r.items); this.examsLoading.set(false); },
       error: () => this.examsLoading.set(false)
     });

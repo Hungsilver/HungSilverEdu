@@ -33,10 +33,8 @@ public sealed class CurrentRelationCleanupService(AppDbContext context) : ICurre
             .ToListAsync(ct);
         context.ClassScheduleSlots.RemoveRange(slots);
 
-        var materials = await context.LearningMaterials
-            .Where(m => m.ClassId == classId)
-            .ToListAsync(ct);
-        context.LearningMaterials.RemoveRange(materials);
+        // Tài liệu KHÔNG còn gắn lớp (cột ClassId legacy đã bỏ ở CleanupMaterialSchema) — kho tài liệu
+        // là tài nguyên dùng chung, xóa lớp chỉ rút lượt giao (MaterialAssignments bên dưới).
 
         var assignments = await context.Assignments
             .Where(a => a.ClassId == classId)
@@ -85,16 +83,6 @@ public sealed class CurrentRelationCleanupService(AppDbContext context) : ICurre
                 select e.StudentId)
             .Distinct()
             .ToHashSetAsync(ct);
-    }
-
-    public async Task<Result> EnsureMaterialCategoryNotInUseAsync(Guid categoryId, CancellationToken ct = default)
-    {
-        var inUse = await context.LearningMaterials
-            .AnyAsync(m => m.CategoryId == categoryId, ct);
-
-        return inUse
-            ? Result.Failure(Error.Conflict("MaterialCategory.InUse", "Không thể xóa danh mục khi vẫn còn học liệu đang sử dụng."))
-            : Result.Success();
     }
 
     public async Task NullAssignmentsForMaterialAsync(Guid materialId, CancellationToken ct = default)

@@ -28,11 +28,12 @@ import { AuthService } from '../../core/auth.service';
 import { ClassesService } from '../../core/classes.service';
 import {
   CalendarSession, ClassDetail, ClassStudentOverview, RosterItem, ScheduleSlot, Student,
-  StudentImportPreview, StudentImportResult, TuitionInvoice, Warnings, WEEKDAY_LABELS
+  BulkProvisionItem, StudentImportPreview, StudentImportResult, TuitionInvoice, Warnings, WEEKDAY_LABELS
 } from '../../core/models';
 import { ScheduleService } from '../../core/schedule.service';
 import { toDateOnly, toTimeOnly } from '../../core/date-util';
 import { StudentsService } from '../../core/students.service';
+import { AccountHandoverModal } from '../../shared/account-handover-modal';
 import { TuitionService } from '../../core/tuition.service';
 import { WarningsService } from '../../core/warnings.service';
 import { ScreenService } from '../../core/screen.service';
@@ -48,7 +49,7 @@ import { SessionMaterials } from '../sessions/session-materials';
     FormsModule, RouterLink, DatePipe, DecimalPipe,
     NzCardModule, NzGridModule, NzStatisticModule, NzTableModule, NzButtonModule, NzIconModule,
     NzSelectModule, NzTagModule, NzModalModule, NzDatePickerModule, NzInputModule, NzFormModule,
-    NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule,
+    NzPopconfirmModule, NzTimePickerModule, NzUploadModule, NzCheckboxModule, NzAlertModule, AccountHandoverModal,
     NzTabsModule, NzDescriptionsModule, NzTooltipModule, PageHeader, ClassFormModal,
     SessionExams, SessionMaterials, StudentHomeworkModal
   ],
@@ -184,6 +185,18 @@ import { SessionMaterials } from '../sessions/session-materials';
 
         <!-- Tab 4: Học viên -->
         <nz-tab nzTitle="Học viên">
+          <!-- Cấp tài khoản cho cả lớp ngay tại đây — đúng ngữ cảnh, không phải lọc lại ở trang Học viên. -->
+          @if (canManage() && noAccountCount() > 0) {
+            <nz-alert nzType="warning" class="no-acc-alert"
+              [nzMessage]="noAccountCount() + '/' + roster().length + ' học viên chưa có tài khoản đăng nhập.'"
+              [nzAction]="provisionAction" />
+            <ng-template #provisionAction>
+              <button nz-button nzSize="small" nzType="primary" [nzLoading]="bulkBusy()" (click)="provisionAllMissing()">
+                Cấp tài khoản cho {{ noAccountCount() }} học viên
+              </button>
+            </ng-template>
+          }
+
           <div class="enroll-row">
             <button nz-button nzType="primary" (click)="openCreateStudent()">
               <nz-icon nzType="user-add" /> Tạo học sinh
@@ -459,6 +472,10 @@ import { SessionMaterials } from '../sessions/session-materials';
         <nz-range-picker [(ngModel)]="genRange" nzFormat="dd/MM/yyyy" class="full" />
       </ng-container>
     </nz-modal>
+
+    <app-account-handover-modal
+      [visible]="handoverOpen()" title="Bàn giao tài khoản học viên" [items]="handoverItems()"
+      (closed)="handoverOpen.set(false)" />
   `,
   styles: `
     .acc-hint { color: var(--hs-text-muted); font-size: 12px; margin-top: 4px; }
@@ -522,6 +539,14 @@ export class ClassDetailPage implements OnInit {
 
   protected readonly detail = signal<ClassDetail | null>(null);
   protected readonly roster = signal<RosterItem[]>([]);
+
+  /** Học viên trong lớp chưa có tài khoản đăng nhập — nguồn cho banner cấp hàng loạt. */
+  protected readonly noAccountCount = computed(() => this.roster().filter(r => !r.userId).length);
+  protected readonly bulkBusy = signal(false);
+
+  // Bảng bàn giao sau khi cấp tài khoản (kèm mật khẩu để phát cho học viên).
+  protected readonly handoverOpen = signal(false);
+  protected readonly handoverItems = signal<BulkProvisionItem[]>([]);
   protected readonly overview = signal<ClassStudentOverview[]>([]);
   protected readonly sessions = signal<CalendarSession[]>([]);
   protected readonly slots = signal<ScheduleSlot[]>([]);
@@ -754,6 +779,29 @@ export class ClassDetailPage implements OnInit {
     this.classesService.withdraw(this.id(), r.studentId).subscribe({
       next: () => { this.message.success('Đã xóa khỏi lớp.'); this.reload(); },
       error: (e: HttpErrorResponse) => this.message.error(e.error?.message ?? e.message ?? 'Thất bại.')
+    });
+  }
+
+  /**
+   * Cấp tài khoản cho MỌI học viên trong lớp chưa có — kết thúc bằng bảng bàn giao
+   * kèm tên đăng nhập + mật khẩu để phát cho từng em.
+   */
+  protected provisionAllMissing(): void {
+    const ids = this.roster().filter(r => !r.userId).map(r => r.studentId);
+    if (ids.length === 0) return;
+
+    this.bulkBusy.set(true);
+    this.studentsService.bulkProvision(ids).subscribe({
+      next: r => {
+        this.bulkBusy.set(false);
+        this.handoverItems.set(r.items);
+        this.handoverOpen.set(true);
+        this.reload();
+      },
+      error: (e: HttpErrorResponse) => {
+        this.bulkBusy.set(false);
+        this.message.error(e.error?.message ?? e.message ?? 'Cấp tài khoản thất bại.');
+      }
     });
   }
 

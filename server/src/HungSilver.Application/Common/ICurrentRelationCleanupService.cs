@@ -17,8 +17,6 @@ public interface ICurrentRelationCleanupService
 
     Task<HashSet<Guid>> LoadValidActiveStudentIdsByClassesAsync(IEnumerable<Guid> classIds, CancellationToken ct = default);
 
-    Task<Result> EnsureMaterialCategoryNotInUseAsync(Guid categoryId, CancellationToken ct = default);
-
     Task NullAssignmentsForMaterialAsync(Guid materialId, CancellationToken ct = default);
 
     Task UnlinkUserRelationsAsync(Guid userId, CancellationToken ct = default);

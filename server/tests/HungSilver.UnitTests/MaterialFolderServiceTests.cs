@@ -49,6 +49,7 @@ public sealed class MaterialFolderServiceTests : IDisposable
         new Repository<MaterialUnit>(_context),
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
+        new Repository<Exam>(_context),
         new UnitOfWork(_context),
         new CreateMaterialFolderRequestValidator(),
         new UpdateMaterialFolderRequestValidator());

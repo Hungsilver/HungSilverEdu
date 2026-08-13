@@ -90,18 +90,17 @@ public sealed class UserAdminService(
         var userName = request.UserName?.Trim();
         if (string.IsNullOrWhiteSpace(userName))
             return Result.Failure<UserListItemDto>(Error.Validation("Users.UserNameRequired", "Vui lòng nhập tên đăng nhập."));
-        if (string.IsNullOrWhiteSpace(request.Password))
-            return Result.Failure<UserListItemDto>(Error.Validation("Users.PasswordRequired", "Vui lòng nhập mật khẩu."));
+        // Mật khẩu bỏ trống ⇒ dùng mật khẩu mặc định của trung tâm (giống cấp tài khoản HS/GV).
+        var password = await ResolveDefaultPasswordAsync(request.Password, ct);
 
-        var email = string.IsNullOrWhiteSpace(request.Email)
-            ? (userName.Contains('@') ? userName : $"{userName}@hedu.local")
-            : request.Email.Trim();
+        // Không sinh email ảo nữa: bỏ trống email ⇒ để null, đăng nhập bằng tên đăng nhập.
+        var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
 
         // Kiểm tra trùng username/email kể cả tài khoản đã xóa mềm (unique index của Identity giữ chỗ).
         if (await context.Users.IgnoreQueryFilters()
                 .AnyAsync(u => u.NormalizedUserName == userManager.NormalizeName(userName), ct))
             return Result.Failure<UserListItemDto>(Error.Conflict("Users.UserNameTaken", "Tên đăng nhập đã tồn tại."));
-        if (await context.Users.IgnoreQueryFilters()
+        if (email is not null && await context.Users.IgnoreQueryFilters()
                 .AnyAsync(u => u.NormalizedEmail == userManager.NormalizeEmail(email), ct))
             return Result.Failure<UserListItemDto>(Error.Conflict("Users.EmailTaken", "Email đã được sử dụng."));
 
@@ -110,10 +109,12 @@ public sealed class UserAdminService(
             UserName = userName,
             Email = email,
             EmailConfirmed = true,
-            FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim()
+            FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
+            // Admin mới cũng bị buộc đổi mật khẩu ở lần đăng nhập đầu — thống nhất với HS/GV.
+            MustChangePassword = await ForceChangePasswordAsync(ct)
         };
 
-        var created = await userManager.CreateAsync(user, request.Password);
+        var created = await userManager.CreateAsync(user, password);
         if (!created.Succeeded)
             return Result.Failure<UserListItemDto>(Error.Validation(
                 "Users.CreateFailed", string.Join(" | ", created.Errors.Select(e => e.Description))));
@@ -188,14 +189,7 @@ public sealed class UserAdminService(
         if (user is null)
             return Result.Failure(UserNotFound);
 
-        var password = request.Password;
-        if (string.IsNullOrWhiteSpace(password))
-        {
-            var configured = await settingsResolver.GetEffectiveValueAsync(SettingKeys.AccountDefaultPassword, ct: ct);
-            password = string.IsNullOrWhiteSpace(configured)
-                ? SettingKeys.Defaults[SettingKeys.AccountDefaultPassword]
-                : configured;
-        }
+        var password = await ResolveDefaultPasswordAsync(request.Password, ct);
 
         // Validate mật khẩu TRƯỚC khi gỡ mật khẩu cũ — nếu gỡ xong mới fail thì tài khoản kẹt không còn mật khẩu.
         foreach (var validator in userManager.PasswordValidators)
@@ -216,11 +210,28 @@ public sealed class UserAdminService(
             return Result.Failure(Error.Validation(
                 "Users.ResetPasswordFailed", string.Join(" | ", added.Errors.Select(e => e.Description))));
 
-        user.MustChangePassword = request.MustChangePassword;
+        // Luôn ép đổi ở lần đăng nhập kế tiếp (theo cấu hình trung tâm) — thống nhất với đường cấp
+        // tài khoản HS/GV; admin không còn tùy chọn tắt để tránh 2 hành vi khác nhau cho cùng một việc.
+        user.MustChangePassword = await ForceChangePasswordAsync(ct);
         await userManager.UpdateAsync(user);
 
         await RevokeRefreshTokensAsync(userId, ct);
         return Result.Success();
+    }
+
+    /// <summary>Mật khẩu yêu cầu, bỏ trống ⇒ mật khẩu mặc định của trung tâm.</summary>
+    private async Task<string> ResolveDefaultPasswordAsync(string? requested, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(requested)) return requested;
+        var configured = await settingsResolver.GetEffectiveValueAsync(SettingKeys.AccountDefaultPassword, ct: ct);
+        return string.IsNullOrWhiteSpace(configured) ? SettingKeys.Defaults[SettingKeys.AccountDefaultPassword] : configured;
+    }
+
+    /// <summary>Có bắt đổi mật khẩu ở lần đăng nhập đầu không (cấu hình Admin, mặc định bật).</summary>
+    private async Task<bool> ForceChangePasswordAsync(CancellationToken ct)
+    {
+        var configured = await settingsResolver.GetEffectiveValueAsync(SettingKeys.AccountForceChangePassword, ct: ct);
+        return !bool.TryParse(configured?.Trim(), out var force) || force;
     }
 
     public async Task<Result> SetLockedAsync(Guid userId, bool locked, CancellationToken ct = default)

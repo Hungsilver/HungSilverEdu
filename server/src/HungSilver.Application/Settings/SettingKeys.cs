@@ -3,8 +3,14 @@ namespace HungSilver.Application.Settings;
 /// <summary>Khóa cấu hình hệ thống dùng chung + giá trị mặc định.</summary>
 public static class SettingKeys
 {
-    /// <summary>Chế độ lưu file: "Server" hoặc "ExternalUrl" (Admin cấu hình).</summary>
-    public const string FileStorageMode = "FileStorage.Mode";
+    /// <summary>Cho phép tải file lên server khi thêm tài liệu ("true"/"false").</summary>
+    public const string FileStorageAllowServerUpload = "FileStorage.AllowServerUpload";
+
+    /// <summary>Cho phép dán đường dẫn ngoài khi thêm tài liệu ("true"/"false").</summary>
+    public const string FileStorageAllowExternalUrl = "FileStorage.AllowExternalUrl";
+
+    /// <summary>Cách nạp tài liệu chọn sẵn khi bật cả hai: "ServerFile" hoặc "ExternalUrl".</summary>
+    public const string FileStorageDefaultSource = "FileStorage.DefaultSource";
 
     /// <summary>Số ngày trước hạn để coi là "sắp đến hạn" học phí.</summary>
     public const string TuitionDueSoonDays = "Tuition.DueSoonDays";
@@ -18,12 +24,13 @@ public static class SettingKeys
     /// </summary>
     public const string CenterCodePrefix = "Center.CodePrefix";
 
-    /// <summary>Mật khẩu mặc định khi cấp/đặt lại tài khoản (HS &amp; GV). Phải đạt chính sách Identity
-    /// (≥8 ký tự, có chữ hoa/thường/số). Người dùng vẫn bị buộc đổi ở lần đăng nhập đầu.</summary>
+    /// <summary>Mật khẩu mặc định khi cấp/đặt lại tài khoản (mọi vai trò). Phải đạt chính sách Identity
+    /// (≥8 ký tự, có chữ hoa/thường/số).</summary>
     public const string AccountDefaultPassword = "Account.DefaultPassword";
 
-    /// <summary>Tên miền email "ảo" cho tài khoản không có email thật (Identity bắt buộc email duy nhất).</summary>
-    public const string AccountLocalEmailDomain = "Account.LocalEmailDomain";
+    /// <summary>Buộc đổi mật khẩu ở lần đăng nhập đầu cho tài khoản mới cấp/vừa đặt lại ("true"/"false").
+    /// Bật thì server chặn mọi API (403) tới khi đổi xong — xem <c>MustChangePasswordMiddleware</c>.</summary>
+    public const string AccountForceChangePassword = "Account.ForceChangePasswordOnFirstLogin";
 
     /// <summary>
     /// Khung "Ca" học (để nhóm lịch theo Ca). JSON: <c>{ "default": [{name,from,to}], "byBranch": { "&lt;branchId&gt;": [...] } }</c>.
@@ -31,6 +38,10 @@ public static class SettingKeys
     /// Giờ dạng "HH:mm". Cấu hình ở màn Cấu hình hệ thống (Admin).
     /// </summary>
     public const string ScheduleShifts = "Schedule.Shifts";
+
+    /// <summary>Giá trị hợp lệ của <see cref="FileStorageDefaultSource"/> — khớp <c>MaterialSource</c>.</summary>
+    public const string SourceServerFile = "ServerFile";
+    public const string SourceExternalUrl = "ExternalUrl";
 
     /// <summary>JSON Ca mặc định (5 ca: 2 sáng, 2 chiều, 1 tối) — fallback khi chưa cấu hình.</summary>
     public const string DefaultShiftsJson = """
@@ -40,12 +51,34 @@ public static class SettingKeys
     /// <summary>Giá trị mặc định khi chưa có cấu hình ở scope nào.</summary>
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
-        [FileStorageMode] = "Server",
+        [FileStorageAllowServerUpload] = "true",
+        [FileStorageAllowExternalUrl] = "true",
+        [FileStorageDefaultSource] = SourceServerFile,
         [TuitionDueSoonDays] = "7",
         [WarningScoreDropThreshold] = "1.5",
         [CenterCodePrefix] = "HV",
         [AccountDefaultPassword] = "Hocvien@123",
-        [AccountLocalEmailDomain] = "hs.local",
+        [AccountForceChangePassword] = "true",
         [ScheduleShifts] = DefaultShiftsJson
     };
+
+    /// <summary>
+    /// Khóa mang tính TOÀN HỆ THỐNG: chỉ giải ở scope System (bỏ qua User/Class/Role).
+    /// Tránh việc một bản ghi scope User của chính người đang thao tác ghi đè chính sách chung
+    /// (vd mật khẩu mặc định, cách nạp tài liệu).
+    /// </summary>
+    public static readonly IReadOnlySet<string> SystemOnly = new HashSet<string>
+    {
+        FileStorageAllowServerUpload,
+        FileStorageAllowExternalUrl,
+        FileStorageDefaultSource,
+        AccountDefaultPassword,
+        AccountForceChangePassword
+    };
+
+    /// <summary>Khóa được phép ghi (whitelist) — chặn tạo rác trong bảng Settings.</summary>
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(Defaults.Keys);
+
+    /// <summary>Khóa đã bỏ — DbSeeder dọn khỏi DB để không còn hiện ở màn Cấu hình.</summary>
+    public static readonly IReadOnlyList<string> Obsolete = ["FileStorage.Mode", "Account.LocalEmailDomain"];
 }

@@ -228,7 +228,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
           <nz-form-item>
             <nz-form-label nzRequired>Tên đăng nhập</nz-form-label>
             <nz-form-control>
-              <input nz-input [(ngModel)]="cUserName" name="u" placeholder="vd: gv_lan" autocomplete="off" />
+              <input nz-input [(ngModel)]="cUserName" name="u" placeholder="vd: quantri01" autocomplete="off" />
             </nz-form-control>
           </nz-form-item>
           <nz-form-item>
@@ -242,7 +242,7 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
           <nz-form-item>
             <nz-form-label nzRequired>Mật khẩu</nz-form-label>
             <nz-form-control>
-              <input nz-input [(ngModel)]="cPassword" name="p" type="text" placeholder="tối thiểu 8 ký tự" autocomplete="new-password" />
+              <input nz-input [(ngModel)]="cPassword" name="p" type="text" placeholder="Bỏ trống ⇒ dùng mật khẩu mặc định của trung tâm" autocomplete="new-password" />
             </nz-form-control>
           </nz-form-item>
         </form>
@@ -296,7 +296,6 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
           </nz-form-item>
           <nz-form-item>
             <nz-form-control>
-              <label nz-checkbox [(ngModel)]="rMustChange" name="rm">Bắt buộc đổi mật khẩu ở lần đăng nhập kế tiếp</label>
             </nz-form-control>
           </nz-form-item>
         </form>
@@ -404,7 +403,6 @@ export class UsersPage {
 
   protected submitCreate(): void {
     if (!this.cUserName.trim()) { this.message.warning('Nhập tên đăng nhập.'); return; }
-    if (!this.cPassword) { this.message.warning('Nhập mật khẩu.'); return; }
 
     this.createBusy.set(true);
     this.usersService.create({

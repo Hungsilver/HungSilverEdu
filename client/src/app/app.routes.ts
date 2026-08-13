@@ -123,11 +123,12 @@ export const routes: Routes = [
         data: { roles: [ROLE_ADMIN, ROLE_TEACHER] },
         loadComponent: () => import('./features/materials/folder-detail.page').then(m => m.FolderDetailPage)
       },
+      // Đề & Bài tập — module riêng, ngang hàng Kho tài liệu.
       {
-        path: 'materials/:materialId/exams',
+        path: 'exams',
         canActivate: [roleGuard],
         data: teacherOrAdmin,
-        loadComponent: () => import('./features/exams/exam-list.page').then(m => m.ExamListPage)
+        loadComponent: () => import('./features/exams/exams.page').then(m => m.ExamsPage)
       },
       {
         path: 'exams/:id',

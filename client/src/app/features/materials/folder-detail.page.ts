@@ -1,266 +1,307 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzEmptyModule } from 'ng-zorro-antd/empty';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
+import { NzMenuModule } from 'ng-zorro-antd/menu';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzModalModule, NzModalService } from 'ng-zorro-antd/modal';
-import { NzPopconfirmModule } from 'ng-zorro-antd/popconfirm';
 import { NzRadioModule } from 'ng-zorro-antd/radio';
-import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
+import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzTooltipModule } from 'ng-zorro-antd/tooltip';
-import { NzUploadModule, NzUploadXHRArgs } from 'ng-zorro-antd/upload';
 import { AuthService } from '../../core/auth.service';
 import { FilesService } from '../../core/files.service';
 import { MaterialsService } from '../../core/materials.service';
-import {
-  FileStorageMode, Material, MaterialFolder, MaterialSource, MaterialUnit, MaterialUnitKind
-} from '../../core/models';
-import { SettingsService } from '../../core/settings.service';
+import { Material, MaterialFolder, MaterialSource, MaterialUnit, MaterialUnitKind } from '../../core/models';
+import { AssignToClassModal } from '../../shared/assign-to-class.modal';
 import { DocumentPreview } from '../../shared/document-preview';
+import { ExamGenerateModal } from '../exams/exam-generate.modal';
+import { ExamsOfMaterialModal } from '../exams/exams-of-material.modal';
+import { MaterialFormModal } from './material-form.modal';
 
 /**
- * Màn immersive chi tiết BỘ TÀI LIỆU kiểu "sách giáo khoa" (Sách Mềm) — route /materials/folders/:folderId.
- * Mức 3 (không ?unitId=): panel 2 cột thanh Unit (Unit xanh lá + chip số cam, Review cam) + sidebar
- * "Tài nguyên khác" chứa tài liệu chưa thuộc Unit. Mức 4 (?unitId=): danh sách bài học trong Unit,
- * click mở viewer. Nền hero = ảnh bìa bộ blur (fallback gradient ấm). Chỉ Admin/Teacher (roleGuard).
+ * Chi tiết một Bộ tài liệu — trình bày kiểu "sách": bìa làm nền + mục lục Unit + danh sách bài học.
+ *
+ * Mục lục là LƯỚI THẺ tự xuống dòng nên giáo viên thấy hết Unit kèm TÊN trong một lần nhìn
+ * (không cuộn ngang), và chọn Unit là đổi luôn danh sách bên dưới — không phải vào/ra hai mức như trước.
+ * Mỗi bài học là một thẻ có badge số đề, nút giao cho lớp và nút sinh đề bằng AI.
  */
 @Component({
   selector: 'app-folder-detail-page',
-  host: { class: 'hs-mat-theme' },
   imports: [
     ReactiveFormsModule,
-    NzButtonModule, NzDropDownModule, NzEmptyModule, NzFormModule, NzIconModule, NzInputModule, NzModalModule,
-    NzPopconfirmModule, NzRadioModule, NzSelectModule, NzSpinModule, NzTooltipModule, NzUploadModule,
-    DocumentPreview
+    NzButtonModule, NzCardModule, NzDropDownModule, NzEmptyModule, NzFormModule, NzIconModule,
+    NzInputModule, NzModalModule, NzRadioModule, NzSpinModule, NzTagModule, NzTooltipModule,
+    DocumentPreview, MaterialFormModal, AssignToClassModal, ExamGenerateModal, ExamsOfMaterialModal
   ],
+  host: { class: 'hs-book' },
   template: `
-    <div class="fd-page" [class.has-cover]="!!folder()?.coverFileId">
-      <div class="fd-hero-bg" [style.background-image]="heroBg()"></div>
-      <div class="fd-hero-overlay"></div>
-
-      <div class="fd-top">
-        <button class="fd-home" nz-button nzShape="circle" aria-label="Về Kho tài liệu"
-                nz-tooltip nzTooltipTitle="Về Kho tài liệu" (click)="goHome()"><nz-icon nzType="home" /></button>
-        <header class="fd-head">
-          <h1 class="fd-title">{{ folder()?.name || 'Bộ tài liệu' }}</h1>
-          <div class="fd-sub">
-            {{ folder()?.subjectName }}@if (folder()?.gradeBand) { · Khối {{ folder()?.gradeBand }} }
+    <!-- Hero: ảnh bìa làm nền mờ, nội dung nổi bên trên -->
+    <div class="hero">
+      <div class="hero-bg" [style.background-image]="heroBg()"></div>
+      <div class="hero-overlay"></div>
+      <div class="hero-inner">
+        <button nz-button nzShape="circle" nzType="primary" class="hero-home"
+                nz-tooltip nzTooltipTitle="Về danh sách bộ tài liệu" aria-label="Về danh sách bộ tài liệu"
+                (click)="goHome()">
+          <nz-icon nzType="home" />
+        </button>
+        <div class="hero-text">
+          <div class="hero-crumb">{{ folder()?.subjectName || 'Môn học' }}@if (folder()?.gradeBand) { · Khối {{ folder()?.gradeBand }} }</div>
+          <h1 class="hero-title">{{ folder()?.name || 'Bộ tài liệu' }}</h1>
+          <div class="hero-meta">
+            {{ folder()?.materialCount ?? 0 }} tài liệu · {{ units().length }} Unit
+            @if ((folder()?.examCount ?? 0) > 0) { · {{ folder()?.examCount }} đề }
           </div>
-        </header>
-      </div>
-
-      <div class="fd-body">
-        <main class="fd-panel">
-          @if (unitId()) {
-            <!-- ================= MỨC 4: CHI TIẾT UNIT (danh sách bài học) ================= -->
-            <div class="unit-head" [class.is-review]="currentUnit()?.kind === Kind.Review">
-              <button class="fd-back" nz-button nzShape="circle" aria-label="Quay lại danh sách Unit"
-                      (click)="backToUnits()"><nz-icon nzType="arrow-left" /></button>
-              @if (currentUnit(); as u) {
-                @if (u.kind === Kind.Unit) {
-                  <span class="uh-label">Unit</span><span class="uh-no">{{ u.unitNo }}</span>
-                  <span class="uh-name">{{ u.name }}</span>
-                } @else {
-                  <span class="uh-name">Review {{ u.unitNo }}@if (u.name) { — {{ u.name }} }</span>
-                }
-              } @else { <span class="uh-name">…</span> }
-              <span class="spacer"></span>
-              @if (canManage()) {
-                <button nz-button nzGhost class="uh-add" (click)="openCreateMaterial(unitId()!)">
-                  <nz-icon nzType="plus" /><span class="btn-text"> Thêm tài liệu</span></button>
-              }
-            </div>
-
-            <nz-spin [nzSpinning]="materialsLoading()">
-              <div class="lesson-list">
-                @for (m of unitMaterials(); track m.id) {
-                  <div class="lesson-row">
-                    <a class="lesson-title" (click)="openMaterial(m)">{{ m.title }}</a>
-                    @if (m.description) { <span class="lesson-desc">{{ m.description }}</span> }
-                    <span class="lesson-actions">
-                      <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Download tài liệu"
-                              aria-label="Download tài liệu" (click)="download(m)"><nz-icon nzType="download" /></button>
-                      <button nz-button nzType="link" nzSize="small" (click)="openExams(m)"><nz-icon nzType="file-text" /> Đề</button>
-                      @if (canManage()) {
-                        <button nz-button nzType="link" nzSize="small" nz-tooltip nzTooltipTitle="Sửa tài liệu"
-                                aria-label="Sửa tài liệu" (click)="openEditMaterial(m)"><nz-icon nzType="edit" /></button>
-                        <button nz-button nzType="link" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa tài liệu" aria-label="Xóa tài liệu"
-                                nz-popconfirm nzPopconfirmTitle="Xóa tài liệu này?" (nzOnConfirm)="removeMaterial(m)"><nz-icon nzType="delete" /></button>
-                      }
-                    </span>
-                  </div>
-                } @empty {
-                  @if (!materialsLoading()) { <nz-empty nzNotFoundContent="Unit chưa có tài liệu — bấm Thêm tài liệu." /> }
-                }
-              </div>
-            </nz-spin>
-          } @else {
-            <!-- ================= MỨC 3: DANH SÁCH UNIT TRONG BỘ ================= -->
-            @if (canManage()) {
-              <div class="fd-toolbar">
-                <button nz-button nzType="primary" (click)="openCreateUnit()"><nz-icon nzType="plus" /> Thêm Unit</button>
-              </div>
-            }
-            <nz-spin [nzSpinning]="loading()">
-              <div class="unit-cols">
-                @for (col of unitColumns(); track $index) {
-                  <div class="unit-col">
-                    @for (u of col; track u.id) {
-                      <div class="unit-bar" [class.is-review]="u.kind === Kind.Review" tabindex="0" role="button"
-                           [attr.aria-label]="unitLabel(u)" (click)="openUnit(u)" (keyup.enter)="openUnit(u)">
-                        @if (u.kind === Kind.Unit) {
-                          <span class="unit-label">Unit</span><span class="unit-no">{{ u.unitNo }}</span>
-                          <span class="unit-name">{{ u.name }}</span>
-                        } @else {
-                          <span class="unit-name">Review {{ u.unitNo }}@if (u.name) { — {{ u.name }} }</span>
-                        }
-                        <span class="unit-count" nz-tooltip nzTooltipTitle="Số tài liệu">{{ u.materialCount }}</span>
-                        @if (canManage()) {
-                          <span class="unit-actions" (click)="$event.stopPropagation()">
-                            <button nz-button nzType="text" nzSize="small" [disabled]="isFirst(u)" aria-label="Chuyển lên"
-                                    (click)="moveUnit(u, -1)"><nz-icon nzType="arrow-up" /></button>
-                            <button nz-button nzType="text" nzSize="small" [disabled]="isLast(u)" aria-label="Chuyển xuống"
-                                    (click)="moveUnit(u, 1)"><nz-icon nzType="arrow-down" /></button>
-                            <button nz-button nzType="text" nzSize="small" aria-label="Sửa unit"
-                                    (click)="openEditUnit(u)"><nz-icon nzType="edit" /></button>
-                            <button nz-button nzType="text" nzSize="small" aria-label="Xóa unit"
-                                    nz-popconfirm nzPopconfirmTitle="Xóa unit này?" (nzOnConfirm)="removeUnit(u)"><nz-icon nzType="delete" /></button>
-                          </span>
-                        }
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
-              @if (!loading() && units().length === 0) {
-                <nz-empty nzNotFoundContent="Bộ chưa có Unit — bấm Thêm Unit để dựng mục lục như sách." />
-              }
-            </nz-spin>
-          }
-        </main>
-
-        <!-- Sidebar "Tài nguyên khác" = tài liệu chưa thuộc Unit (hiện ở cả mức 3 và 4) -->
-        @if (unassigned().length > 0 || canManage()) {
-          <aside class="fd-side">
-            <div class="side-title">Tài nguyên khác</div>
-            <div class="side-hint">Tài liệu ngoài mục lục Unit</div>
-            @for (m of unassigned(); track m.id) {
-              <div class="side-item">
-                <a class="side-link" (click)="openMaterial(m)"><nz-icon nzType="file-text" /><span>{{ m.title }}</span></a>
-                <button class="side-more" nz-button nzType="text" nzSize="small" nz-dropdown [nzDropdownMenu]="sideMenu"
-                        aria-label="Thao tác tài liệu"><nz-icon nzType="more" /></button>
-                <nz-dropdown-menu #sideMenu="nzDropdownMenu">
-                  <ul nz-menu>
-                    <li nz-menu-item (click)="download(m)"><nz-icon nzType="download" /> Download</li>
-                    <li nz-menu-item (click)="openExams(m)"><nz-icon nzType="file-text" /> Đề</li>
-                    @if (canManage()) {
-                      <li nz-menu-item (click)="openEditMaterial(m)"><nz-icon nzType="edit" /> Sửa</li>
-                      <li nz-menu-item nzDanger (click)="confirmRemoveMaterial(m)"><nz-icon nzType="delete" /> Xóa</li>
-                    }
-                  </ul>
-                </nz-dropdown-menu>
-              </div>
-            } @empty { <div class="side-empty">Chưa có tài liệu nào ngoài Unit.</div> }
-            @if (canManage()) {
-              <button nz-button nzBlock nzSize="small" class="side-add" (click)="openCreateMaterial(null)">
-                <nz-icon nzType="plus" /> Thêm tài liệu</button>
-            }
-          </aside>
+        </div>
+        @if (canManage()) {
+          <button nz-button nzType="primary" (click)="openCreateMaterial(activeUnitId())">
+            <nz-icon nzType="plus" /> Thêm tài liệu
+          </button>
         }
       </div>
     </div>
 
-    <!-- Modal thêm/sửa UNIT -->
-    <nz-modal [nzVisible]="unitModalOpen()" [nzTitle]="editingUnit() ? 'Sửa Unit' : 'Thêm Unit'"
-      [nzOkLoading]="saving()" (nzOnOk)="saveUnit()" (nzOnCancel)="unitModalOpen.set(false)">
-      <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical" [formGroup]="unitForm">
-          <nz-form-item><nz-form-label>Kiểu</nz-form-label>
-            <nz-form-control>
-              <nz-radio-group formControlName="kind" nzButtonStyle="solid">
-                <label nz-radio-button [nzValue]="Kind.Unit">Unit thường</label>
-                <label nz-radio-button [nzValue]="Kind.Review">Review (ôn tập)</label>
-              </nz-radio-group>
-            </nz-form-control></nz-form-item>
-          <nz-form-item>
-            <nz-form-label [nzRequired]="unitForm.value.kind === Kind.Unit">Tên chủ đề</nz-form-label>
-            <nz-form-control [nzExtra]="unitForm.value.kind === Kind.Review ? 'Review để trống tên vẫn được — hiển thị \\'Review 1\\', \\'Review 2\\'…' : 'Số thứ tự \\'Unit 1/2/3\\' tự đánh theo vị trí — không cần nhập.'">
-              <input nz-input formControlName="name"
-                     [placeholder]="unitForm.value.kind === Kind.Unit ? 'VD: Family life' : 'VD: Unit 1-2-3 (tùy chọn)'" />
-            </nz-form-control></nz-form-item>
-        </form>
-      </ng-container>
-    </nz-modal>
+    <!-- Mục lục: lưới thẻ Unit, thấy hết cùng lúc kèm tên -->
+    <div class="toc-head">
+      <h3>Mục lục</h3>
+      <span class="rule"></span>
+      @if (canManage()) {
+        <button nz-button nzSize="small" (click)="openCreateUnit()"><nz-icon nzType="plus" /> Thêm Unit</button>
+      }
+    </div>
 
-    <!-- Modal thêm/sửa TÀI LIỆU (form tối giản — Môn/Khối snapshot từ bộ ở server) -->
-    <nz-modal [nzVisible]="materialModalOpen()" [nzTitle]="editingMaterial() ? 'Sửa tài liệu' : 'Thêm tài liệu'"
-      [nzOkLoading]="saving()" [nzOkDisabled]="materialForm.invalid" (nzOnOk)="saveMaterial()" (nzOnCancel)="materialModalOpen.set(false)">
-      <ng-container *nzModalContent>
-        <form nz-form nzLayout="vertical" [formGroup]="materialForm">
-          @if (editingMaterial(); as m) {
-            <nz-form-item><nz-form-label>Mã tài liệu</nz-form-label>
-              <nz-form-control><input nz-input [value]="m.code" disabled /></nz-form-control></nz-form-item>
-          }
-          <nz-form-item><nz-form-label nzRequired>Tên tài liệu</nz-form-label>
-            <nz-form-control nzErrorTip="Nhập tên tài liệu">
-              <input nz-input formControlName="title" placeholder="VD: Getting Started, Reading..." /></nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label>Unit</nz-form-label>
-            <nz-form-control>
-              <nz-select formControlName="unitId" class="full" nzAllowClear nzPlaceHolder="— Chưa thuộc Unit —">
-                @for (u of units(); track u.id) {
-                  <nz-option [nzValue]="u.id" [nzLabel]="unitLabel(u)" />
+    <nz-spin [nzSpinning]="loading()">
+      <div class="toc">
+        @for (u of units(); track u.id) {
+          <button class="unit-card" [class.is-review]="u.kind === Kind.Review"
+                  [attr.aria-selected]="u.id === activeUnitId()" (click)="selectUnit(u.id)">
+            <span class="unit-no">{{ u.kind === Kind.Review ? 'R' + u.unitNo : u.unitNo }}</span>
+            <span class="unit-text">
+              <span class="unit-lab">{{ u.kind === Kind.Review ? 'Review ' + u.unitNo : 'Unit ' + u.unitNo }}</span>
+              <span class="unit-name">{{ u.name || 'Chưa đặt tên' }}</span>
+              <span class="unit-meta">
+                {{ u.materialCount }} tài liệu@if (u.examCount > 0) { · {{ u.examCount }} đề }
+              </span>
+            </span>
+            @if (canManage()) {
+              <span class="unit-tools" (click)="$event.stopPropagation()">
+                <button nz-button nzType="text" nzSize="small" [disabled]="isFirst(u)"
+                        nz-tooltip nzTooltipTitle="Lên trên" aria-label="Chuyển Unit lên trên" (click)="moveUnit(u, -1)">
+                  <nz-icon nzType="arrow-up" />
+                </button>
+                <button nz-button nzType="text" nzSize="small" [disabled]="isLast(u)"
+                        nz-tooltip nzTooltipTitle="Xuống dưới" aria-label="Chuyển Unit xuống dưới" (click)="moveUnit(u, 1)">
+                  <nz-icon nzType="arrow-down" />
+                </button>
+                <button nz-button nzType="text" nzSize="small" nz-tooltip nzTooltipTitle="Sửa Unit"
+                        aria-label="Sửa Unit" (click)="openEditUnit(u)">
+                  <nz-icon nzType="edit" />
+                </button>
+                <button nz-button nzType="text" nzSize="small" nzDanger nz-tooltip nzTooltipTitle="Xóa Unit"
+                        aria-label="Xóa Unit" (click)="confirmRemoveUnit(u)">
+                  <nz-icon nzType="delete" />
+                </button>
+              </span>
+            }
+          </button>
+        }
+
+        <!-- Tài liệu chưa thuộc Unit nằm ngay trong mục lục, không cần cột riêng -->
+        <button class="unit-card is-none" [attr.aria-selected]="activeUnitId() === null" (click)="selectUnit(null)">
+          <span class="unit-no">?</span>
+          <span class="unit-text">
+            <span class="unit-lab">Ngoài mục lục</span>
+            <span class="unit-name">Chưa thuộc Unit</span>
+            <span class="unit-meta">{{ unassignedCount() }} tài liệu</span>
+          </span>
+        </button>
+      </div>
+    </nz-spin>
+
+    <!-- Danh sách bài học của Unit đang chọn -->
+    <nz-card class="lessons-card">
+      <div class="lessons-head">
+        <div class="lessons-title">{{ activeUnitTitle() }}</div>
+        @if (canManage()) {
+          <button nz-button nzSize="small" (click)="openCreateMaterial(activeUnitId())">
+            <nz-icon nzType="plus" /> Thêm tài liệu
+          </button>
+        }
+      </div>
+
+      <nz-spin [nzSpinning]="materialsLoading()">
+        <div class="lessons">
+          @for (m of visibleMaterials(); track m.id) {
+            <div class="lesson">
+              <span class="lesson-ico" [class]="iconClass(m)"><nz-icon [nzType]="iconType(m)" /></span>
+              <span class="lesson-text">
+                <span class="lesson-name">{{ m.title }}</span>
+                <span class="lesson-meta">{{ m.code }} · {{ sourceLabel(m) }}</span>
+              </span>
+              <span class="lesson-actions">
+                @if (m.examCount > 0) {
+                  <button class="exam-badge" type="button" (click)="openExams(m)"
+                          nz-tooltip nzTooltipTitle="Xem và giao các đề sinh từ tài liệu này">{{ m.examCount }} đề</button>
+                } @else {
+                  <nz-tag>Chưa có đề</nz-tag>
                 }
-              </nz-select>
-            </nz-form-control></nz-form-item>
-          <nz-form-item><nz-form-label nzRequired>Nguồn</nz-form-label>
-            <nz-form-control>
-              <nz-select formControlName="source" class="full">
-                <nz-option [nzValue]="MaterialSource.ExternalUrl" nzLabel="Liên kết (URL)" />
-                @if (serverUploadAllowed()) { <nz-option [nzValue]="MaterialSource.ServerFile" nzLabel="Tải file lên server" /> }
-              </nz-select>
-            </nz-form-control></nz-form-item>
-          @if (materialForm.value.source === MaterialSource.ExternalUrl) {
-            <nz-form-item><nz-form-label nzRequired>Đường dẫn (URL)</nz-form-label>
-              <nz-form-control><input nz-input formControlName="url" placeholder="https://..." /></nz-form-control></nz-form-item>
-          } @else {
-            <nz-form-item><nz-form-label nzRequired>File</nz-form-label>
-              <nz-form-control>
-                <nz-upload [nzCustomRequest]="customUpload" [nzLimit]="1" nzAccept="*">
-                  <button nz-button type="button"><nz-icon nzType="link" /> Chọn file</button>
-                </nz-upload>
-                @if (uploadedFileName()) { <span class="muted">Đã tải: {{ uploadedFileName() }}</span> }
-              </nz-form-control></nz-form-item>
+                <button nz-button nzSize="small" (click)="openMaterial(m)">
+                  {{ m.source === MaterialSource.ExternalUrl ? 'Mở liên kết' : 'Xem' }}
+                </button>
+                @if (canManage()) {
+                  <button nz-button nzSize="small" (click)="openAssign(m)">Giao cho lớp</button>
+                  <button nz-button nzSize="small" nzType="primary" nzGhost (click)="openGenerate(m)">
+                    <nz-icon nzType="thunderbolt" /> Sinh đề
+                  </button>
+                  <button nz-button nzSize="small" nzType="text" nz-dropdown [nzDropdownMenu]="more"
+                          aria-label="Thao tác khác"><nz-icon nzType="more" /></button>
+                  <nz-dropdown-menu #more="nzDropdownMenu">
+                    <ul nz-menu>
+                      <li nz-menu-item (click)="download(m)"><nz-icon nzType="download" /> Tải xuống</li>
+                      <li nz-menu-item (click)="openEditMaterial(m)"><nz-icon nzType="edit" /> Sửa</li>
+                      <li nz-menu-item nzDanger (click)="confirmRemoveMaterial(m)"><nz-icon nzType="delete" /> Xóa</li>
+                    </ul>
+                  </nz-dropdown-menu>
+                }
+              </span>
+            </div>
+          } @empty {
+            @if (!materialsLoading()) {
+              <nz-empty class="lessons-empty" nzNotFoundContent="Chưa có tài liệu nào trong mục này." />
+            }
           }
-          <nz-form-item><nz-form-label>Mô tả</nz-form-label>
-            <nz-form-control><input nz-input formControlName="description" /></nz-form-control></nz-form-item>
-        </form>
-      </ng-container>
+        </div>
+      </nz-spin>
+    </nz-card>
+
+    <!-- Modal Unit -->
+    <nz-modal [nzVisible]="unitModalOpen()" [nzTitle]="editingUnit() ? 'Sửa Unit' : 'Thêm Unit'"
+              [nzOkLoading]="saving()" (nzOnOk)="saveUnit()" (nzOnCancel)="unitModalOpen.set(false)">
+      <form *nzModalContent nz-form nzLayout="vertical" [formGroup]="unitForm">
+        <nz-form-item>
+          <nz-form-label>Kiểu</nz-form-label>
+          <nz-form-control>
+            <nz-radio-group formControlName="kind">
+              <label nz-radio-button [nzValue]="Kind.Unit">Unit</label>
+              <label nz-radio-button [nzValue]="Kind.Review">Review</label>
+            </nz-radio-group>
+          </nz-form-control>
+        </nz-form-item>
+        <nz-form-item>
+          <nz-form-label [nzRequired]="unitForm.value.kind === Kind.Unit">Tên chủ đề</nz-form-label>
+          <nz-form-control nzExtra="Review được để trống — hệ thống hiển thị “Review 1”, “Review 2”…">
+            <input nz-input formControlName="name" placeholder="vd: Our experiences" />
+          </nz-form-control>
+        </nz-form-item>
+      </form>
     </nz-modal>
 
-    <!-- Trình xem tài liệu full màn hình dùng chung -->
     <app-document-preview />
+
+    <app-material-form-modal
+      [visible]="materialFormOpen()" [editing]="editingMaterial()" [folderId]="folderId()"
+      [units]="units()"
+      (closed)="materialFormOpen.set(false)"
+      (saved)="materialFormOpen.set(false); reloadAfterMaterialChange()" />
+
+    <app-assign-to-class-modal
+      [visible]="assignOpen()" kind="material"
+      [targetId]="assignTarget()?.id ?? null" [targetTitle]="assignTarget()?.title ?? ''"
+      (closed)="assignOpen.set(false)" (assigned)="assignOpen.set(false)" />
+
+    <app-exam-generate-modal
+      [visible]="generateOpen()" [material]="generateTarget()"
+      (closed)="generateOpen.set(false)" (generated)="generateOpen.set(false); reloadAfterMaterialChange()" />
+
+    <app-exams-of-material-modal
+      [visible]="examsOpen()" [material]="examsTarget()"
+      (closed)="examsOpen.set(false)" (changed)="reloadAfterMaterialChange()" />
   `,
-  // Style layout của flow này nằm ở styles.scss dưới scope .hs-mat-theme (host class) —
-  // tránh vượt budget anyComponentStyle, đồng thời dùng chung token với card sách ở tab môn học.
   styles: `
-    :host { display: block; }
-    .full { width: 100%; }
-    .muted { color: var(--hs-text-muted); }
-    .spacer { flex: 1; }
+    /* Hero: ảnh bìa làm nền mờ; màu lấy từ design system chung (không dùng bảng màu riêng nữa). */
+    .hero { position: relative; border-radius: 16px; overflow: hidden; margin-bottom: 18px;
+      border: 1px solid var(--hs-border); background: var(--hs-surface); }
+    .hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center;
+      filter: blur(24px); transform: scale(1.2); opacity: .35; }
+    .hero-overlay { position: absolute; inset: 0;
+      background: linear-gradient(120deg, var(--hs-primary-weak, #eef0fe) 0%, transparent 70%); }
+    .hero-inner { position: relative; display: flex; align-items: center; gap: 14px; padding: 18px; flex-wrap: wrap; }
+    .hero-home { flex: 0 0 auto; }
+    .hero-text { flex: 1; min-width: 0; }
+    .hero-crumb { font-size: 11.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+      color: var(--hs-primary, #4f46e5); }
+    .hero-title { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.3px; text-wrap: balance; }
+    .hero-meta { font-size: 12.5px; color: var(--hs-text-muted); }
+
+    .toc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .toc-head h3 { margin: 0; font-size: 12.5px; font-weight: 800; letter-spacing: .6px;
+      text-transform: uppercase; color: var(--hs-text-muted); }
+    .toc-head .rule { flex: 1; height: 1px; background: var(--hs-border); }
+
+    /* Lưới thẻ Unit tự xuống dòng — thấy hết Unit kèm tên, không phải cuộn ngang. */
+    .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .unit-card { display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer;
+      padding: 10px 12px; border-radius: 12px; border: 1px solid var(--hs-border-strong, #cbcee4);
+      background: var(--hs-surface); color: inherit; transition: border-color .14s, transform .14s, box-shadow .14s; }
+    .unit-card:hover { border-color: var(--hs-primary, #4f46e5); transform: translateY(-1px); }
+    .unit-card[aria-selected="true"] { border-color: var(--hs-primary, #4f46e5);
+      box-shadow: 0 0 0 2px var(--hs-primary-weak, #eef0fe) inset; }
+    .unit-no { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; display: grid; place-items: center;
+      font-weight: 800; font-size: 15px; background: var(--hs-primary-weak, #eef0fe); color: var(--hs-primary, #4f46e5); }
+    .unit-card.is-review .unit-no { background: #fdf3e3; color: #b45309; font-size: 13px; }
+    .unit-card.is-none .unit-no { background: var(--hs-surface-3, #edeff8); color: var(--hs-text-muted); }
+    .unit-text { display: block; min-width: 0; flex: 1; }
+    .unit-lab { display: block; font-size: 10px; font-weight: 800; letter-spacing: .8px;
+      text-transform: uppercase; color: var(--hs-text-muted); }
+    .unit-name { display: block; font-size: 13.5px; font-weight: 700; line-height: 1.28; overflow-wrap: anywhere; }
+    .unit-meta { display: block; font-size: 11.5px; color: var(--hs-text-muted); margin-top: 1px; }
+    .unit-tools { display: none; gap: 0; }
+    .unit-card:hover .unit-tools, .unit-card[aria-selected="true"] .unit-tools { display: flex; }
+
+    .lessons-card :where(.ant-card-body) { padding: 0; }
+    .lessons-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; border-bottom: 1px solid var(--hs-border); flex-wrap: wrap; }
+    .lessons-title { font-weight: 750; font-size: 15px; }
+    .lessons { display: flex; flex-direction: column; }
+    .lessons-empty { padding: 28px 0; }
+    .lesson { display: flex; align-items: center; gap: 13px; padding: 12px 16px;
+      border-bottom: 1px solid var(--hs-border); }
+    .lesson:last-child { border-bottom: 0; }
+    .lesson:hover { background: var(--hs-surface-2, #f7f8fd); }
+    .lesson-ico { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px; display: grid; place-items: center;
+      font-size: 18px; background: var(--hs-surface-3, #edeff8); color: var(--hs-text-muted); }
+    .lesson-ico.ico-pdf { background: #fbebeb; color: #c62828; }
+    .lesson-ico.ico-doc { background: var(--hs-primary-weak, #eef0fe); color: var(--hs-primary, #4f46e5); }
+    .lesson-ico.ico-link { background: #e6f5ec; color: #15803d; }
+    .lesson-text { flex: 1; min-width: 0; }
+    .lesson-name { display: block; font-weight: 700; font-size: 14.5px; overflow-wrap: anywhere; }
+    .lesson-meta { display: block; font-size: 12px; color: var(--hs-text-muted); }
+    .lesson-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+    .exam-badge { border: 0; cursor: pointer; font-size: 12px; font-weight: 700; line-height: 22px;
+      padding: 0 10px; border-radius: 999px; background: var(--hs-primary-weak, #eef0fe); color: var(--hs-primary, #4f46e5); }
+    .exam-badge:hover { background: var(--hs-primary, #4f46e5); color: #fff; }
+
+    @media (max-width: 640px) {
+      .hero-title { font-size: 20px; }
+      .toc { grid-template-columns: 1fr; }
+      .lesson { flex-wrap: wrap; }
+      .lesson-actions { width: 100%; justify-content: flex-start; }
+      .unit-tools { display: flex; }
+    }
   `
 })
 export class FolderDetailPage {
   private readonly auth = inject(AuthService);
   private readonly materialsService = inject(MaterialsService);
-  private readonly settingsService = inject(SettingsService);
   protected readonly filesService = inject(FilesService);
   private readonly router = inject(Router);
   private readonly message = inject(NzMessageService);
@@ -277,26 +318,33 @@ export class FolderDetailPage {
 
   protected readonly folder = signal<MaterialFolder | null>(null);
   protected readonly units = signal<MaterialUnit[]>([]);
-  /** Tài liệu chưa thuộc Unit — sidebar "Tài nguyên khác". */
+  /** Tài liệu chưa thuộc Unit — hiện khi chọn thẻ "Ngoài mục lục". */
   protected readonly unassigned = signal<Material[]>([]);
-  /** Tài liệu của unit đang mở (mức 4). */
   protected readonly unitMaterials = signal<Material[]>([]);
   protected readonly loading = signal(false);
   protected readonly materialsLoading = signal(false);
   protected readonly saving = signal(false);
-  protected readonly serverUploadAllowed = signal(false);
 
-  protected readonly currentUnit = computed(() => this.units().find(u => u.id === this.unitId()) ?? null);
+  /** Unit đang chọn; null = mục "Chưa thuộc Unit". */
+  protected readonly activeUnitId = computed(() => this.unitId());
+  protected readonly unassignedCount = computed(() => this.unassigned().length);
+
+  protected readonly visibleMaterials = computed(() =>
+    this.activeUnitId() === null ? this.unassigned() : this.unitMaterials());
+
+  protected readonly activeUnitTitle = computed(() => {
+    const id = this.activeUnitId();
+    if (id === null) return 'Tài liệu chưa thuộc Unit';
+    const u = this.units().find(x => x.id === id);
+    if (!u) return 'Tài liệu';
+    return u.kind === MaterialUnitKind.Review
+      ? `Review ${u.unitNo}${u.name ? ': ' + u.name : ''}`
+      : `Unit ${u.unitNo}${u.name ? ': ' + u.name : ''}`;
+  });
+
   protected readonly heroBg = computed(() => {
     const cid = this.folder()?.coverFileId;
     return cid ? `url(${this.filesService.downloadUrl(cid)})` : '';
-  });
-  /** 2 cột kiểu mục lục sách: nửa đầu cột trái, nửa sau cột phải (mobile stack giữ thứ tự). */
-  protected readonly unitColumns = computed(() => {
-    const list = this.units();
-    if (list.length === 0) return [];
-    const half = Math.ceil(list.length / 2);
-    return list.length <= 3 ? [list] : [list.slice(0, half), list.slice(half)];
   });
 
   // Modal Unit
@@ -307,33 +355,30 @@ export class FolderDetailPage {
     name: new FormControl<string | null>(null)
   });
 
-  // Modal Tài liệu (tối giản + chọn Unit)
-  protected readonly materialModalOpen = signal(false);
+  // Modal tài liệu / giao lớp / sinh đề / danh sách đề
+  protected readonly materialFormOpen = signal(false);
   protected readonly editingMaterial = signal<Material | null>(null);
-  protected readonly uploadedFileId = signal<string | null>(null);
-  protected readonly uploadedFileName = signal<string | null>(null);
-  protected readonly materialForm = new FormGroup({
-    title: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    unitId: new FormControl<string | null>(null),
-    source: new FormControl(MaterialSource.ExternalUrl, { nonNullable: true }),
-    url: new FormControl<string | null>(null),
-    description: new FormControl<string | null>(null)
-  });
+  protected readonly assignOpen = signal(false);
+  protected readonly assignTarget = signal<Material | null>(null);
+  protected readonly generateOpen = signal(false);
+  protected readonly generateTarget = signal<Material | null>(null);
+  protected readonly examsOpen = signal(false);
+  protected readonly examsTarget = signal<Material | null>(null);
 
-  /** Trình xem tài liệu full màn hình dùng chung. */
   private readonly preview = viewChild.required(DocumentPreview);
+  private readonly materialForm = viewChild.required(MaterialFormModal);
+  private readonly assign = viewChild.required(AssignToClassModal);
+  private readonly generate = viewChild.required(ExamGenerateModal);
+  private readonly examsModal = viewChild.required(ExamsOfMaterialModal);
 
   constructor() {
-    this.settingsService.getEffective().subscribe(s =>
-      this.serverUploadAllowed.set(s.values['FileStorage.Mode'] === FileStorageMode.Server));
-
     // Đổi bộ (deep-link/F5) → nạp bộ + units + tài liệu ngoài unit.
     effect(() => {
       const fid = this.folderId();
       untracked(() => { if (fid) this.loadFolderContext(fid); });
     });
 
-    // Đổi unit đang mở → nạp danh sách bài học (mức 4).
+    // Đổi unit đang chọn → nạp danh sách bài học tương ứng.
     effect(() => {
       const uid = this.unitId();
       untracked(() => { if (uid) this.loadUnitMaterials(uid); });
@@ -347,19 +392,32 @@ export class FolderDetailPage {
     this.router.navigate(['/materials'], { queryParams: { tab: 'subject', subjectId: sid } });
   }
 
-  protected openUnit(u: MaterialUnit): void {
-    this.router.navigate([], { queryParams: { unitId: u.id }, queryParamsHandling: 'merge' });
+  /** Chọn Unit (null = mục chưa thuộc Unit) — giữ trên URL để F5/back đúng vị trí. */
+  protected selectUnit(unitId: string | null): void {
+    this.router.navigate([], { queryParams: { unitId }, queryParamsHandling: 'merge' });
   }
 
-  protected backToUnits(): void {
-    this.router.navigate([], { queryParams: { unitId: null }, queryParamsHandling: 'merge' });
+  // ---- Hiển thị ----
+
+  protected iconType(m: Material): string {
+    if (m.source === MaterialSource.ExternalUrl) return 'link';
+    const ext = (m.fileName ?? '').toLowerCase();
+    if (ext.endsWith('.pdf')) return 'file-pdf';
+    if (ext.endsWith('.doc') || ext.endsWith('.docx')) return 'file-word';
+    if (/\.(png|jpe?g|gif|webp)$/.test(ext)) return 'file-image';
+    return 'file-text';
   }
 
-  /** Nhãn hiển thị của unit — dùng cho aria-label + option select. */
-  protected unitLabel(u: MaterialUnit): string {
-    return u.kind === MaterialUnitKind.Unit
-      ? `Unit ${u.unitNo} — ${u.name}`
-      : `Review ${u.unitNo}${u.name ? ` — ${u.name}` : ''}`;
+  protected iconClass(m: Material): string {
+    if (m.source === MaterialSource.ExternalUrl) return 'ico-link';
+    const ext = (m.fileName ?? '').toLowerCase();
+    if (ext.endsWith('.pdf')) return 'ico-pdf';
+    if (ext.endsWith('.doc') || ext.endsWith('.docx')) return 'ico-doc';
+    return '';
+  }
+
+  protected sourceLabel(m: Material): string {
+    return m.source === MaterialSource.ExternalUrl ? 'Đường dẫn ngoài' : (m.fileName ?? 'File trên server');
   }
 
   // ---- Nạp dữ liệu ----
@@ -400,12 +458,11 @@ export class FolderDetailPage {
     });
   }
 
-  /** Nạp lại mọi thứ phụ thuộc tài liệu sau CRUD (đếm trên bar + sidebar + list unit đang mở). */
-  private reloadAfterMaterialChange(): void {
+  /** Nạp lại mọi thứ phụ thuộc tài liệu sau CRUD (đếm trên mục lục + danh sách đang mở). */
+  protected reloadAfterMaterialChange(): void {
     const fid = this.folderId();
     if (!fid) return;
-    this.loadUnits(fid);
-    this.loadUnassigned(fid);
+    this.loadFolderContext(fid);
     const uid = this.unitId();
     if (uid) this.loadUnitMaterials(uid);
   }
@@ -442,9 +499,23 @@ export class FolderDetailPage {
     });
   }
 
-  protected removeUnit(u: MaterialUnit): void {
+  /** Popconfirm không hoạt động tốt trong thẻ Unit (click lồng nhau) ⇒ dùng modal xác nhận. */
+  protected confirmRemoveUnit(u: MaterialUnit): void {
+    this.modal.confirm({
+      nzTitle: 'Xóa Unit này?',
+      nzContent: 'Unit còn tài liệu bên trong sẽ không xóa được.',
+      nzOkDanger: true,
+      nzOnOk: () => this.removeUnit(u)
+    });
+  }
+
+  private removeUnit(u: MaterialUnit): void {
     this.materialsService.deleteUnit(u.id).subscribe({
-      next: () => { this.message.success('Đã xóa Unit.'); this.loadUnits(this.folderId()!); },
+      next: () => {
+        this.message.success('Đã xóa Unit.');
+        if (this.unitId() === u.id) this.selectUnit(null);
+        this.loadUnits(this.folderId()!);
+      },
       // Unit còn tài liệu ⇒ BE chặn (MaterialUnit.InUse) — hiện message tiếng Việt từ server.
       error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
     });
@@ -471,87 +542,53 @@ export class FolderDetailPage {
     });
   }
 
-  // ---- CRUD Tài liệu ----
+  // ---- Tài liệu ----
 
   protected openCreateMaterial(unitId: string | null): void {
     this.editingMaterial.set(null);
-    this.uploadedFileId.set(null);
-    this.uploadedFileName.set(null);
-    this.materialForm.reset({ title: '', unitId, source: MaterialSource.ExternalUrl, url: null, description: null });
-    this.materialModalOpen.set(true);
+    this.materialForm().open(unitId);
+    this.materialFormOpen.set(true);
   }
 
   protected openEditMaterial(m: Material): void {
     this.editingMaterial.set(m);
-    this.uploadedFileId.set(m.storedFileId);
-    this.uploadedFileName.set(m.storedFileId ? (m.fileName ?? 'file hiện tại') : null);
-    this.materialForm.reset({ title: m.title, unitId: m.unitId, source: m.source, url: m.url, description: m.description });
-    this.materialModalOpen.set(true);
+    this.materialForm().open();
+    this.materialFormOpen.set(true);
   }
 
-  protected saveMaterial(): void {
-    if (this.materialForm.invalid) return;
-    const v = this.materialForm.getRawValue();
-    if (v.source === MaterialSource.ServerFile && !this.uploadedFileId()) { this.message.warning('Vui lòng tải file lên.'); return; }
-    if (v.source === MaterialSource.ExternalUrl && !v.url) { this.message.warning('Vui lòng nhập URL.'); return; }
-
-    // Môn/Khối server tự snapshot từ bộ — client không gửi.
-    const editing = this.editingMaterial();
-    const body = {
-      categoryId: editing?.categoryId ?? null,
-      subjectId: null,
-      gradeBand: null,
-      title: v.title,
-      source: v.source,
-      url: v.source === MaterialSource.ExternalUrl ? v.url : null,
-      storedFileId: v.source === MaterialSource.ServerFile ? this.uploadedFileId() : null,
-      description: v.description,
-      coverFileId: editing?.coverFileId ?? null,
-      folderId: this.folderId(),
-      unitId: v.unitId
-    };
-    const op = editing ? this.materialsService.update(editing.id, body) : this.materialsService.create(body);
-
-    this.saving.set(true);
-    op.subscribe({
-      next: () => { this.saving.set(false); this.materialModalOpen.set(false); this.message.success('Đã lưu tài liệu.'); this.reloadAfterMaterialChange(); },
-      error: (err: HttpErrorResponse) => { this.saving.set(false); this.message.error(err.error?.message ?? err.message ?? 'Lưu thất bại.'); }
-    });
+  protected openAssign(m: Material): void {
+    this.assignTarget.set(m);
+    this.assign().open();
+    this.assignOpen.set(true);
   }
 
-  protected removeMaterial(m: Material): void {
-    this.materialsService.delete(m.id).subscribe({
-      next: () => { this.message.success('Đã xóa.'); this.reloadAfterMaterialChange(); },
-      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
-    });
+  protected openGenerate(m: Material): void {
+    this.generateTarget.set(m);
+    this.generate().open();
+    this.generateOpen.set(true);
   }
 
-  /** Xóa từ menu ⋮ sidebar — confirm bằng modal (popconfirm không hợp trong dropdown). */
+  protected openExams(m: Material): void {
+    this.examsTarget.set(m);
+    this.examsModal().open();
+    this.examsOpen.set(true);
+  }
+
   protected confirmRemoveMaterial(m: Material): void {
     this.modal.confirm({
       nzTitle: 'Xóa tài liệu này?',
       nzContent: m.title,
-      nzOkText: 'Xóa',
       nzOkDanger: true,
       nzOnOk: () => this.removeMaterial(m)
     });
   }
 
-  protected customUpload = (item: NzUploadXHRArgs): Subscription =>
-    this.filesService.upload(item.file as unknown as File).subscribe({
-      next: f => {
-        this.uploadedFileId.set(f.id);
-        this.uploadedFileName.set(f.fileName);
-        item.onSuccess?.(f, item.file, null as never);
-        this.message.success('Đã tải file lên.');
-      },
-      error: (e: HttpErrorResponse) => {
-        item.onError?.(e as never, item.file);
-        this.message.error(e.error?.message ?? e.message);
-      }
+  private removeMaterial(m: Material): void {
+    this.materialsService.delete(m.id).subscribe({
+      next: () => { this.message.success('Đã xóa tài liệu.'); this.reloadAfterMaterialChange(); },
+      error: (err: HttpErrorResponse) => this.message.error(err.error?.message ?? err.message ?? 'Xóa thất bại.')
     });
-
-  // ---- Xem / Download / Đề (pattern dùng chung của Kho tài liệu) ----
+  }
 
   protected openMaterial(m: Material): void {
     if (m.source === MaterialSource.ExternalUrl) {
@@ -567,16 +604,5 @@ export class FolderDetailPage {
     } else if (m.url) {
       window.open(m.url, '_blank');
     }
-  }
-
-  /** Mở trang đề (sinh đề AI) — kèm ngữ cảnh folderId + unitId để nút back quay về đúng màn. */
-  protected openExams(m: Material): void {
-    this.router.navigate(['/materials', m.id, 'exams'], {
-      queryParams: {
-        title: m.title, tab: 'subject',
-        subjectId: this.folder()?.subjectId ?? this.subjectId(),
-        folderId: this.folderId(), unitId: this.unitId()
-      }
-    });
   }
 }

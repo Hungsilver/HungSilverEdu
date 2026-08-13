@@ -28,11 +28,11 @@ public sealed class FileService(
     {
         if (enforceStorageMode)
         {
-            var mode = await settings.GetEffectiveValueAsync(SettingKeys.FileStorageMode, ct: ct);
-            if (!string.Equals(mode, nameof(FileStorageMode.Server), StringComparison.OrdinalIgnoreCase))
+            var allowed = await settings.GetEffectiveValueAsync(SettingKeys.FileStorageAllowServerUpload, ct: ct);
+            if (!bool.TryParse(allowed?.Trim(), out var canUpload) || !canUpload)
                 return Result.Failure<StoredFileDto>(Error.Validation(
                     "Files.UploadDisabled",
-                    "Hệ thống đang ở chế độ lưu link ngoài. Vui lòng dùng đường dẫn URL thay vì upload file."));
+                    "Hệ thống đang tắt cách nạp tài liệu bằng tải file lên. Vui lòng dùng đường dẫn ngoài."));
         }
 
         if (length <= 0)

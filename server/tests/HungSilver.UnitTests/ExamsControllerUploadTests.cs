@@ -23,9 +23,9 @@ public sealed class ExamsControllerUploadTests
     {
         var sourceMaterialId = Guid.NewGuid();
         var materialService = new FakeMaterialService(new MaterialDto(
-            sourceMaterialId, "TL0001", null, Guid.NewGuid(), null, null, null,
+            sourceMaterialId, "TL0001", Guid.NewGuid(), null,
             Guid.NewGuid(), "Tiếng Anh", "10", "Unit 3",
-            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.docx", null, null, "/api/files/x", DateTime.Now));
+            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.docx", null, null, "/api/files/x", 0, DateTime.Now));
         var files = new FakeFileService(Guid.NewGuid());
         var jobs = new FakeJobService();
         var controller = NewController(materialService, files, jobs);
@@ -52,9 +52,9 @@ public sealed class ExamsControllerUploadTests
     {
         var sourceMaterialId = Guid.NewGuid();
         var materialService = new FakeMaterialService(new MaterialDto(
-            sourceMaterialId, "TL0002", null, null, null, Guid.NewGuid(), "Đề kiểm tra",
+            sourceMaterialId, "TL0002", null, null,
             Guid.NewGuid(), "Tiếng Anh", "9", "Tài liệu chung",
-            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.pdf", null, null, "/api/files/x", DateTime.Now));
+            MaterialSource.ServerFile, null, Guid.NewGuid(), "unit.pdf", null, null, "/api/files/x", 0, DateTime.Now));
         var jobs = new FakeJobService();
         var controller = NewController(materialService, new FakeFileService(Guid.NewGuid()), jobs);
 
@@ -188,8 +188,7 @@ public sealed class ExamsControllerUploadTests
 
     private sealed class StubExamService : IExamService
     {
-        public Task<Result<PagedResult<ExamListItemDto>>> GetPagedBySubjectAsync(Guid subjectId, ExamStatus? status, PagedRequest paging, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<Result<PagedResult<ExamListItemDto>>> GetPagedByMaterialAsync(Guid materialId, PagedRequest paging, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Result<PagedResult<ExamListItemDto>>> GetPagedAsync(ExamListFilter filter, PagedRequest paging, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<ExamDetailDto>> GetDetailAsync(Guid examId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<ExamDetailDto>> UpdateExamAsync(Guid examId, UpdateExamRequest request, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<ExamQuestionDto>> UpsertQuestionAsync(Guid examId, Guid? questionId, UpsertQuestionRequest request, CancellationToken ct = default) => throw new NotImplementedException();
@@ -202,6 +201,7 @@ public sealed class ExamsControllerUploadTests
     {
         public Task<Result<ExamAssignmentDto>> AssignAsync(Guid examId, AssignExamRequest request, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<ExamAssignmentDto>>> ListByExamAsync(Guid examId, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Result<PagedResult<ExamAssignmentDto>>> GetPagedAsync(Guid? classId, ExamAssignmentStatus? status, PagedRequest paging, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<ExamAssignmentDto>>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<ExamAssignmentDto>>> ListByClassAsync(Guid classId, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<Result<List<StudentHomeworkDto>>> ListStudentHomeworkAsync(Guid studentId, Guid? classId = null, CancellationToken ct = default) => throw new NotImplementedException();

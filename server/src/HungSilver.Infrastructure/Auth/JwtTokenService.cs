@@ -12,7 +12,11 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
 {
     private readonly JwtOptions _options = options.Value;
 
-    public AccessTokenResult CreateAccessToken(Guid userId, string email, string? fullName, IEnumerable<string> roles)
+    /// <summary>Tên claim đánh dấu "phải đổi mật khẩu" — middleware đọc để chặn API.</summary>
+    public const string MustChangePasswordClaim = "mcp";
+
+    public AccessTokenResult CreateAccessToken(
+        Guid userId, string email, string? fullName, IEnumerable<string> roles, bool mustChangePassword = false)
     {
         var expiresAt = DateTime.Now.AddMinutes(_options.AccessTokenMinutes);
 
@@ -24,6 +28,8 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options) : IJwtTokenSer
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
         claims.AddRange(roles.Select(role => new Claim("role", role)));
+        if (mustChangePassword)
+            claims.Add(new Claim(MustChangePasswordClaim, "1"));
 
         var descriptor = new SecurityTokenDescriptor
         {

@@ -26,6 +26,7 @@ public sealed class MaterialUnitService(
     IRepository<MaterialUnit> units,
     IRepository<MaterialFolder> folders,
     IRepository<LearningMaterial> materials,
+    IRepository<Exam> exams,
     IUnitOfWork unitOfWork,
     IValidator<CreateMaterialUnitRequest> createValidator,
     IValidator<UpdateMaterialUnitRequest> updateValidator,
@@ -36,8 +37,8 @@ public sealed class MaterialUnitService(
     public async Task<Result<List<MaterialUnitDto>>> GetByFolderAsync(Guid folderId, CancellationToken ct = default)
     {
         var list = await LoadOrderedAsync(folderId, ct);
-        var counts = await CountMaterialsByUnitAsync(list.Select(u => u.Id).ToList(), ct);
-        return ToDtos(list, counts);
+        var (counts, examCounts) = await CountByUnitAsync(list.Select(u => u.Id).ToList(), ct);
+        return ToDtos(list, counts, examCounts);
     }
 
     public async Task<Result<MaterialUnitDto>> CreateAsync(CreateMaterialUnitRequest request, CancellationToken ct = default)
@@ -120,8 +121,8 @@ public sealed class MaterialUnitService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var reordered = request.OrderedIds.Select(oid => byId[oid]).ToList();
-        var counts = await CountMaterialsByUnitAsync(reordered.Select(u => u.Id).ToList(), ct);
-        return ToDtos(reordered, counts);
+        var (counts, examCounts) = await CountByUnitAsync(reordered.Select(u => u.Id).ToList(), ct);
+        return ToDtos(reordered, counts, examCounts);
     }
 
     /// <summary>Unit của bộ theo thứ tự hiển thị. FindAsync mặc định sort CreatedAt desc — phải tự OrderBy lại.</summary>
@@ -129,22 +130,33 @@ public sealed class MaterialUnitService(
         (await units.FindAsync(u => u.FolderId == folderId, ct))
             .OrderBy(u => u.SortOrder).ThenBy(u => u.CreatedAt).ToList();
 
-    private async Task<Dictionary<Guid, int>> CountMaterialsByUnitAsync(List<Guid> unitIds, CancellationToken ct)
+    /// <summary>Đếm tài liệu VÀ số đề của từng unit trong 1 lượt — mục lục hiện "N tài liệu · N đề".</summary>
+    private async Task<(Dictionary<Guid, int> Materials, Dictionary<Guid, int> Exams)> CountByUnitAsync(
+        List<Guid> unitIds, CancellationToken ct)
     {
-        if (unitIds.Count == 0) return [];
+        if (unitIds.Count == 0) return ([], []);
+
         var items = await materials.FindAsync(m => m.UnitId != null && unitIds.Contains(m.UnitId.Value), ct);
-        return items.GroupBy(m => m.UnitId!.Value).ToDictionary(g => g.Key, g => g.Count());
+        var materialCounts = items.GroupBy(m => m.UnitId!.Value).ToDictionary(g => g.Key, g => g.Count());
+        if (items.Count == 0) return (materialCounts, []);
+
+        var byMaterial = await MaterialExamCounter.CountByMaterialAsync(exams, items.Select(m => m.Id), ct);
+        var examCounts = items
+            .GroupBy(m => m.UnitId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(m => byMaterial.GetValueOrDefault(m.Id)));
+        return (materialCounts, examCounts);
     }
 
     /// <summary>DTO của một unit — số hiển thị phụ thuộc cả danh sách nên phải derive lại từ toàn bộ.</summary>
     private async Task<Result<MaterialUnitDto>> BuildDtoAsync(MaterialUnit unit, CancellationToken ct)
     {
         var list = await LoadOrderedAsync(unit.FolderId, ct);
-        var counts = await CountMaterialsByUnitAsync(list.Select(u => u.Id).ToList(), ct);
-        return ToDtos(list, counts).First(d => d.Id == unit.Id);
+        var (counts, examCounts) = await CountByUnitAsync(list.Select(u => u.Id).ToList(), ct);
+        return ToDtos(list, counts, examCounts).First(d => d.Id == unit.Id);
     }
 
-    private static List<MaterialUnitDto> ToDtos(List<MaterialUnit> ordered, Dictionary<Guid, int> materialCounts)
+    private static List<MaterialUnitDto> ToDtos(
+        List<MaterialUnit> ordered, Dictionary<Guid, int> materialCounts, Dictionary<Guid, int> examCounts)
     {
         var result = new List<MaterialUnitDto>(ordered.Count);
         int unitNo = 0, reviewNo = 0;
@@ -152,7 +164,7 @@ public sealed class MaterialUnitService(
         {
             var no = u.Kind == MaterialUnitKind.Unit ? ++unitNo : ++reviewNo;
             result.Add(new MaterialUnitDto(u.Id, u.FolderId, u.Kind, u.Name, no,
-                u.SortOrder, materialCounts.GetValueOrDefault(u.Id), u.CreatedAt));
+                u.SortOrder, materialCounts.GetValueOrDefault(u.Id), examCounts.GetValueOrDefault(u.Id), u.CreatedAt));
         }
         return result;
     }

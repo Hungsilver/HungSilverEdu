@@ -1,0 +1,1889 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>HungSilver v2</title>
+<style>
+/* ============================================================
+   HungSilver — design system "Indigo học thuật" (bám theo styles.scss của project)
+   Token đặt ở :root; dark mode phủ cả 3 trạng thái (system / explicit light / explicit dark)
+   ============================================================ */
+:root{
+  --ground:#F4F5FA;
+  --surface:#FFFFFF;
+  --surface-2:#F7F8FD;
+  --surface-3:#EDEFF8;
+  --border:#E3E5F1;
+  --border-strong:#CBCEE4;
+  --text:#1B1D2E;
+  --text-2:#3E4159;
+  --muted:#6B6F89;
+  --primary:#4F46E5;
+  --primary-strong:#4338CA;
+  --primary-weak:#EEF0FE;
+  --primary-ring:rgba(79,70,229,.28);
+  --success:#15803D; --success-weak:#E6F5EC;
+  --warning:#B45309; --warning-weak:#FCF2E2;
+  --danger:#C62828;  --danger-weak:#FBEBEB;
+  --shadow-1:0 1px 2px rgba(20,22,40,.05), 0 6px 18px rgba(20,22,40,.05);
+  --shadow-2:0 12px 40px rgba(20,22,40,.16);
+  --r-sm:8px; --r:12px; --r-lg:16px;
+  --sider-w:236px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#12131F;
+    --surface:#1A1B2B;
+    --surface-2:#202234;
+    --surface-3:#282B41;
+    --border:#2E3149;
+    --border-strong:#3D4160;
+    --text:#F1F2F8;
+    --text-2:#D3D5E4;
+    --muted:#9CA0BC;
+    --primary:#8B87F5;
+    --primary-strong:#A5A1FF;
+    --primary-weak:#25254A;
+    --primary-ring:rgba(139,135,245,.34);
+    --success:#4ADE80; --success-weak:#16301F;
+    --warning:#FBBF24; --warning-weak:#33260C;
+    --danger:#F87171;  --danger-weak:#361A1A;
+    --shadow-1:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.28);
+    --shadow-2:0 12px 40px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#12131F;
+  --surface:#1A1B2B;
+  --surface-2:#202234;
+  --surface-3:#282B41;
+  --border:#2E3149;
+  --border-strong:#3D4160;
+  --text:#F1F2F8;
+  --text-2:#D3D5E4;
+  --muted:#9CA0BC;
+  --primary:#8B87F5;
+  --primary-strong:#A5A1FF;
+  --primary-weak:#25254A;
+  --primary-ring:rgba(139,135,245,.34);
+  --success:#4ADE80; --success-weak:#16301F;
+  --warning:#FBBF24; --warning-weak:#33260C;
+  --danger:#F87171;  --danger-weak:#361A1A;
+  --shadow-1:0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.28);
+  --shadow-2:0 12px 40px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--ground);
+  color:var(--text);
+  font-family:"Be Vietnam Pro",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",system-ui,sans-serif;
+  font-size:14px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+
+/* ---------- Shell ---------- */
+.app{display:flex;min-height:100vh}
+.sider{
+  width:var(--sider-w);flex:0 0 var(--sider-w);
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:11px;padding:18px 16px 16px}
+.brand__mark{
+  width:38px;height:38px;flex:0 0 38px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:800;font-size:15px;letter-spacing:.5px;
+}
+.brand__name{font-weight:800;font-size:15.5px;letter-spacing:-.2px;line-height:1.15}
+.brand__sub{font-size:11px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;font-weight:600}
+.nav{display:flex;flex-direction:column;gap:2px;padding:6px 10px;overflow-y:auto}
+.nav__label{font-size:10.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);padding:14px 10px 6px}
+.nav__item{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  padding:9px 11px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--text-2);
+  font-size:13.5px;font-weight:600;cursor:pointer;position:relative;transition:background .14s,color .14s;
+}
+.nav__item:hover{background:var(--surface-2);color:var(--text)}
+.nav__item[aria-current="page"]{background:var(--primary-weak);color:var(--primary-strong)}
+.nav__item[aria-current="page"]::before{
+  content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--primary);
+}
+.nav__ico{width:18px;flex:0 0 18px;text-align:center;font-size:15px;line-height:1}
+.nav__new{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2px 6px;border-radius:999px;background:var(--primary);color:#fff}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{
+  height:60px;flex:0 0 60px;display:flex;align-items:center;gap:12px;padding:0 20px;
+  background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;
+}
+.topbar__burger{display:none}
+.topbar__title{font-weight:700;font-size:15.5px}
+.topbar__spacer{flex:1}
+.topbar__user{display:flex;align-items:center;gap:9px;font-weight:600;font-size:13px}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:800}
+.content{padding:22px;max-width:1320px;width:100%}
+.screen{display:none}
+.screen.is-active{display:block;animation:fade .22s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- Nguyên tố dùng chung ---------- */
+.page-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.page-head__left{display:flex;align-items:center;gap:13px;min-width:0}
+.page-head__badge{width:44px;height:44px;flex:0 0 44px;border-radius:var(--r);display:grid;place-items:center;font-size:21px;background:var(--primary-weak);color:var(--primary)}
+.page-head h1{margin:0;font-size:21px;font-weight:800;letter-spacing:-.3px;text-wrap:balance}
+.page-head p{margin:1px 0 0;font-size:12.5px;color:var(--muted)}
+.page-head__actions{display:flex;gap:9px;flex-wrap:wrap}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border-strong);background:var(--surface);
+  color:var(--text);padding:6px 13px;border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;
+  transition:border-color .14s,background .14s,color .14s,box-shadow .14s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn--primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn--primary:hover{background:var(--primary-strong);border-color:var(--primary-strong);color:#fff}
+.btn--ghost{border-color:transparent;background:transparent;color:var(--muted);padding:6px 9px}
+.btn--ghost:hover{background:var(--surface-2);color:var(--text)}
+.btn--danger{color:var(--danger);border-color:var(--border-strong)}
+.btn--danger:hover{border-color:var(--danger);background:var(--danger-weak)}
+.btn--sm{padding:4px 10px;font-size:12.5px}
+.btn--gen{background:var(--primary-weak);border-color:transparent;color:var(--primary-strong)}
+.btn--gen:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow-1)}
+.card__head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card__title{font-weight:700;font-size:14.5px}
+.card__body{padding:16px}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:18px;overflow-x:auto}
+.tab{
+  border:0;background:transparent;color:var(--muted);font-size:13.5px;font-weight:600;
+  padding:10px 15px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;
+}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--primary);border-bottom-color:var(--primary)}
+.tabpanel{display:none}
+.tabpanel.is-active{display:block}
+
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;line-height:1.7;white-space:nowrap}
+.tag--ok{background:var(--success-weak);color:var(--success)}
+.tag--warn{background:var(--warning-weak);color:var(--warning)}
+.tag--bad{background:var(--danger-weak);color:var(--danger)}
+.tag--info{background:var(--primary-weak);color:var(--primary-strong)}
+.tag--mute{background:var(--surface-3);color:var(--muted)}
+
+.field{display:flex;flex-direction:column;gap:5px}
+.field__label{font-size:12.5px;font-weight:700;color:var(--text-2)}
+.field__hint{font-size:11.5px;color:var(--muted)}
+.input,.select{
+  width:100%;padding:7px 11px;border:1px solid var(--border-strong);border-radius:var(--r-sm);
+  background:var(--surface);color:var(--text);font-size:13.5px;
+}
+.input:focus,.select:focus{outline:0;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+.req{color:var(--danger)}
+
+.tablewrap{overflow-x:auto;border-radius:var(--r)}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+.tbl thead th{
+  text-align:left;font-size:11.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);
+  background:var(--surface-2);padding:10px 12px;border-bottom:1px solid var(--border);white-space:nowrap;
+}
+.tbl tbody td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:var(--surface-2)}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,"Cascadia Mono","SF Mono",Consolas,monospace;font-size:12.5px;letter-spacing:-.2px}
+.rowsub{font-size:11.5px;color:var(--muted)}
+.cellactions{display:flex;gap:4px;justify-content:flex-end}
+
+.filterbar{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px}
+.filterbar .field{min-width:150px}
+
+.note{display:flex;gap:10px;padding:11px 13px;border-radius:var(--r-sm);font-size:12.5px;line-height:1.55;border:1px solid transparent}
+.note--info{background:var(--primary-weak);color:var(--primary-strong);border-color:transparent}
+.note--warn{background:var(--warning-weak);color:var(--warning)}
+.note--bad{background:var(--danger-weak);color:var(--danger)}
+.note b{font-weight:800}
+
+.switchrow{display:flex;align-items:flex-start;gap:11px;padding:11px 0}
+.switchrow + .switchrow{border-top:1px solid var(--border)}
+.switchrow__txt{flex:1;min-width:0}
+.switchrow__txt b{display:block;font-size:13.5px}
+.switchrow__txt span{font-size:12px;color:var(--muted)}
+.swt{position:relative;width:40px;height:22px;flex:0 0 40px;border:0;border-radius:999px;background:var(--border-strong);cursor:pointer;transition:background .16s}
+.swt::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .16s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.swt[aria-checked="true"]{background:var(--primary)}
+.swt[aria-checked="true"]::after{transform:translateX(18px)}
+
+.chk{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+
+/* ---------- Kho tài liệu: lưới môn + card sách ---------- */
+.grid-sub{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.subj{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;
+  text-align:left;display:flex;gap:13px;align-items:center;transition:border-color .15s,transform .15s,box-shadow .15s;
+}
+.subj:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:var(--shadow-1)}
+.subj__ico{width:42px;height:42px;flex:0 0 42px;border-radius:11px;background:var(--primary-weak);color:var(--primary);display:grid;place-items:center;font-size:20px}
+.subj__name{font-weight:750;font-size:14.5px}
+.subj__meta{font-size:12px;color:var(--muted)}
+
+.shelf{margin-bottom:22px}
+.shelf__head{display:flex;align-items:center;gap:9px;margin:0 0 11px}
+.shelf__head h3{margin:0;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.shelf__rule{flex:1;height:1px;background:var(--border)}
+.grid-book{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.book{background:transparent;border:0;padding:0;cursor:pointer;text-align:left;display:block}
+.book__cover{
+  aspect-ratio:3/4;border-radius:10px;position:relative;overflow:hidden;
+  background:linear-gradient(150deg,#4F46E5,#7C3AED 60%,#A855F7);
+  box-shadow:var(--shadow-1);transition:transform .18s,box-shadow .18s;
+  display:grid;place-items:center;
+}
+.book:hover .book__cover{transform:translateY(-4px);box-shadow:var(--shadow-2)}
+.book__cover span{color:rgba(255,255,255,.94);font-weight:800;font-size:16px;text-align:center;padding:0 14px;line-height:1.3;text-wrap:balance}
+.book__cover::after{content:"";position:absolute;left:0;top:0;bottom:0;width:9px;background:rgba(0,0,0,.18)}
+.book__pill{
+  position:absolute;right:8px;top:8px;background:rgba(255,255,255,.94);color:#4338CA;
+  font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;
+}
+.book__name{margin-top:9px;font-weight:750;font-size:13.5px;line-height:1.35}
+.book__meta{font-size:11.5px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px}
+
+/* ---------- Kho tài liệu: màn "sách" (folder detail) ---------- */
+.hero{
+  position:relative;border-radius:var(--r-lg);overflow:hidden;margin-bottom:16px;
+  border:1px solid var(--border);background:var(--surface);
+}
+.hero__bg{
+  position:absolute;inset:0;
+  background:linear-gradient(135deg,#4F46E5,#7C3AED 55%,#0EA5E9);
+  filter:blur(26px);transform:scale(1.25);opacity:.30;
+}
+.hero__inner{position:relative;display:flex;align-items:center;gap:14px;padding:18px 18px}
+.hero__home{
+  width:38px;height:38px;flex:0 0 38px;border-radius:11px;border:0;cursor:pointer;
+  background:var(--primary);color:#fff;font-size:17px;display:grid;place-items:center;box-shadow:var(--shadow-1);
+}
+.hero__home:hover{background:var(--primary-strong)}
+.hero__txt{min-width:0;flex:1}
+.hero__crumb{font-size:11.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--primary-strong)}
+.hero__title{margin:1px 0 0;font-size:22px;font-weight:800;letter-spacing:-.4px;text-wrap:balance}
+.hero__sub{font-size:12.5px;color:var(--muted)}
+
+/* mục lục Unit: lưới thẻ tự xuống dòng — thấy hết Unit kèm TÊN, không phải cuộn */
+.units{display:grid;grid-template-columns:repeat(auto-fill,minmax(218px,1fr));gap:10px;margin-bottom:16px}
+.unitcard{
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
+  border-radius:var(--r);padding:10px 12px;cursor:pointer;text-align:left;
+  display:flex;gap:11px;align-items:center;transition:border-color .14s,transform .14s,box-shadow .14s,background .14s;
+}
+.unitcard:hover{border-color:var(--primary);transform:translateY(-1px);box-shadow:var(--shadow-1)}
+.unitcard[aria-selected="true"]{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:var(--shadow-1)}
+.unitcard__no{
+  width:36px;height:36px;flex:0 0 36px;border-radius:10px;display:grid;place-items:center;
+  background:var(--primary-weak);color:var(--primary-strong);font-weight:800;font-size:15px;line-height:1;
+}
+.unitcard--review .unitcard__no{background:var(--warning-weak);color:var(--warning);font-size:13px}
+.unitcard--none .unitcard__no{background:var(--surface-3);color:var(--muted);font-size:15px}
+.unitcard[aria-selected="true"] .unitcard__no{background:rgba(255,255,255,.22);color:#fff}
+.unitcard__txt{display:block;min-width:0;flex:1}
+.unitcard__lab{display:block;font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;opacity:.7}
+.unitcard__name{display:block;font-size:13.5px;font-weight:750;line-height:1.28;overflow-wrap:anywhere}
+.unitcard__meta{display:block;font-size:11.5px;opacity:.72;margin-top:1px}
+.unitcard[aria-selected="true"] .unitcard__meta{opacity:.85}
+
+/* radio dạng thẻ — dùng ở cửa sổ sinh đề */
+.opt{
+  display:flex;gap:11px;align-items:flex-start;border:1px solid var(--border-strong);border-radius:10px;
+  padding:11px 13px;cursor:pointer;transition:border-color .14s,background .14s;
+}
+.opt:hover{border-color:var(--primary)}
+.opt.is-on{border-color:var(--primary);background:var(--primary-weak)}
+.opt input{margin:3px 0 0;accent-color:var(--primary);flex:0 0 auto}
+.opt b{display:block;font-size:13.5px;font-weight:750}
+.opt span{font-size:12px;color:var(--muted);line-height:1.5}
+.opt.is-on span{color:var(--primary-strong)}
+.opt__tip{font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--success-weak);color:var(--success);margin-left:6px}
+
+.lessons{display:flex;flex-direction:column;gap:0}
+.lesson{
+  display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid var(--border);
+  transition:background .14s;
+}
+.lesson:last-child{border-bottom:0}
+.lesson:hover{background:var(--surface-2)}
+.lesson__ico{
+  width:40px;height:40px;flex:0 0 40px;border-radius:10px;display:grid;place-items:center;font-size:18px;
+  background:var(--surface-3);color:var(--muted);
+}
+.lesson__ico--pdf{background:var(--danger-weak);color:var(--danger)}
+.lesson__ico--doc{background:var(--primary-weak);color:var(--primary)}
+.lesson__ico--link{background:var(--success-weak);color:var(--success)}
+.lesson__txt{flex:1;min-width:0}
+.lesson__name{font-weight:750;font-size:14.5px;letter-spacing:-.1px}
+.lesson__meta{font-size:12px;color:var(--muted);display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.lesson__act{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:13px}
+.empty__ico{font-size:30px;opacity:.5;display:block;margin-bottom:6px}
+
+/* ---------- Modal ---------- */
+.mask{
+  position:fixed;inset:0;background:rgba(15,16,28,.5);backdrop-filter:blur(2px);
+  display:none;align-items:flex-start;justify-content:center;padding:34px 16px;overflow-y:auto;z-index:60;
+}
+.mask.is-open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-2);width:100%;max-width:560px;animation:pop .18s ease;
+}
+.modal--wide{max-width:820px}
+@keyframes pop{from{opacity:0;transform:translateY(-10px) scale(.985)}to{opacity:1;transform:none}}
+.modal__head{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.modal__head h2{margin:0;font-size:16px;font-weight:750;flex:1}
+.modal__x{border:0;background:transparent;color:var(--muted);font-size:19px;cursor:pointer;line-height:1;padding:4px 6px;border-radius:6px}
+.modal__x:hover{background:var(--surface-2);color:var(--text)}
+.modal__body{padding:18px;display:flex;flex-direction:column;gap:14px}
+.modal__foot{padding:13px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+
+/* segmented + dropzone (form tài liệu) */
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:3px;gap:3px}
+.seg__b{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:650;padding:6px 14px;border-radius:7px;cursor:pointer}
+.seg__b[aria-selected="true"]{background:var(--surface);color:var(--primary);box-shadow:var(--shadow-1)}
+.drop{
+  border:1.5px dashed var(--border-strong);border-radius:var(--r);padding:26px 16px;text-align:center;
+  background:var(--surface-2);cursor:pointer;transition:border-color .15s,background .15s;
+}
+.drop:hover{border-color:var(--primary);background:var(--primary-weak)}
+.drop__ico{font-size:26px;display:block;margin-bottom:4px}
+.drop__t{font-weight:700;font-size:13.5px}
+.drop__s{font-size:12px;color:var(--muted)}
+.hidden{display:none !important}
+
+/* tiến trình sinh đề */
+.steps{display:flex;flex-direction:column;gap:9px}
+.step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.step__dot{width:20px;height:20px;flex:0 0 20px;border-radius:50%;border:2px solid var(--border-strong);display:grid;place-items:center;font-size:11px;font-weight:800}
+.step.is-done{color:var(--text)}
+.step.is-done .step__dot{background:var(--success);border-color:var(--success);color:#fff}
+.step.is-run{color:var(--primary-strong);font-weight:700}
+.step.is-run .step__dot{border-color:var(--primary);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bar{height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden}
+.bar__f{height:100%;width:0;background:var(--primary);border-radius:999px;transition:width .5s ease}
+
+/* thanh chọn nổi */
+.bulkbar{
+  position:sticky;bottom:14px;margin-top:14px;display:none;align-items:center;gap:12px;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--primary);border-radius:var(--r);
+  padding:11px 15px;box-shadow:var(--shadow-2);z-index:15;
+}
+.bulkbar.is-on{display:flex}
+.bulkbar__n{font-weight:750;font-size:13.5px}
+
+/* toast */
+.toasts{position:fixed;top:16px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:90;pointer-events:none}
+.toast{
+  background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--primary);
+  border-radius:10px;padding:10px 15px;box-shadow:var(--shadow-2);font-size:13px;font-weight:600;
+  animation:drop .2s ease;max-width:min(90vw,460px);
+}
+.toast--ok{border-left-color:var(--success)}
+.toast--bad{border-left-color:var(--danger)}
+@keyframes drop{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+
+/* chú thích bản mock */
+.mockbar{
+  display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px dashed var(--border-strong);
+  border-radius:var(--r);padding:11px 14px;margin-bottom:18px;font-size:12.5px;color:var(--muted);line-height:1.55;
+}
+.mockbar b{color:var(--text);font-weight:750}
+.mockbar kbd{
+  font-family:inherit;font-size:11.5px;font-weight:700;background:var(--surface-3);color:var(--text-2);
+  padding:1px 6px;border-radius:5px;border:1px solid var(--border);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width:960px){
+  .sider{
+    position:fixed;z-index:70;left:0;top:0;transform:translateX(-100%);transition:transform .2s ease;
+    box-shadow:var(--shadow-2);
+  }
+  body.drawer-open .sider{transform:none}
+  .scrim{position:fixed;inset:0;background:rgba(15,16,28,.45);z-index:65;display:none}
+  body.drawer-open .scrim{display:block}
+  .topbar__burger{display:inline-flex}
+  .content{padding:16px 14px 40px}
+}
+@media (max-width:640px){
+  .page-head h1{font-size:19px}
+  .hero__title{font-size:19px}
+  .hero__inner{padding:15px 14px}
+  .lesson{flex-wrap:wrap}
+  .lesson__act{width:100%;justify-content:flex-start}
+  .filterbar .field{min-width:100%}
+  .modal__foot{justify-content:stretch}
+  .modal__foot .btn{flex:1;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+
+<div class="scrim" data-close-drawer></div>
+
+<div class="app">
+  <!-- ================= SIDER ================= -->
+  <aside class="sider">
+    <div class="brand">
+      <div class="brand__mark">HS</div>
+      <div>
+        <div class="brand__name">HungSilver</div>
+        <div class="brand__sub">Trung tâm Anh ngữ</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav__label">Vận hành</div>
+      <button class="nav__item" data-screen="classes"><span class="nav__ico">🏫</span> Lớp học</button>
+      <button class="nav__item" data-screen="students"><span class="nav__ico">🎒</span> Học viên</button>
+      <button class="nav__item" data-screen="teachers"><span class="nav__ico">👩‍🏫</span> Giáo viên</button>
+
+      <div class="nav__label">Học liệu</div>
+      <button class="nav__item" data-screen="materials" aria-current="page"><span class="nav__ico">📚</span> Kho tài liệu</button>
+      <button class="nav__item" data-screen="exams"><span class="nav__ico">📝</span> Đề &amp; Bài tập <span class="nav__new">MỚI</span></button>
+
+      <div class="nav__label">Quản trị</div>
+      <button class="nav__item" data-screen="settings"><span class="nav__ico">⚙️</span> Cấu hình hệ thống</button>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn--ghost topbar__burger" data-open-drawer aria-label="Mở menu">☰</button>
+      <div class="topbar__title" id="topTitle">Kho tài liệu</div>
+      <div class="topbar__spacer"></div>
+      <button class="btn btn--ghost" id="themeBtn" title="Đổi giao diện sáng/tối">🌗</button>
+      <div class="topbar__user"><div class="avatar">A</div><span>Admin</span></div>
+    </header>
+
+    <div class="content">
+
+      <div class="mockbar">
+        <span style="font-size:16px;line-height:1.2">🧪</span>
+        <div>
+          <b>Bản dựng tương tác — chưa động vào code.</b>
+          Bấm thử: mở bộ tài liệu → mục lục Unit có đủ tên → <kbd>⚡ Sinh đề</kbd> (chọn được
+          <b>file chỉ có câu hỏi</b> để AI khỏi bắt nhầm phần lý thuyết) → xong bấm <kbd>Giao cho lớp</kbd> ·
+          bấm badge <kbd>3 đề</kbd> để xem và giao từng đề · <kbd>Cấu hình ▸ Kho tài liệu</kbd> đổi cách nạp file
+          rồi quay lại <kbd>Thêm tài liệu</kbd> · <kbd>Học viên</kbd> tick vài em rồi cấp tài khoản hàng loạt.
+        </div>
+      </div>
+
+      <!-- ============ MÀN: KHO TÀI LIỆU ============ -->
+      <section class="screen is-active" id="s-materials">
+
+        <!-- 1a. mức Môn / Bộ -->
+        <div id="matBrowse">
+          <div class="page-head">
+            <div class="page-head__left">
+              <div class="page-head__badge">📚</div>
+              <div>
+                <h1>Kho tài liệu</h1>
+                <p>Môn học → Bộ tài liệu → Unit → Tài liệu</p>
+              </div>
+            </div>
+            <div class="page-head__actions">
+              <button class="btn" onclick="toast('Bản mock — chức năng tạo bộ giữ nguyên như hiện tại.')">＋ Bộ tài liệu</button>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true" data-tab="mat-subject">Tài liệu môn học</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="mat-general">Tài liệu chung</button>
+          </div>
+
+          <div class="tabpanel is-active" id="tp-mat-subject">
+            <div id="matLevel1">
+              <div class="grid-sub">
+                <button class="subj" onclick="openSubject()">
+                  <div class="subj__ico">🇬🇧</div>
+                  <div><div class="subj__name">Tiếng Anh</div><div class="subj__meta">3 bộ · 41 tài liệu · 12 đề</div></div>
+                </button>
+                <button class="subj" onclick="toast('Môn Toán chưa có bộ tài liệu nào.')">
+                  <div class="subj__ico">📐</div>
+                  <div><div class="subj__name">Toán</div><div class="subj__meta">0 bộ · 0 tài liệu</div></div>
+                </button>
+                <button class="subj" onclick="toast('Môn Ngữ văn chưa có bộ tài liệu nào.')">
+                  <div class="subj__ico">✒️</div>
+                  <div><div class="subj__name">Ngữ văn</div><div class="subj__meta">0 bộ · 0 tài liệu</div></div>
+                </button>
+              </div>
+            </div>
+
+            <div id="matLevel2" class="hidden">
+              <div class="page-head" style="margin-bottom:14px">
+                <div class="page-head__left">
+                  <button class="btn btn--sm" onclick="backToSubjects()">← Môn học</button>
+                  <div><h1 style="font-size:18px">Tiếng Anh</h1><p>3 bộ tài liệu</p></div>
+                </div>
+              </div>
+
+              <div class="shelf">
+                <div class="shelf__head"><h3>Khối 9</h3><div class="shelf__rule"></div></div>
+                <div class="grid-book">
+                  <button class="book" onclick="openFolder()">
+                    <div class="book__cover"><span>Tiếng Anh 9</span><div class="book__pill">7 đề</div></div>
+                    <div class="book__name">Tiếng Anh 9</div>
+                    <div class="book__meta">18 tài liệu · 6 Unit</div>
+                  </button>
+                  <button class="book" onclick="toast('Bản mock chỉ dựng chi tiết bộ “Tiếng Anh 9”.')">
+                    <div class="book__cover" style="background:linear-gradient(150deg,#0EA5E9,#4F46E5)"><span>Ôn thi vào 10</span><div class="book__pill">5 đề</div></div>
+                    <div class="book__name">Ôn thi vào 10</div>
+                    <div class="book__meta">14 tài liệu · 4 Unit</div>
+                  </button>
+                </div>
+              </div>
+
+              <div class="shelf">
+                <div class="shelf__head"><h3>Khối 8</h3><div class="shelf__rule"></div></div>
+                <div class="grid-book">
+                  <button class="book" onclick="toast('Bản mock chỉ dựng chi tiết bộ “Tiếng Anh 9”.')">
+                    <div class="book__cover" style="background:linear-gradient(150deg,#7C3AED,#DB2777)"><span>Tiếng Anh 8</span></div>
+                    <div class="book__name">Tiếng Anh 8</div>
+                    <div class="book__meta">9 tài liệu · 3 Unit</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tabpanel" id="tp-mat-general">
+            <div class="filterbar">
+              <div class="field"><span class="field__label">Tìm kiếm</span><input class="input" placeholder="Mã hoặc tên tài liệu"></div>
+              <div class="field"><span class="field__label">Môn</span><select class="select"><option>Tất cả</option><option>Tiếng Anh</option></select></div>
+              <div class="field"><span class="field__label">Khối</span><select class="select"><option>Tất cả</option><option>Khối 9</option></select></div>
+              <button class="btn btn--primary">Tìm kiếm</button>
+              <button class="btn">Đặt lại</button>
+            </div>
+            <div class="card">
+              <div class="lessons">
+                <div class="lesson">
+                  <div class="lesson__ico lesson__ico--pdf">📕</div>
+                  <div class="lesson__txt">
+                    <div class="lesson__name">Nội quy trung tâm 2026</div>
+                    <div class="lesson__meta"><span>TL0031</span>·<span>PDF · 1.2 MB</span>·<span>10/08/2026</span></div>
+                  </div>
+                  <div class="lesson__act">
+                    <span class="tag tag--mute">Chưa có đề</span>
+                    <button class="btn btn--sm" onclick="toast('Mở trình xem tài liệu.')">Xem</button>
+                    <button class="btn btn--sm btn--gen" onclick="openGen('Nội quy trung tâm 2026')">⚡ Sinh đề</button>
+                  </div>
+                </div>
+                <div class="lesson">
+                  <div class="lesson__ico lesson__ico--link">🔗</div>
+                  <div class="lesson__txt">
+                    <div class="lesson__name">Kho nghe BBC Learning English</div>
+                    <div class="lesson__meta"><span>TL0032</span>·<span>Đường dẫn ngoài</span>·<span>02/08/2026</span></div>
+                  </div>
+                  <div class="lesson__act">
+                    <span class="tag tag--mute">Chưa có đề</span>
+                    <button class="btn btn--sm" onclick="toast('Mở tab mới tới đường dẫn ngoài.')">Mở liên kết</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="field__hint" style="margin-top:10px">Tab “Danh mục” và “Quản lí câu hỏi” đã được gỡ khỏi Kho tài liệu — ngân hàng câu hỏi chuyển sang <b>Đề &amp; Bài tập</b>.</p>
+          </div>
+        </div>
+
+        <!-- 1b. màn "sách" (chi tiết bộ) -->
+        <div id="matFolder" class="hidden">
+          <div class="hero">
+            <div class="hero__bg"></div>
+            <div class="hero__inner">
+              <button class="hero__home" onclick="closeFolder()" aria-label="Về danh sách bộ tài liệu">⌂</button>
+              <div class="hero__txt">
+                <div class="hero__crumb">Tiếng Anh · Khối 9</div>
+                <h1 class="hero__title">Tiếng Anh 9</h1>
+                <div class="hero__sub">18 tài liệu · 6 Unit · 7 đề đã sinh</div>
+              </div>
+              <button class="btn" onclick="openMaterialForm()">＋ Thêm tài liệu</button>
+            </div>
+          </div>
+
+          <div class="shelf__head" style="margin-bottom:10px">
+            <h3>Mục lục</h3>
+            <div class="shelf__rule"></div>
+            <button class="btn btn--sm" onclick="toast('Thêm Unit · Đổi tên · Sắp xếp · Xóa.')">Quản lý Unit</button>
+          </div>
+          <div class="units" id="unitChips" role="tablist"></div>
+
+          <div class="card">
+            <div class="card__head">
+              <div class="card__title" id="unitTitle">Unit 5: Our experiences</div>
+              <button class="btn btn--sm" onclick="openMaterialForm()">＋ Thêm tài liệu vào Unit</button>
+            </div>
+            <div class="lessons" id="lessonList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MÀN: ĐỀ & BÀI TẬP ============ -->
+      <section class="screen" id="s-exams">
+        <div class="page-head">
+          <div class="page-head__left">
+            <div class="page-head__badge">📝</div>
+            <div><h1>Đề &amp; Bài tập</h1><p>Toàn bộ đề của trung tâm — sinh, duyệt, giao, chấm</p></div>
+          </div>
+          <div class="page-head__actions">
+            <button class="btn btn--primary" onclick="openGen('Chọn tài liệu nguồn')">＋ Tạo đề mới</button>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-tab="ex-bank">Bộ đề</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="ex-assign">Đã giao cho lớp</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="ex-qbank">Ngân hàng câu hỏi</button>
+        </div>
+
+        <div class="tabpanel is-active" id="tp-ex-bank">
+          <div class="filterbar">
+            <div class="field" style="min-width:auto">
+              <span class="field__label">Trạng thái</span>
+              <div class="seg" id="examStatusSeg">
+                <button class="seg__b" aria-selected="true" data-st="all">Tất cả</button>
+                <button class="seg__b" aria-selected="false" data-st="draft">Nháp</button>
+                <button class="seg__b" aria-selected="false" data-st="pub">Đã phát hành</button>
+                <button class="seg__b" aria-selected="false" data-st="assigned">Đang giao</button>
+              </div>
+            </div>
+            <div class="field"><span class="field__label">Môn</span><select class="select"><option>Tất cả môn</option><option selected>Tiếng Anh</option></select></div>
+            <div class="field"><span class="field__label">Tài liệu nguồn</span><select class="select"><option>Tất cả tài liệu</option><option>TL0007 — VOCABULARY</option></select></div>
+            <div class="field"><span class="field__label">Tìm kiếm</span><input class="input" placeholder="Tên đề"></div>
+            <button class="btn btn--primary">Tìm kiếm</button>
+          </div>
+
+          <div class="card">
+            <div class="tablewrap">
+              <table class="tbl">
+                <thead><tr>
+                  <th>Tên đề</th><th>Nguồn</th><th class="num">Câu</th><th class="num">Thời gian</th>
+                  <th>Trạng thái</th><th>Đã giao</th><th>Người tạo</th><th></th>
+                </tr></thead>
+                <tbody id="examRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabpanel" id="tp-ex-assign">
+          <div class="filterbar">
+            <div class="field"><span class="field__label">Lớp</span><select class="select"><option>Tất cả lớp</option><option>9A1</option><option>9A2</option></select></div>
+            <div class="field"><span class="field__label">Trạng thái</span><select class="select"><option>Tất cả</option><option>Đang mở</option><option>Đã đóng</option></select></div>
+            <button class="btn btn--primary">Tìm kiếm</button>
+          </div>
+          <div class="card">
+            <div class="tablewrap">
+              <table class="tbl">
+                <thead><tr><th>Đề</th><th>Lớp</th><th>Hình thức</th><th>Mở / Hạn nộp</th><th>Đã nộp</th><th class="num">Điểm TB</th><th>Trạng thái</th><th></th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><b>Unit 5 — Vocabulary check</b></td>
+                    <td>9A1</td><td>Về nhà</td>
+                    <td class="num rowsub">12/08 08:00 → 14/08 22:00</td>
+                    <td><b class="num">18</b><span class="rowsub">/30</span></td>
+                    <td class="num">7.4</td>
+                    <td><span class="tag tag--ok">Đang mở</span></td>
+                    <td class="cellactions">
+                      <button class="btn btn--sm" onclick="toast('Mở báo cáo kết quả lớp 9A1.')">Báo cáo</button>
+                      <button class="btn btn--sm btn--danger" onclick="toast('Đã đóng lượt giao.','ok')">Đóng</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>Unit 5 — Vocabulary check</b></td>
+                    <td>9A2</td><td>Trên lớp · 20 phút</td>
+                    <td class="num rowsub">11/08 18:00</td>
+                    <td><b class="num">28</b><span class="rowsub">/28</span></td>
+                    <td class="num">8.1</td>
+                    <td><span class="tag tag--mute">Đã đóng</span></td>
+                    <td class="cellactions"><button class="btn btn--sm" onclick="toast('Mở báo cáo kết quả lớp 9A2.')">Báo cáo</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>Kiểm tra giữa kỳ I</b></td>
+                    <td>8B</td><td>Trên lớp · 45 phút</td>
+                    <td class="num rowsub">18/08 07:30</td>
+                    <td><b class="num">0</b><span class="rowsub">/26</span></td>
+                    <td class="num rowsub">—</td>
+                    <td><span class="tag tag--info">Sắp mở</span></td>
+                    <td class="cellactions"><button class="btn btn--sm" disabled>Báo cáo</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabpanel" id="tp-ex-qbank">
+          <div class="note note--info" style="margin-bottom:14px">
+            <span>💡</span><div>Ngân hàng câu hỏi đã chuyển từ <b>Kho tài liệu</b> về đây. Lọc câu, tick chọn rồi bấm <b>Tạo đề từ câu đã chọn</b>.</div>
+          </div>
+          <div class="filterbar">
+            <div class="field"><span class="field__label">Môn</span><select class="select"><option selected>Tiếng Anh</option></select></div>
+            <div class="field"><span class="field__label">Loại câu</span><select class="select"><option>Tất cả</option><option>Trắc nghiệm</option><option>Điền từ</option><option>Nối</option></select></div>
+            <div class="field"><span class="field__label">Tìm kiếm</span><input class="input" placeholder="Nội dung câu hỏi"></div>
+            <button class="btn btn--primary">Tìm kiếm</button>
+          </div>
+          <div class="card">
+            <div class="tablewrap">
+              <table class="tbl">
+                <thead><tr><th style="width:38px"><input class="chk" type="checkbox" id="qAll"></th><th>Câu hỏi</th><th>Loại</th><th>Đề nguồn</th><th></th></tr></thead>
+                <tbody id="qRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="bulkbar" id="qBulk">
+            <span class="bulkbar__n"><span id="qCount">0</span> câu đã chọn</span>
+            <span class="rowsub">Giữ nguyên lựa chọn khi sang trang khác</span>
+            <div style="flex:1"></div>
+            <button class="btn" onclick="clearQ()">Bỏ chọn</button>
+            <button class="btn btn--primary" onclick="toast('Đã tạo đề Nháp từ các câu đã chọn.','ok')">Tạo đề từ câu đã chọn</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MÀN: HỌC VIÊN ============ -->
+      <section class="screen" id="s-students">
+        <div class="page-head">
+          <div class="page-head__left">
+            <div class="page-head__badge">🎒</div>
+            <div><h1>Học viên</h1><p>Hồ sơ và tài khoản đăng nhập</p></div>
+          </div>
+          <div class="page-head__actions"><button class="btn btn--primary" onclick="toast('Mở form thêm học viên.')">＋ Thêm học viên</button></div>
+        </div>
+
+        <div class="note note--warn" style="margin-bottom:14px">
+          <span>⚠️</span><div><b>12/30 học viên lớp 9A1 chưa có tài khoản đăng nhập.</b> Tick chọn ở bảng dưới rồi bấm “Cấp tài khoản”, hoặc dùng nút chọn nhanh.</div>
+        </div>
+
+        <div class="filterbar">
+          <div class="field"><span class="field__label">Cơ sở</span><select class="select"><option>Tất cả</option><option>Đông Thọ</option></select></div>
+          <div class="field"><span class="field__label">Khối</span><select class="select"><option>Tất cả</option><option>Khối 9</option></select></div>
+          <div class="field"><span class="field__label">Lớp <span class="tag tag--info" style="font-size:9.5px">mới</span></span><select class="select"><option selected>9A1</option><option>9A2</option><option>Tất cả lớp</option></select></div>
+          <div class="field"><span class="field__label">Tìm kiếm</span><input class="input" placeholder="Mã, tên, SĐT"></div>
+          <button class="btn btn--primary">Tìm kiếm</button>
+        </div>
+
+        <div class="card">
+          <div class="card__head">
+            <div class="card__title">Lớp 9A1 · 30 học viên</div>
+            <button class="btn btn--sm" onclick="selectAllNoAccount()">Chọn 12 em chưa có tài khoản</button>
+          </div>
+          <div class="tablewrap">
+            <table class="tbl">
+              <thead><tr>
+                <th style="width:38px"><input class="chk" type="checkbox" id="stAll"></th>
+                <th>Mã HV</th><th>Họ tên</th><th>SĐT phụ huynh</th><th>Tài khoản</th><th></th>
+              </tr></thead>
+              <tbody id="stRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bulkbar" id="stBulk">
+          <span class="bulkbar__n"><span id="stCount">0</span> học viên đã chọn</span>
+          <span class="rowsub">Mật khẩu mặc định · buộc đổi ở lần đăng nhập đầu</span>
+          <div style="flex:1"></div>
+          <button class="btn" onclick="clearSt()">Bỏ chọn</button>
+          <button class="btn btn--primary" onclick="openHandover()">Cấp tài khoản</button>
+        </div>
+      </section>
+
+      <!-- ============ MÀN: GIÁO VIÊN ============ -->
+      <section class="screen" id="s-teachers">
+        <div class="page-head">
+          <div class="page-head__left">
+            <div class="page-head__badge">👩‍🏫</div>
+            <div><h1>Giáo viên</h1><p>Hồ sơ và tài khoản đăng nhập</p></div>
+          </div>
+          <div class="page-head__actions">
+            <button class="btn btn--primary" onclick="toast('Mở form thêm giáo viên (1 nút duy nhất — đã gỡ nút “Tạo tài khoản GV” trùng lặp).')">＋ Thêm giáo viên</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="tablewrap">
+            <table class="tbl">
+              <thead><tr><th>Mã GV</th><th>Giáo viên</th><th>Cơ sở</th><th>Tài khoản</th><th class="num">Lớp</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="mono">DongTho@HungLV0</td>
+                  <td><b>Lê Văn Hùng</b><div class="rowsub">0912 345 678</div></td>
+                  <td>Đông Thọ</td>
+                  <td><span class="tag tag--ok">✅ DongTho@HungLV0</span></td>
+                  <td class="num">4</td>
+                  <td class="cellactions"><button class="btn btn--sm" onclick="toast('Mở quản lý tài khoản: đặt lại mật khẩu · khóa · gỡ liên kết.')">Tài khoản</button></td>
+                </tr>
+                <tr>
+                  <td class="mono">DongTho@TrangNTT0</td>
+                  <td><b>Nguyễn Thị Thu Trang</b><div class="rowsub">0987 111 222</div></td>
+                  <td>Đông Thọ</td>
+                  <td>
+                    <span class="tag tag--warn">⚠ Chưa có tài khoản</span>
+                    <button class="btn btn--sm btn--primary" style="margin-left:6px" onclick="openHandover(1)">Cấp ngay</button>
+                  </td>
+                  <td class="num">2</td>
+                  <td class="cellactions"><button class="btn btn--sm" onclick="toast('Mở form sửa hồ sơ giáo viên.')">Sửa</button></td>
+                </tr>
+                <tr>
+                  <td class="mono">LamSon@MaiPT1</td>
+                  <td><b>Phạm Thị Mai</b><div class="rowsub">0933 444 555</div></td>
+                  <td>Lam Sơn</td>
+                  <td>
+                    <span class="tag tag--ok">✅ LamSon@MaiPT1</span>
+                    <span class="tag tag--warn">⚠ Chưa đổi MK</span>
+                  </td>
+                  <td class="num">3</td>
+                  <td class="cellactions"><button class="btn btn--sm" onclick="toast('Mở quản lý tài khoản.')">Tài khoản</button></td>
+                </tr>
+                <tr>
+                  <td class="mono">LamSon@SonNT0</td>
+                  <td><b>Nguyễn Thanh Sơn</b><div class="rowsub">0966 777 888</div></td>
+                  <td>Lam Sơn</td>
+                  <td><span class="tag tag--bad">🔒 Đã khóa đăng nhập</span></td>
+                  <td class="num">0</td>
+                  <td class="cellactions"><button class="btn btn--sm" onclick="toast('Đã mở khóa đăng nhập.','ok')">Mở khóa</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MÀN: LỚP HỌC (rút gọn) ============ -->
+      <section class="screen" id="s-classes">
+        <div class="page-head">
+          <div class="page-head__left">
+            <div class="page-head__badge">🏫</div>
+            <div><h1>Lớp học</h1><p>Danh sách lớp — bản mock chỉ dựng phần liên quan tài khoản</p></div>
+          </div>
+        </div>
+        <div class="note note--info" style="margin-bottom:14px">
+          <span>ℹ️</span><div>Vùng <b>Danh mục</b> (Môn học · Khối · Cơ sở) đã chuyển sang <b>Cấu hình hệ thống ▸ Danh mục</b> để không còn cảnh “Cơ sở tạo ở trang Lớp học, tiền tố mã GV lại sửa ở trang Cấu hình”.</div>
+        </div>
+        <div class="card">
+          <div class="card__head"><div class="card__title">Chi tiết lớp 9A1 ▸ tab Học viên</div></div>
+          <div class="card__body" style="display:flex;flex-direction:column;gap:12px">
+            <div class="note note--warn">
+              <span>⚠️</span>
+              <div style="flex:1"><b>12/30 học viên chưa có tài khoản đăng nhập.</b><br><span style="font-size:12px">Cấp một lượt và nhận ngay bảng bàn giao có tên đăng nhập + mật khẩu.</span></div>
+              <button class="btn btn--primary btn--sm" onclick="openHandover()">Cấp tài khoản cho 12 học viên</button>
+            </div>
+            <p class="field__hint" style="margin:0">Cùng một bảng bàn giao được dùng ở cả trang Học viên lẫn màn này.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ MÀN: CẤU HÌNH ============ -->
+      <section class="screen" id="s-settings">
+        <div class="page-head">
+          <div class="page-head__left">
+            <div class="page-head__badge">⚙️</div>
+            <div><h1>Cấu hình hệ thống</h1><p>Gom theo nhóm chức năng — mỗi tab lưu riêng phần của mình</p></div>
+          </div>
+        </div>
+
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" aria-selected="true" data-tab="cf-account">Tài khoản</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="cf-mat">Kho tài liệu</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="cf-cat">Danh mục</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="cf-sch">Lịch &amp; Ca học</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="cf-fee">Học phí &amp; Điểm</button>
+        </div>
+
+        <!-- Tài khoản -->
+        <div class="tabpanel is-active" id="tp-cf-account">
+          <div class="card" style="max-width:660px">
+            <div class="card__head"><div class="card__title">Tài khoản &amp; bảo mật</div></div>
+            <div class="card__body" style="display:flex;flex-direction:column;gap:16px">
+              <div class="field">
+                <label class="field__label" for="defPwd">Mật khẩu mặc định khi cấp tài khoản</label>
+                <div style="display:flex;gap:8px">
+                  <input class="input mono" id="defPwd" type="password" value="Hocvien@123">
+                  <button class="btn" id="pwdEye" onclick="togglePwd()">👁 Hiện</button>
+                </div>
+                <span class="field__hint">Tối thiểu 8 ký tự, có chữ hoa, chữ thường và số. Áp cho <b>mọi</b> tài khoản mới: học viên, giáo viên và quản trị viên.</span>
+              </div>
+
+              <div>
+                <div class="switchrow">
+                  <div class="switchrow__txt">
+                    <b>Bắt buộc đổi mật khẩu ở lần đăng nhập đầu</b>
+                    <span>Chặn ngay tại máy chủ — chưa đổi thì mọi API đều trả 403, không chỉ chặn ở giao diện.</span>
+                  </div>
+                  <button class="swt" role="switch" aria-checked="true" onclick="swt(this)"></button>
+                </div>
+                <div class="switchrow">
+                  <div class="switchrow__txt">
+                    <b>Tên miền email ảo</b>
+                    <span>Đã gỡ. Tài khoản không có email thật sẽ để trống email; đăng nhập bằng mã học viên / mã giáo viên.</span>
+                  </div>
+                  <span class="tag tag--mute">Đã bỏ</span>
+                </div>
+              </div>
+
+              <div class="modal__foot" style="padding:0;border:0;margin-top:2px">
+                <button class="btn">Hoàn tác</button>
+                <button class="btn btn--primary" onclick="toast('Đã lưu cấu hình tài khoản.','ok')">Lưu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kho tài liệu -->
+        <div class="tabpanel" id="tp-cf-mat">
+          <div class="card" style="max-width:660px">
+            <div class="card__head"><div class="card__title">Cách nạp tài liệu</div></div>
+            <div class="card__body" style="display:flex;flex-direction:column;gap:14px">
+              <p class="field__hint" style="margin:0">Bật cách nào thì form thêm tài liệu hiện đúng cách đó. Bật cả hai sẽ có thanh chọn; chỉ bật một thì ẩn hẳn phần chọn cho gọn.</p>
+
+              <div>
+                <div class="switchrow">
+                  <div class="switchrow__txt">
+                    <b>Tải file lên server</b>
+                    <span>PDF, Word, ảnh… tối đa 20 MB. Cần thiết nếu muốn sinh đề bằng AI từ tài liệu.</span>
+                  </div>
+                  <button class="swt" role="switch" aria-checked="true" id="cfUpload" onclick="toggleUpload('upload')"></button>
+                </div>
+                <div class="switchrow">
+                  <div class="switchrow__txt">
+                    <b>Dán đường dẫn ngoài</b>
+                    <span>Google Drive, YouTube, trang web… hệ thống chỉ lưu liên kết.</span>
+                  </div>
+                  <button class="swt" role="switch" aria-checked="true" id="cfUrl" onclick="toggleUpload('url')"></button>
+                </div>
+              </div>
+
+              <div class="field" id="defSourceBox">
+                <span class="field__label">Cách chọn sẵn khi thêm tài liệu</span>
+                <div class="seg" id="defSourceSeg">
+                  <button class="seg__b" aria-selected="true" data-src="upload">Tải file lên</button>
+                  <button class="seg__b" aria-selected="false" data-src="url">Dán đường dẫn</button>
+                </div>
+              </div>
+
+              <div class="note note--bad hidden" id="cfUploadErr"><span>⛔</span><div>Phải bật ít nhất một cách nạp tài liệu.</div></div>
+
+              <div class="modal__foot" style="padding:0;border:0">
+                <button class="btn btn--primary" onclick="toast('Đã lưu cấu hình kho tài liệu.','ok')">Lưu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danh mục -->
+        <div class="tabpanel" id="tp-cf-cat">
+          <div class="note note--info" style="margin-bottom:14px">
+            <span>📦</span><div>Môn học · Khối · Cơ sở được chuyển từ trang <b>Lớp học</b> về đây, đứng cùng chỗ với <b>tiền tố mã giáo viên</b> của từng cơ sở.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+            <div class="card">
+              <div class="card__head"><div class="card__title">Môn học</div><button class="btn btn--sm">＋ Thêm</button></div>
+              <div class="tablewrap"><table class="tbl" style="min-width:auto">
+                <tbody>
+                  <tr><td><b>Tiếng Anh</b></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button><button class="btn btn--ghost btn--sm">🗑</button></td></tr>
+                  <tr><td><b>Toán</b></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button><button class="btn btn--ghost btn--sm">🗑</button></td></tr>
+                  <tr><td><b>Ngữ văn</b></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button><button class="btn btn--ghost btn--sm">🗑</button></td></tr>
+                </tbody>
+              </table></div>
+            </div>
+            <div class="card">
+              <div class="card__head"><div class="card__title">Khối</div><button class="btn btn--sm">＋ Thêm</button></div>
+              <div class="tablewrap"><table class="tbl" style="min-width:auto">
+                <tbody>
+                  <tr><td><b>Khối 8</b></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                  <tr><td><b>Khối 9</b></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                  <tr><td><b>Khối 10</b></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                </tbody>
+              </table></div>
+            </div>
+            <div class="card" style="grid-column:1/-1">
+              <div class="card__head"><div class="card__title">Cơ sở</div><button class="btn btn--sm">＋ Thêm</button></div>
+              <div class="tablewrap"><table class="tbl">
+                <thead><tr><th>Tên cơ sở</th><th>Địa chỉ</th><th>Tiền tố mã giáo viên</th><th></th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><b>Đông Thọ</b></td><td class="rowsub">123 Lê Lợi, TP Thanh Hóa</td>
+                    <td><input class="input mono" value="DongTho@" style="max-width:170px"></td>
+                    <td class="cellactions"><button class="btn btn--sm" onclick="toast('Đã lưu cơ sở Đông Thọ.','ok')">Lưu</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>Lam Sơn</b></td><td class="rowsub">45 Trần Phú, TP Thanh Hóa</td>
+                    <td><input class="input mono" value="LamSon@" style="max-width:170px"></td>
+                    <td class="cellactions"><button class="btn btn--sm" onclick="toast('Đã lưu cơ sở Lam Sơn.','ok')">Lưu</button></td>
+                  </tr>
+                </tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lịch -->
+        <div class="tabpanel" id="tp-cf-sch">
+          <div class="card" style="max-width:660px">
+            <div class="card__head">
+              <div class="card__title">Khung Ca học</div>
+              <select class="select" style="max-width:200px"><option>Mặc định toàn trung tâm</option><option>Riêng: Đông Thọ</option></select>
+            </div>
+            <div class="tablewrap"><table class="tbl" style="min-width:auto">
+              <thead><tr><th>Tên ca</th><th>Bắt đầu</th><th>Kết thúc</th><th></th></tr></thead>
+              <tbody>
+                <tr><td><input class="input" value="Ca 1"></td><td><input class="input num" type="time" value="07:30"></td><td><input class="input num" type="time" value="09:00"></td><td class="cellactions"><button class="btn btn--ghost btn--sm">🗑</button></td></tr>
+                <tr><td><input class="input" value="Ca 2"></td><td><input class="input num" type="time" value="09:15"></td><td><input class="input num" type="time" value="10:45"></td><td class="cellactions"><button class="btn btn--ghost btn--sm">🗑</button></td></tr>
+                <tr><td><input class="input" value="Ca chiều"></td><td><input class="input num" type="time" value="14:00"></td><td><input class="input num" type="time" value="15:30"></td><td class="cellactions"><button class="btn btn--ghost btn--sm">🗑</button></td></tr>
+              </tbody>
+            </table></div>
+            <div class="card__body modal__foot" style="border-top:1px solid var(--border)">
+              <button class="btn">＋ Thêm ca</button>
+              <button class="btn btn--primary" onclick="toast('Đã lưu khung ca học.','ok')">Lưu</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Học phí & điểm -->
+        <div class="tabpanel" id="tp-cf-fee">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+            <div class="card">
+              <div class="card__head"><div class="card__title">Học phí &amp; cảnh báo</div></div>
+              <div class="card__body" style="display:flex;flex-direction:column;gap:14px">
+                <div class="field">
+                  <span class="field__label">Báo “sắp đến hạn” trước (ngày)</span>
+                  <input class="input num" type="number" value="7" style="max-width:120px">
+                </div>
+                <div class="field">
+                  <span class="field__label">Ngưỡng cảnh báo điểm giảm mạnh</span>
+                  <input class="input num" type="number" step="0.5" value="1.5" style="max-width:120px">
+                  <span class="field__hint">Điểm tháng này thấp hơn tháng trước quá ngưỡng sẽ sinh cảnh báo.</span>
+                </div>
+                <div class="modal__foot" style="padding:0;border:0"><button class="btn btn--primary" onclick="toast('Đã lưu.','ok')">Lưu</button></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card__head"><div class="card__title">Lý do cộng / trừ điểm</div><button class="btn btn--sm">＋ Thêm</button></div>
+              <div class="tablewrap"><table class="tbl" style="min-width:auto">
+                <tbody>
+                  <tr><td><b>Phát biểu tốt</b></td><td><span class="tag tag--ok">+2</span></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                  <tr><td><b>Làm đủ bài tập</b></td><td><span class="tag tag--ok">+3</span></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                  <tr><td><b>Không làm bài tập</b></td><td><span class="tag tag--bad">−3</span></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                  <tr><td><b>Nói chuyện riêng</b></td><td><span class="tag tag--bad">−1</span></td><td class="cellactions"><button class="btn btn--ghost btn--sm">✎</button></td></tr>
+                </tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: THÊM TÀI LIỆU ================= -->
+<div class="mask" id="mForm">
+  <div class="modal">
+    <div class="modal__head"><h2>Thêm tài liệu</h2><button class="modal__x" data-close>✕</button></div>
+    <div class="modal__body">
+      <div class="field">
+        <label class="field__label" for="fTitle">Tên tài liệu <span class="req">*</span></label>
+        <input class="input" id="fTitle" placeholder="vd: Unit 5 — Vocabulary">
+      </div>
+
+      <div class="field" id="srcPicker">
+        <span class="field__label">Nguồn tài liệu</span>
+        <div class="seg" id="srcSeg">
+          <button class="seg__b" aria-selected="true" data-src="upload">Tải file lên</button>
+          <button class="seg__b" aria-selected="false" data-src="url">Dán đường dẫn</button>
+        </div>
+      </div>
+
+      <div id="srcUpload">
+        <div class="drop" onclick="toast('Bản mock — hộp thoại chọn file sẽ mở ở ứng dụng thật.')">
+          <span class="drop__ico">⬆️</span>
+          <div class="drop__t">Kéo thả file vào đây hoặc bấm để chọn</div>
+          <div class="drop__s">PDF, Word, ảnh, tối đa 20 MB</div>
+        </div>
+      </div>
+
+      <div id="srcUrl" class="hidden">
+        <div class="field">
+          <label class="field__label" for="fUrl">Đường dẫn <span class="req">*</span></label>
+          <input class="input" id="fUrl" placeholder="https://drive.google.com/...">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="fUnit">Thuộc Unit</label>
+        <select class="select" id="fUnit">
+          <option>Unit 5: Our experiences</option>
+          <option>Unit 4: Life in the past</option>
+          <option>Review 1</option>
+          <option>— Chưa thuộc Unit —</option>
+        </select>
+      </div>
+
+      <div class="note note--info" id="srcNote"><span>ℹ️</span><div id="srcNoteTxt"></div></div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-close>Hủy</button>
+      <button class="btn btn--primary" onclick="closeModal();toast('Đã thêm tài liệu vào Unit 5.','ok')">Lưu tài liệu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: SINH ĐỀ BẰNG AI ================= -->
+<div class="mask" id="mGen">
+  <div class="modal">
+    <div class="modal__head"><h2>Tạo đề bằng AI</h2><button class="modal__x" data-close>✕</button></div>
+
+    <div class="modal__body" id="genSetup">
+      <div class="note note--info"><span>📄</span><div>Đề sẽ gắn vào tài liệu: <b id="genSource">VOCABULARY</b></div></div>
+
+      <div class="field">
+        <span class="field__label">AI đọc file nào để lấy câu hỏi?</span>
+        <label class="opt is-on" data-src="self">
+          <input type="radio" name="gensrc" value="self" checked>
+          <span><b>Chính tài liệu này</b>
+            <span>Dùng khi file đã có sẵn phần bài tập rõ ràng.</span></span>
+        </label>
+        <label class="opt" data-src="other">
+          <input type="radio" name="gensrc" value="other">
+          <span><b>Một tài liệu khác trong bộ</b>
+            <span>Ví dụ file bài tập riêng bạn đã tải lên kho trước đó.</span></span>
+        </label>
+        <label class="opt" data-src="upload">
+          <input type="radio" name="gensrc" value="upload">
+          <span><b>Tải lên file chỉ có phần câu hỏi<span class="opt__tip">nên dùng</span></b>
+            <span>File này KHÔNG lưu vào kho — chỉ dùng để AI đọc. Đề vẫn gắn vào tài liệu ở trên.</span></span>
+        </label>
+        <span class="field__hint">File bài học thường lẫn cả lý thuyết lẫn bài tập, AI dễ bắt nhầm phần lý thuyết thành câu hỏi. Tách riêng phần bài tập cho AI đọc sẽ chính xác hơn hẳn.</span>
+      </div>
+
+      <div class="field hidden" id="genPickOther">
+        <label class="field__label" for="genOtherSel">Chọn tài liệu chứa câu hỏi</label>
+        <select class="select" id="genOtherSel">
+          <option>VOCAB — EXTRA DRILL (Unit 5)</option>
+          <option>REVIEW 1 — MIXED TEST (Review 1)</option>
+          <option>ĐỀ CƯƠNG ÔN TẬP HK1 (Chưa thuộc Unit)</option>
+        </select>
+      </div>
+
+      <div class="hidden" id="genPickUpload">
+        <div class="drop" onclick="toast('Bản mock — hộp thoại chọn file sẽ mở ở ứng dụng thật.')">
+          <span class="drop__ico">⬆️</span>
+          <div class="drop__t">Chọn file chỉ chứa bài tập / câu hỏi</div>
+          <div class="drop__s">PDF, Word · tối đa 25 MB · dùng một lần, không lưu vào kho</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field__label">Cách làm đề</span>
+        <div class="seg" id="genModeSeg">
+          <button class="seg__b" aria-selected="true" data-mode="extract">Bóc tách từ tài liệu</button>
+          <button class="seg__b" aria-selected="false" data-mode="generate">AI soạn đề mới</button>
+        </div>
+        <span class="field__hint" id="genModeHint">Giữ nguyên văn câu hỏi và đáp án đã có sẵn trong tài liệu.</span>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="genTitle">Tên đề <span class="req">*</span></label>
+        <input class="input" id="genTitle" value="Unit 5 — Vocabulary check">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label class="field__label" for="genDur">Thời gian làm (phút)</label>
+          <input class="input num" id="genDur" type="number" value="20">
+        </div>
+        <div class="field" id="genMaxBox" style="opacity:.45">
+          <label class="field__label" for="genMax">Số câu tối đa</label>
+          <input class="input num" id="genMax" type="number" value="25" disabled>
+        </div>
+      </div>
+
+      <div class="switchrow" style="border-top:1px solid var(--border);padding-top:13px">
+        <div class="switchrow__txt"><b>Đối chiếu lại với bản gốc</b><span>AI kiểm tra chéo bản trích so với tài liệu, chậm hơn nhưng an toàn hơn.</span></div>
+        <button class="swt" role="switch" aria-checked="true" onclick="swt(this)"></button>
+      </div>
+    </div>
+
+    <div class="modal__body hidden" id="genRun">
+      <div class="bar"><div class="bar__f" id="genBar"></div></div>
+      <div class="steps" id="genSteps"></div>
+      <p class="field__hint" style="margin:0">Quá trình chạy nền — bạn có thể rời màn hình, đề sẽ nằm trong <b>Đề &amp; Bài tập</b> khi xong.</p>
+    </div>
+
+    <div class="modal__body hidden" id="genDone">
+      <div class="note note--info" style="background:var(--success-weak);color:var(--success)">
+        <span>✅</span><div><b>Đã tạo đề “Unit 5 — Vocabulary check”</b><br>24 câu hỏi · bỏ 1 câu không tự chấm được (câu nghe audio) · thang điểm 10.</div>
+      </div>
+      <div class="note note--warn"><span>⚠️</span><div>Câu 12 nghi thiếu phương án — nên duyệt lại cạnh bản gốc trước khi phát hành.</div></div>
+    </div>
+
+    <div class="modal__foot" id="genFootSetup">
+      <button class="btn" data-close>Hủy</button>
+      <button class="btn btn--primary" onclick="runGen()">Bắt đầu tạo đề</button>
+    </div>
+    <div class="modal__foot hidden" id="genFootRun">
+      <button class="btn" data-close>Chạy nền, đóng cửa sổ</button>
+    </div>
+    <div class="modal__foot hidden" id="genFootDone">
+      <button class="btn" data-close>Để sau</button>
+      <button class="btn" onclick="closeModal();go('exams');toast('Mở đề để duyệt câu hỏi.','ok')">Duyệt đề</button>
+      <button class="btn btn--primary" onclick="openAssign('exam','Unit 5 — Vocabulary check')">Giao cho lớp</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: BẢNG BÀN GIAO TÀI KHOẢN ================= -->
+<div class="mask" id="mHand">
+  <div class="modal modal--wide">
+    <div class="modal__head"><h2 id="handTitle">Bàn giao tài khoản</h2><button class="modal__x" data-close>✕</button></div>
+    <div class="modal__body">
+      <div class="note note--info" id="handSummary"></div>
+      <div class="tablewrap" style="border:1px solid var(--border)">
+        <table class="tbl">
+          <thead><tr><th>Họ tên</th><th>Mã</th><th>Tên đăng nhập</th><th>Mật khẩu</th><th>Kết quả</th></tr></thead>
+          <tbody id="handRows"></tbody>
+        </table>
+      </div>
+      <p class="field__hint" style="margin:0">Mật khẩu chỉ hiện <b>một lần duy nhất</b> tại đây. Người dùng bắt buộc đổi mật khẩu ở lần đăng nhập đầu tiên.</p>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" onclick="toast('Đã sao chép danh sách — dán thẳng vào Excel.','ok')">Copy tất cả</button>
+      <button class="btn" onclick="toast('Ứng dụng thật sẽ tải file .csv về máy.')">Xuất Excel</button>
+      <button class="btn" onclick="toast('Ứng dụng thật sẽ mở hộp thoại in.')">In</button>
+      <button class="btn btn--primary" data-close>Xong</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: ĐỀ CỦA TÀI LIỆU ================= -->
+<div class="mask" id="mExamsOf">
+  <div class="modal modal--wide">
+    <div class="modal__head"><h2 id="examsOfTitle">Đề của tài liệu</h2><button class="modal__x" data-close>✕</button></div>
+    <div class="modal__body">
+      <div class="tablewrap" style="border:1px solid var(--border)">
+        <table class="tbl">
+          <thead><tr><th>Tên đề</th><th class="num">Câu</th><th class="num">Thời gian</th><th>Trạng thái</th><th>Đã giao</th><th></th></tr></thead>
+          <tbody id="examsOfRows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-close>Đóng</button>
+      <button class="btn btn--primary" id="examsOfGen">⚡ Sinh thêm đề từ tài liệu này</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: GIAO CHO LỚP ================= -->
+<div class="mask" id="mAssign">
+  <div class="modal">
+    <div class="modal__head"><h2 id="assignTitle">Giao cho lớp</h2><button class="modal__x" data-close>✕</button></div>
+    <div class="modal__body">
+      <div class="note note--info"><span id="assignIco">📄</span><div id="assignWhat"></div></div>
+
+      <div class="field">
+        <label class="field__label" for="assignClass">Lớp nhận <span class="req">*</span></label>
+        <select class="select" id="assignClass">
+          <option>9A1 — Tiếng Anh 9 · 30 học viên</option>
+          <option>9A2 — Tiếng Anh 9 · 28 học viên</option>
+          <option>8B — Tiếng Anh 8 · 26 học viên</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="assignSession">Gắn vào buổi học</label>
+        <select class="select" id="assignSession">
+          <option>— Không gắn buổi —</option>
+          <option>Buổi 12 · 14/08/2026 · Ca 1</option>
+          <option>Buổi 13 · 16/08/2026 · Ca 1</option>
+        </select>
+      </div>
+
+      <div id="assignExamOnly">
+        <div class="field">
+          <span class="field__label">Hình thức</span>
+          <div class="seg" id="assignModeSeg">
+            <button class="seg__b" aria-selected="true" data-mode="inclass">Làm trên lớp</button>
+            <button class="seg__b" aria-selected="false" data-mode="home">Bài tập về nhà</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+          <div class="field">
+            <label class="field__label" for="assignOpen">Mở lúc</label>
+            <input class="input" id="assignOpen" type="datetime-local" value="2026-08-14T08:00">
+          </div>
+          <div class="field" id="assignCloseBox" style="opacity:.45">
+            <label class="field__label" for="assignClose">Hạn nộp</label>
+            <input class="input" id="assignClose" type="datetime-local" value="2026-08-16T22:00" disabled>
+          </div>
+        </div>
+
+        <div class="switchrow" style="border-top:1px solid var(--border);margin-top:12px">
+          <div class="switchrow__txt"><b>Giới hạn thời gian làm bài</b><span id="assignDurHint">Đếm ngược từ lúc học viên bấm bắt đầu.</span></div>
+          <button class="swt" role="switch" aria-checked="true" id="assignDurSwt"></button>
+        </div>
+        <div class="field" id="assignDurBox" style="margin-top:10px">
+          <label class="field__label" for="assignDur">Thời gian làm (phút)</label>
+          <input class="input num" id="assignDur" type="number" value="20" style="max-width:140px">
+        </div>
+      </div>
+
+      <div id="assignMatOnly" class="hidden">
+        <div class="field">
+          <label class="field__label" for="assignNote">Ghi chú cho học viên</label>
+          <textarea class="input" id="assignNote" rows="3" placeholder="vd: Đọc trước phần Vocabulary trang 42 trước buổi sau."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-close>Hủy</button>
+      <button class="btn btn--primary" id="assignGo">Giao</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+"use strict";
+
+/* ---------- dữ liệu mock ---------- */
+const UNITS = [
+  { id:"u4", label:"Unit", no:4, name:"Life in the past", kind:"unit", items:[
+    { t:"WORD FORM", k:"doc", meta:"Word · 240 KB · 02/08/2026", exams:2 },
+    { t:"READING PRACTICE", k:"pdf", meta:"PDF · 1.1 MB · 02/08/2026", exams:1 }
+  ]},
+  { id:"u5", label:"Unit", no:5, name:"Our experiences", kind:"unit", items:[
+    { t:"VOCABULARY", k:"pdf", meta:"PDF · 820 KB · 12/08/2026", exams:3 },
+    { t:"VOCAB — EXTRA DRILL", k:"doc", meta:"Word · 310 KB · 12/08/2026", exams:1 },
+    { t:"GRAMMAR: PRESENT PERFECT", k:"pdf", meta:"PDF · 640 KB · 11/08/2026", exams:0 },
+    { t:"SPEAKING PROMPTS", k:"link", meta:"Đường dẫn ngoài · 08/08/2026", exams:0 }
+  ]},
+  { id:"r1", label:"Review", no:1, name:"", kind:"review", items:[
+    { t:"REVIEW 1 — MIXED TEST", k:"pdf", meta:"PDF · 1.6 MB · 05/08/2026", exams:1 }
+  ]},
+  { id:"u6", label:"Unit", no:6, name:"Vietnam: then and now", kind:"unit", items:[] },
+  { id:"none", label:"", no:0, name:"Chưa thuộc Unit", kind:"none", items:[
+    { t:"ĐỀ CƯƠNG ÔN TẬP HK1", k:"pdf", meta:"PDF · 2.0 MB · 01/08/2026", exams:0 },
+    { t:"BẢNG TỪ VỰNG TỔNG HỢP", k:"doc", meta:"Word · 180 KB · 28/07/2026", exams:0 }
+  ]}
+];
+
+const EXAMS = [
+  { t:"Unit 5 — Vocabulary check", src:"TL0007 · VOCABULARY", q:24, d:20, st:"pub", assigned:2, by:"Admin" },
+  { t:"Unit 5 — Grammar practice", src:"TL0009 · GRAMMAR: PRESENT PERFECT", q:15, d:25, st:"draft", assigned:0, by:"Trang NTT" },
+  { t:"Unit 4 — Reading comprehension", src:"TL0004 · READING PRACTICE", q:18, d:30, st:"pub", assigned:1, by:"Hùng LV" },
+  { t:"Kiểm tra giữa kỳ I", src:"TL0021 · REVIEW 1 — MIXED TEST", q:40, d:45, st:"pub", assigned:3, by:"Admin" },
+  { t:"Luyện tập tổng hợp (từ ngân hàng câu)", src:"Ghép từ ngân hàng câu hỏi", q:12, d:15, st:"draft", assigned:0, by:"Mai PT" }
+];
+
+const QUESTIONS = [
+  { s:"She ______ in London since 2019.", type:"Trắc nghiệm", ex:"Unit 5 — Grammar practice" },
+  { s:"Choose the word whose underlined part is pronounced differently: s(ou)nd / f(ou)nd / c(ou)sin", type:"Trắc nghiệm", ex:"Unit 5 — Vocabulary check" },
+  { s:"Nối từ ở cột A với định nghĩa ở cột B (5 cặp)", type:"Nối", ex:"Unit 5 — Vocabulary check" },
+  { s:"He has never ______ (be) to Japan before.", type:"Điền từ", ex:"Unit 5 — Grammar practice" },
+  { s:"The story took place in the 19th century. — True or False?", type:"Đúng/Sai", ex:"Unit 4 — Reading comprehension" }
+];
+
+const ROSTER = [
+  { code:"2K9NGANV0", name:"Nguyễn Văn An",     phone:"0912 111 001", acc:null },
+  { code:"2K9TRANB1", name:"Trần Thị Bình",     phone:"0912 111 002", acc:"2K9TRANB1" },
+  { code:"2K9LEVC0",  name:"Lê Văn Cường",      phone:"0912 111 003", acc:null },
+  { code:"2K9PHAMD0", name:"Phạm Thị Dung",     phone:"0912 111 004", acc:null },
+  { code:"2K9HOANGE", name:"Hoàng Minh Đức",    phone:"0912 111 005", acc:"2K9HOANGE", locked:true },
+  { code:"2K9VUTG0",  name:"Vũ Thu Giang",      phone:"0912 111 006", acc:null },
+  { code:"2K9DANGH0", name:"Đặng Quốc Hải",     phone:"0912 111 007", acc:"2K9DANGH0", mustChange:true },
+  { code:"2K9BUIKH0", name:"Bùi Thị Khánh",     phone:"0912 111 008", acc:null }
+];
+
+const HANDOVER = [
+  { name:"Nguyễn Văn An",   code:"2K9NGANV0", user:"2K9NGANV0", pwd:"Hocvien@123", ok:true },
+  { name:"Lê Văn Cường",    code:"2K9LEVC0",  user:"2K9LEVC0",  pwd:"Hocvien@123", ok:true },
+  { name:"Phạm Thị Dung",   code:"2K9PHAMD0", user:"2K9PHAMD0", pwd:"Hocvien@123", ok:true },
+  { name:"Vũ Thu Giang",    code:"2K9VUTG0",  user:"2K9VUTG0",  pwd:"Hocvien@123", ok:true },
+  { name:"Bùi Thị Khánh",   code:"2K9BUIKH0", user:"2K9BUIKH0", pwd:"Hocvien@123", ok:true },
+  { name:"Đỗ Nhật Linh",    code:"2K9DONHL0", user:null,        pwd:null,          ok:false, err:"Trùng mã học viên với hồ sơ đã xóa" }
+];
+
+/* ---------- tiện ích ---------- */
+const $  = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function toast(msg, kind){
+  const el = document.createElement("div");
+  el.className = "toast" + (kind === "ok" ? " toast--ok" : kind === "bad" ? " toast--bad" : "");
+  el.textContent = msg;
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transform = "translateY(-8px)"; el.style.transition = "all .25s"; }, 2400);
+  setTimeout(() => el.remove(), 2700);
+}
+function swt(btn){ btn.setAttribute("aria-checked", btn.getAttribute("aria-checked") === "true" ? "false" : "true"); }
+
+/* ---------- điều hướng ---------- */
+const TITLES = { materials:"Kho tài liệu", exams:"Đề & Bài tập", students:"Học viên", teachers:"Giáo viên", settings:"Cấu hình hệ thống", classes:"Lớp học" };
+function go(name){
+  $$(".screen").forEach(s => s.classList.toggle("is-active", s.id === "s-" + name));
+  $$(".nav__item").forEach(b => { if (b.dataset.screen === name) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  $("#topTitle").textContent = TITLES[name] || "";
+  document.body.classList.remove("drawer-open");
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+$$(".nav__item").forEach(b => b.addEventListener("click", () => go(b.dataset.screen)));
+$("[data-open-drawer]").addEventListener("click", () => document.body.classList.add("drawer-open"));
+$("[data-close-drawer]").addEventListener("click", () => document.body.classList.remove("drawer-open"));
+
+/* tabs */
+$$(".tab").forEach(t => t.addEventListener("click", () => {
+  const group = t.parentElement;
+  $$(".tab", group).forEach(x => x.setAttribute("aria-selected", String(x === t)));
+  const ids = $$(".tab", group).map(x => "tp-" + x.dataset.tab);
+  ids.forEach(id => { const p = document.getElementById(id); if (p) p.classList.toggle("is-active", id === "tp-" + t.dataset.tab); });
+}));
+
+/* theme */
+$("#themeBtn").addEventListener("click", () => {
+  const now = document.documentElement.getAttribute("data-theme");
+  const dark = now ? now === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+});
+
+/* ---------- Kho tài liệu ---------- */
+function openSubject(){ $("#matLevel1").classList.add("hidden"); $("#matLevel2").classList.remove("hidden"); }
+function backToSubjects(){ $("#matLevel2").classList.add("hidden"); $("#matLevel1").classList.remove("hidden"); }
+function openFolder(){ $("#matBrowse").classList.add("hidden"); $("#matFolder").classList.remove("hidden"); window.scrollTo({top:0}); }
+function closeFolder(){ $("#matFolder").classList.add("hidden"); $("#matBrowse").classList.remove("hidden"); }
+
+let activeUnit = "u5";
+function unitLabel(u){
+  if (u.kind === "none") return "Chưa thuộc Unit";
+  if (u.kind === "review") return "Review " + u.no;
+  return "Unit " + u.no;
+}
+function unitExams(u){ return u.items.reduce((n, it) => n + it.exams, 0); }
+function renderUnits(){
+  $("#unitChips").innerHTML = UNITS.map(u => {
+    const mod = u.kind === "review" ? " unitcard--review" : u.kind === "none" ? " unitcard--none" : "";
+    const no = u.kind === "review" ? "R" + u.no : u.kind === "none" ? "?" : u.no;
+    const lab = u.kind === "review" ? "Review " + u.no : u.kind === "none" ? "Ngoài mục lục" : "Unit " + u.no;
+    const name = u.kind === "none" ? "Chưa thuộc Unit"
+      : (u.name || "Chưa đặt tên");
+    const ex = unitExams(u);
+    const meta = `${u.items.length} tài liệu` + (ex ? ` · ${ex} đề` : "");
+    return `<button class="unitcard${mod}" role="tab" aria-selected="${u.id === activeUnit}" data-unit="${u.id}">
+      <span class="unitcard__no">${esc(String(no))}</span>
+      <span class="unitcard__txt">
+        <span class="unitcard__lab">${esc(lab)}</span>
+        <span class="unitcard__name">${esc(name)}</span>
+        <span class="unitcard__meta">${esc(meta)}</span>
+      </span>
+    </button>`;
+  }).join("");
+  $$("#unitChips .unitcard").forEach(c => c.addEventListener("click", () => { activeUnit = c.dataset.unit; renderUnits(); renderLessons(); }));
+}
+const ICO = { pdf:["lesson__ico--pdf","📕"], doc:["lesson__ico--doc","📘"], link:["lesson__ico--link","🔗"] };
+function renderLessons(){
+  const u = UNITS.find(x => x.id === activeUnit);
+  $("#unitTitle").textContent = u.kind === "none" ? "Tài liệu chưa thuộc Unit"
+    : unitLabel(u) + (u.name ? ": " + u.name : "");
+  if (!u.items.length){
+    $("#lessonList").innerHTML = `<div class="empty"><span class="empty__ico">📭</span>Unit này chưa có tài liệu nào.<br>Bấm <b>Thêm tài liệu vào Unit</b> để bắt đầu.</div>`;
+    return;
+  }
+  $("#lessonList").innerHTML = u.items.map(it => {
+    const [cls, ico] = ICO[it.k];
+    const badge = it.exams
+      ? `<button class="tag tag--info" style="border:0;cursor:pointer" data-act="exams" data-t="${esc(it.t)}">${it.exams} đề ▸</button>`
+      : `<span class="tag tag--mute">Chưa có đề</span>`;
+    const open = it.k === "link" ? "Mở liên kết" : "Xem";
+    return `<div class="lesson">
+      <div class="lesson__ico ${cls}">${ico}</div>
+      <div class="lesson__txt">
+        <div class="lesson__name">${esc(it.t)}</div>
+        <div class="lesson__meta"><span>${esc(it.meta)}</span></div>
+      </div>
+      <div class="lesson__act">
+        ${badge}
+        <button class="btn btn--sm" data-act="open" data-t="${esc(it.t)}">${open}</button>
+        <button class="btn btn--sm" data-act="assign" data-t="${esc(it.t)}">Giao cho lớp</button>
+        <button class="btn btn--sm btn--gen" data-act="gen" data-t="${esc(it.t)}">⚡ Sinh đề</button>
+        <button class="btn btn--ghost btn--sm" data-act="more">⋮</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  $$("#lessonList [data-act]").forEach(b => b.addEventListener("click", () => {
+    const t = b.dataset.t, a = b.dataset.act;
+    if (a === "gen") openGen(t);
+    else if (a === "exams") openExamsOf(t);
+    else if (a === "assign") openAssign("material", t);
+    else if (a === "open") toast("Mở trình xem tài liệu: " + t);
+    else toast("Menu: Tải xuống · Sửa · Chuyển Unit · Xóa.");
+  }));
+}
+
+/* ---------- Cấu hình cách nạp file ↔ form tài liệu ---------- */
+const cfg = { upload:true, url:true, def:"upload" };
+function syncUploadCfg(){
+  $("#cfUpload").setAttribute("aria-checked", String(cfg.upload));
+  $("#cfUrl").setAttribute("aria-checked", String(cfg.url));
+  const both = cfg.upload && cfg.url;
+  $("#defSourceBox").classList.toggle("hidden", !both);
+  $$("#defSourceSeg .seg__b").forEach(b => b.setAttribute("aria-selected", String(b.dataset.src === cfg.def)));
+}
+function toggleUpload(which){
+  const other = which === "upload" ? "url" : "upload";
+  if (cfg[which] && !cfg[other]){
+    $("#cfUploadErr").classList.remove("hidden");
+    setTimeout(() => $("#cfUploadErr").classList.add("hidden"), 2600);
+    toast("Phải bật ít nhất một cách nạp tài liệu.", "bad");
+    return;
+  }
+  cfg[which] = !cfg[which];
+  if (!cfg[cfg.def]) cfg.def = cfg.upload ? "upload" : "url";
+  syncUploadCfg();
+}
+$$("#defSourceSeg .seg__b").forEach(b => b.addEventListener("click", () => { cfg.def = b.dataset.src; syncUploadCfg(); }));
+
+let formSrc = "upload";
+function setFormSrc(src){
+  formSrc = src;
+  $$("#srcSeg .seg__b").forEach(b => b.setAttribute("aria-selected", String(b.dataset.src === src)));
+  $("#srcUpload").classList.toggle("hidden", src !== "upload");
+  $("#srcUrl").classList.toggle("hidden", src !== "url");
+}
+$$("#srcSeg .seg__b").forEach(b => b.addEventListener("click", () => setFormSrc(b.dataset.src)));
+
+function openMaterialForm(){
+  const both = cfg.upload && cfg.url;
+  $("#srcPicker").classList.toggle("hidden", !both);
+  setFormSrc(both ? cfg.def : (cfg.upload ? "upload" : "url"));
+  $("#srcNoteTxt").innerHTML = both
+    ? "Đang bật <b>cả hai cách</b> nạp tài liệu nên form có thanh chọn. Vào <b>Cấu hình ▸ Kho tài liệu</b> tắt bớt một cách để form gọn lại."
+    : (cfg.upload
+        ? "Hệ thống chỉ cho <b>tải file lên server</b> nên form ẩn hẳn phần chọn nguồn."
+        : "Hệ thống chỉ cho <b>dán đường dẫn ngoài</b>. Lưu ý: sinh đề bằng AI cần file tải lên hoặc file tải trực tiếp trong cửa sổ tạo đề.");
+  openModal("mForm");
+}
+
+/* ---------- Sinh đề bằng AI ---------- */
+const GEN_STEPS = ["Tải tài liệu nguồn", "Chuẩn hóa về PDF", "AI đọc và bóc tách câu hỏi", "Kiểm chứng cấu trúc &amp; đáp án", "Chia điểm về thang 10"];
+let genTimer = null;
+function openGen(sourceName){
+  $("#genSource").textContent = sourceName;
+  $$('#genSetup .opt').forEach((x, i) => { x.classList.toggle("is-on", i === 0); x.querySelector("input").checked = i === 0; });
+  $("#genPickOther").classList.add("hidden");
+  $("#genPickUpload").classList.add("hidden");
+  $("#genSetup").classList.remove("hidden");
+  $("#genRun").classList.add("hidden");
+  $("#genDone").classList.add("hidden");
+  $("#genFootSetup").classList.remove("hidden");
+  $("#genFootRun").classList.add("hidden");
+  $("#genFootDone").classList.add("hidden");
+  openModal("mGen");
+}
+/* nguồn câu hỏi cho AI: chính tài liệu / tài liệu khác trong bộ / file tải lên một lần */
+$$('#genSetup .opt').forEach(o => o.addEventListener("click", () => {
+  const src = o.dataset.src;
+  $$('#genSetup .opt').forEach(x => x.classList.toggle("is-on", x === o));
+  o.querySelector("input").checked = true;
+  $("#genPickOther").classList.toggle("hidden", src !== "other");
+  $("#genPickUpload").classList.toggle("hidden", src !== "upload");
+}));
+
+$$("#genModeSeg .seg__b").forEach(b => b.addEventListener("click", () => {
+  $$("#genModeSeg .seg__b").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+  const gen = b.dataset.mode === "generate";
+  $("#genModeHint").textContent = gen
+    ? "AI soạn câu hỏi mới theo chủ đề của tài liệu — dùng khi tài liệu không sẵn câu hỏi."
+    : "Giữ nguyên văn câu hỏi và đáp án đã có sẵn trong tài liệu.";
+  $("#genMax").disabled = !gen;
+  $("#genMaxBox").style.opacity = gen ? "1" : ".45";
+}));
+function runGen(){
+  $("#genSetup").classList.add("hidden");
+  $("#genFootSetup").classList.add("hidden");
+  $("#genRun").classList.remove("hidden");
+  $("#genFootRun").classList.remove("hidden");
+  let i = 0;
+  const draw = () => {
+    $("#genSteps").innerHTML = GEN_STEPS.map((s, k) =>
+      `<div class="step ${k < i ? "is-done" : k === i ? "is-run" : ""}">
+         <span class="step__dot">${k < i ? "✓" : ""}</span><span>${s}</span>
+       </div>`).join("");
+    $("#genBar").style.width = Math.round((i / GEN_STEPS.length) * 100) + "%";
+  };
+  draw();
+  clearInterval(genTimer);
+  genTimer = setInterval(() => {
+    i++;
+    if (i >= GEN_STEPS.length){
+      clearInterval(genTimer);
+      draw();
+      setTimeout(() => {
+        $("#genRun").classList.add("hidden");
+        $("#genFootRun").classList.add("hidden");
+        $("#genDone").classList.remove("hidden");
+        $("#genFootDone").classList.remove("hidden");
+      }, 500);
+    } else draw();
+  }, 900);
+}
+
+/* ---------- đề của một tài liệu ---------- */
+const EXAMS_OF = {
+  "VOCABULARY": [
+    { t:"Unit 5 — Vocabulary check", q:24, d:20, st:"pub", assigned:2 },
+    { t:"Unit 5 — Từ vựng (bản rút gọn)", q:12, d:10, st:"pub", assigned:0 },
+    { t:"Unit 5 — Vocabulary (nháp AI)", q:26, d:20, st:"draft", assigned:0 }
+  ],
+  "VOCAB — EXTRA DRILL": [{ t:"Extra drill — Unit 5", q:16, d:15, st:"draft", assigned:0 }],
+  "WORD FORM":          [{ t:"Word form — Unit 4", q:20, d:20, st:"pub", assigned:1 },
+                         { t:"Word form (nháp)", q:20, d:20, st:"draft", assigned:0 }],
+  "READING PRACTICE":   [{ t:"Unit 4 — Reading comprehension", q:18, d:30, st:"pub", assigned:1 }],
+  "REVIEW 1 — MIXED TEST": [{ t:"Kiểm tra giữa kỳ I", q:40, d:45, st:"pub", assigned:3 }]
+};
+function openExamsOf(name){
+  const rows = EXAMS_OF[name] || [];
+  $("#examsOfTitle").textContent = "Đề sinh từ: " + name;
+  $("#examsOfRows").innerHTML = rows.map(e => `
+    <tr>
+      <td><b>${esc(e.t)}</b></td>
+      <td class="num">${e.q}</td>
+      <td class="num">${e.d}′</td>
+      <td><span class="tag ${ST[e.st].cls}">${ST[e.st].txt}</span></td>
+      <td>${e.assigned ? `<span class="tag tag--info">${e.assigned} lớp</span>` : `<span class="rowsub">—</span>`}</td>
+      <td class="cellactions">
+        <button class="btn btn--sm" data-open-exam>Duyệt</button>
+        ${e.st === "pub"
+          ? `<button class="btn btn--sm btn--primary" data-assign-exam="${esc(e.t)}">Giao cho lớp</button>`
+          : `<button class="btn btn--sm" disabled title="Phải phát hành trước khi giao">Giao cho lớp</button>`}
+      </td>
+    </tr>`).join("");
+  $$("#examsOfRows [data-open-exam]").forEach(b => b.addEventListener("click", () => { closeModal(); go("exams"); toast("Mở trình duyệt/sửa đề."); }));
+  $$("#examsOfRows [data-assign-exam]").forEach(b => b.addEventListener("click", () => openAssign("exam", b.dataset.assignExam)));
+  $("#examsOfGen").onclick = () => openGen(name);
+  openModal("mExamsOf");
+}
+
+/* ---------- giao cho lớp (dùng chung tài liệu & đề) ---------- */
+let assignKind = "exam";
+function openAssign(kind, name){
+  assignKind = kind;
+  const isExam = kind === "exam";
+  $("#assignTitle").textContent = isExam ? "Giao đề cho lớp" : "Giao tài liệu cho lớp";
+  $("#assignIco").textContent = isExam ? "📝" : "📄";
+  $("#assignWhat").innerHTML = (isExam ? "Đề: <b>" : "Tài liệu: <b>") + esc(name) + "</b>"
+    + (isExam ? "" : "<br><span style='font-size:12px'>Học viên đọc trong Portal, hệ thống ghi nhận ai đã xem.</span>");
+  $("#assignExamOnly").classList.toggle("hidden", !isExam);
+  $("#assignMatOnly").classList.toggle("hidden", isExam);
+  $("#assignGo").onclick = () => {
+    closeModal();
+    toast(isExam ? "Đã giao đề cho lớp 9A1." : "Đã giao tài liệu cho lớp 9A1.", "ok");
+  };
+  openModal("mAssign");
+}
+$$("#assignModeSeg .seg__b").forEach(b => b.addEventListener("click", () => {
+  $$("#assignModeSeg .seg__b").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+  const home = b.dataset.mode === "home";
+  $("#assignClose").disabled = !home;
+  $("#assignCloseBox").style.opacity = home ? "1" : ".45";
+  $("#assignDurSwt").setAttribute("aria-checked", home ? "false" : "true");
+  syncAssignDur();
+  $("#assignDurHint").textContent = home
+    ? "Tắt thì học viên làm thoải mái tới hạn nộp."
+    : "Bài làm trên lớp bắt buộc có giới hạn thời gian.";
+}));
+function syncAssignDur(){
+  const on = $("#assignDurSwt").getAttribute("aria-checked") === "true";
+  $("#assignDurBox").classList.toggle("hidden", !on);
+}
+$("#assignDurSwt").addEventListener("click", function(){
+  const inclass = $$("#assignModeSeg .seg__b").find(b => b.getAttribute("aria-selected") === "true").dataset.mode === "inclass";
+  if (inclass){ toast("Bài làm trên lớp bắt buộc có giới hạn thời gian.", "bad"); return; }
+  swt(this); syncAssignDur();
+});
+
+/* ---------- bảng đề ---------- */
+const ST = {
+  draft:{ cls:"tag--mute", txt:"Nháp" },
+  pub:{ cls:"tag--ok", txt:"Đã phát hành" }
+};
+function renderExams(filter){
+  const rows = EXAMS.filter(e =>
+    filter === "all" ? true :
+    filter === "draft" ? e.st === "draft" :
+    filter === "pub" ? e.st === "pub" : e.assigned > 0);
+  $("#examRows").innerHTML = rows.length ? rows.map(e => `
+    <tr>
+      <td><b>${esc(e.t)}</b></td>
+      <td class="rowsub">${esc(e.src)}</td>
+      <td class="num">${e.q}</td>
+      <td class="num">${e.d}′</td>
+      <td><span class="tag ${ST[e.st].cls}">${ST[e.st].txt}</span></td>
+      <td>${e.assigned ? `<span class="tag tag--info">${e.assigned} lớp</span>` : `<span class="rowsub">—</span>`}</td>
+      <td class="rowsub">${esc(e.by)}</td>
+      <td class="cellactions">
+        <button class="btn btn--sm" data-x="Mở trình duyệt/sửa đề.">Duyệt</button>
+        ${e.st === "pub"
+          ? `<button class="btn btn--sm btn--primary" data-assign="${esc(e.t)}">Giao lớp</button>`
+          : `<button class="btn btn--sm" disabled title="Phải phát hành đề trước khi giao">Giao lớp</button>`}
+        <button class="btn btn--ghost btn--sm" data-x="Menu: Nhân bản · Xóa.">⋮</button>
+      </td>
+    </tr>`).join("")
+    : `<tr><td colspan="8"><div class="empty"><span class="empty__ico">📭</span>Không có đề nào khớp bộ lọc.</div></td></tr>`;
+  $$("#examRows [data-x]").forEach(b => b.addEventListener("click", () => toast(b.dataset.x)));
+  $$("#examRows [data-assign]").forEach(b => b.addEventListener("click", () => openAssign("exam", b.dataset.assign)));
+}
+$$("#examStatusSeg .seg__b").forEach(b => b.addEventListener("click", () => {
+  $$("#examStatusSeg .seg__b").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+  renderExams(b.dataset.st);
+}));
+
+/* ---------- ngân hàng câu hỏi ---------- */
+const qSel = new Set();
+function renderQ(){
+  $("#qRows").innerHTML = QUESTIONS.map((q, i) => `
+    <tr>
+      <td><input class="chk" type="checkbox" data-q="${i}" ${qSel.has(i) ? "checked" : ""}></td>
+      <td>${esc(q.s)}</td>
+      <td><span class="tag tag--mute">${esc(q.type)}</span></td>
+      <td class="rowsub">${esc(q.ex)}</td>
+      <td class="cellactions"><button class="btn btn--ghost btn--sm" data-x="Xem trước · Sửa · Xóa câu hỏi.">⋮</button></td>
+    </tr>`).join("");
+  $$("#qRows [data-q]").forEach(c => c.addEventListener("change", () => {
+    const i = Number(c.dataset.q);
+    c.checked ? qSel.add(i) : qSel.delete(i);
+    syncQ();
+  }));
+  $$("#qRows [data-x]").forEach(b => b.addEventListener("click", () => toast(b.dataset.x)));
+}
+function syncQ(){
+  $("#qCount").textContent = String(qSel.size);
+  $("#qBulk").classList.toggle("is-on", qSel.size > 0);
+  $("#qAll").checked = qSel.size === QUESTIONS.length;
+}
+function clearQ(){ qSel.clear(); renderQ(); syncQ(); }
+$("#qAll").addEventListener("change", e => {
+  qSel.clear();
+  if (e.target.checked) QUESTIONS.forEach((_, i) => qSel.add(i));
+  renderQ(); syncQ();
+});
+
+/* ---------- học viên ---------- */
+const stSel = new Set();
+function renderSt(){
+  $("#stRows").innerHTML = ROSTER.map((s, i) => {
+    let acc;
+    if (!s.acc) acc = `<span class="tag tag--warn">⚠ Chưa có tài khoản</span>
+        <button class="btn btn--sm btn--primary" style="margin-left:6px" data-one="${i}">Cấp ngay</button>`;
+    else if (s.locked) acc = `<span class="tag tag--bad">🔒 Đã khóa</span> <span class="mono rowsub">${esc(s.acc)}</span>`;
+    else acc = `<span class="tag tag--ok">✅ <span class="mono">${esc(s.acc)}</span></span>` +
+               (s.mustChange ? ` <span class="tag tag--warn">⚠ Chưa đổi MK</span>` : "");
+    return `<tr>
+      <td><input class="chk" type="checkbox" data-st="${i}" ${stSel.has(i) ? "checked" : ""} ${s.acc ? "disabled" : ""}></td>
+      <td class="mono">${esc(s.code)}</td>
+      <td><b>${esc(s.name)}</b></td>
+      <td class="num rowsub">${esc(s.phone)}</td>
+      <td>${acc}</td>
+      <td class="cellactions"><button class="btn btn--ghost btn--sm" data-x="Sửa hồ sơ · Xem BTVN · Quản lý tài khoản.">⋮</button></td>
+    </tr>`;
+  }).join("");
+  $$("#stRows [data-st]").forEach(c => c.addEventListener("change", () => {
+    const i = Number(c.dataset.st);
+    c.checked ? stSel.add(i) : stSel.delete(i);
+    syncSt();
+  }));
+  $$("#stRows [data-one]").forEach(b => b.addEventListener("click", () => openHandover(1)));
+  $$("#stRows [data-x]").forEach(b => b.addEventListener("click", () => toast(b.dataset.x)));
+}
+function syncSt(){
+  $("#stCount").textContent = String(stSel.size);
+  $("#stBulk").classList.toggle("is-on", stSel.size > 0);
+}
+function clearSt(){ stSel.clear(); renderSt(); syncSt(); }
+function selectAllNoAccount(){
+  ROSTER.forEach((s, i) => { if (!s.acc) stSel.add(i); });
+  renderSt(); syncSt();
+  toast("Đã chọn tất cả học viên chưa có tài khoản trong bộ lọc hiện tại.");
+}
+$("#stAll").addEventListener("change", e => {
+  stSel.clear();
+  if (e.target.checked) ROSTER.forEach((s, i) => { if (!s.acc) stSel.add(i); });
+  renderSt(); syncSt();
+});
+
+/* ---------- bàn giao ---------- */
+function openHandover(single){
+  const rows = single ? HANDOVER.slice(0, 1) : HANDOVER;
+  const ok = rows.filter(r => r.ok).length, bad = rows.length - ok;
+  $("#handTitle").textContent = single ? "Đã cấp tài khoản" : "Bàn giao tài khoản — lớp 9A1";
+  $("#handSummary").innerHTML = bad
+    ? `<span>📋</span><div><b>Cấp thành công ${ok} tài khoản</b>, ${bad} trường hợp lỗi (xem cột Kết quả).</div>`
+    : `<span>✅</span><div><b>Đã cấp ${ok} tài khoản.</b> Gửi thông tin dưới đây cho người dùng.</div>`;
+  $("#handRows").innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${esc(r.name)}</b></td>
+      <td class="mono">${esc(r.code)}</td>
+      <td class="mono">${r.user ? esc(r.user) : "—"}</td>
+      <td class="mono">${r.pwd ? esc(r.pwd) : "—"}</td>
+      <td>${r.ok ? `<span class="tag tag--ok">Thành công</span>` : `<span class="tag tag--bad">${esc(r.err)}</span>`}</td>
+    </tr>`).join("");
+  openModal("mHand");
+}
+
+/* ---------- modal ---------- */
+let openMask = null;
+function openModal(id){
+  closeModal();
+  openMask = document.getElementById(id);
+  openMask.classList.add("is-open");
+  document.body.style.overflow = "hidden";
+}
+function closeModal(){
+  clearInterval(genTimer);
+  if (openMask) openMask.classList.remove("is-open");
+  openMask = null;
+  document.body.style.overflow = "";
+}
+$$("[data-close]").forEach(b => b.addEventListener("click", closeModal));
+$$(".mask").forEach(m => m.addEventListener("click", e => { if (e.target === m) closeModal(); }));
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+function togglePwd(){
+  const i = $("#defPwd"), b = $("#pwdEye");
+  const show = i.type === "password";
+  i.type = show ? "text" : "password";
+  b.textContent = show ? "🙈 Ẩn" : "👁 Hiện";
+}
+
+/* ---------- khởi tạo ---------- */
+renderUnits();
+renderLessons();
+renderExams("all");
+renderQ(); syncQ();
+renderSt(); syncSt();
+syncUploadCfg();
+syncAssignDur();
+</script>
+
+</body>
+</html>

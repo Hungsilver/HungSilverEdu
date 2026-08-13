@@ -113,12 +113,9 @@ public sealed class CurrentRelationCleanupTests : IDisposable
     [Fact]
     public async Task DeleteMaterial_NullsAssignmentsThatReferenceIt()
     {
-        var category = new MaterialCategory { Name = "Thư viện", SortOrder = 1 };
         var material = new LearningMaterial
         {
-            CategoryId = category.Id,
             Title = "Bài đọc",
-            Type = MaterialType.Pdf,
             Source = MaterialSource.ExternalUrl,
             Url = "https://example.com/doc"
         };
@@ -128,7 +125,6 @@ public sealed class CurrentRelationCleanupTests : IDisposable
             MaterialId = material.Id,
             Title = "BTVN"
         };
-        _context.MaterialCategories.Add(category);
         _context.LearningMaterials.Add(material);
         _context.Assignments.Add(assignment);
         await _context.SaveChangesAsync();
@@ -139,28 +135,6 @@ public sealed class CurrentRelationCleanupTests : IDisposable
         Assert.True(result.IsSuccess);
         Assert.True(await _context.LearningMaterials.IgnoreQueryFilters().AnyAsync(m => m.Id == material.Id && m.IsDeleted));
         Assert.Null((await _context.Assignments.SingleAsync(a => a.Id == assignment.Id)).MaterialId);
-    }
-
-    [Fact]
-    public async Task DeleteMaterialCategory_InUse_ReturnsConflict()
-    {
-        var category = new MaterialCategory { Name = "Bài đọc", SortOrder = 1 };
-        _context.MaterialCategories.Add(category);
-        _context.LearningMaterials.Add(new LearningMaterial
-        {
-            CategoryId = category.Id,
-            Title = "Reading 1",
-            Type = MaterialType.Pdf,
-            Source = MaterialSource.ExternalUrl,
-            Url = "https://example.com/reading"
-        });
-        await _context.SaveChangesAsync();
-
-        var service = NewMaterialCategoryService();
-        var result = await service.DeleteAsync(category.Id);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("MaterialCategory.InUse", result.Error.Code);
     }
 
     [Fact]
@@ -202,20 +176,15 @@ public sealed class CurrentRelationCleanupTests : IDisposable
     private MaterialService NewMaterialService() =>
         new(
             new Repository<LearningMaterial>(_context),
-            new Repository<MaterialCategory>(_context),
             new Repository<Subject>(_context),
             new Repository<StoredFile>(_context),
             new Repository<MaterialFolder>(_context),
             new Repository<MaterialUnit>(_context),
-            new AdminGuard(),
+            new Repository<Exam>(_context),
             _cleanup,
             new UnitOfWork(_context),
-            new TestCurrentUser(),
             new CreateMaterialRequestValidator(),
             new UpdateMaterialRequestValidator());
-
-    private MaterialCategoryService NewMaterialCategoryService() =>
-        new(new Repository<MaterialCategory>(_context), _cleanup, new UnitOfWork(_context));
 
     private async Task<Guid> AddClassAsync(string name)
     {
@@ -269,7 +238,7 @@ public sealed class CurrentRelationCleanupTests : IDisposable
     {
         private static readonly Task<Result> Ok = Task.FromResult(Result.Success());
         public Task<Result<AccountProvisionResultDto>> ProvisionStudentAsync(Guid studentId, ProvisionAccountOptions? options = null, CancellationToken ct = default)
-            => Task.FromResult(Result.Success(new AccountProvisionResultDto(Guid.NewGuid(), "x", true)));
+            => Task.FromResult(Result.Success(new AccountProvisionResultDto(Guid.NewGuid(), "x", "pw", true)));
         public Task<BulkProvisionResultDto> ProvisionStudentsAsync(IReadOnlyCollection<Guid> studentIds, ProvisionAccountOptions? options = null, CancellationToken ct = default)
             => Task.FromResult(new BulkProvisionResultDto(0, 0, 0, []));
         public Task<Result> ResetStudentPasswordAsync(Guid studentId, string? newPassword = null, CancellationToken ct = default) => Ok;
@@ -277,11 +246,13 @@ public sealed class CurrentRelationCleanupTests : IDisposable
         public Task<Result> UnlinkStudentAsync(Guid studentId, CancellationToken ct = default) => Ok;
         public Task<Result> LinkStudentAsync(Guid studentId, Guid userId, CancellationToken ct = default) => Ok;
         public Task<Result<AccountProvisionResultDto>> ProvisionTeacherAsync(Guid teacherProfileId, ProvisionAccountOptions? options = null, CancellationToken ct = default)
-            => Task.FromResult(Result.Success(new AccountProvisionResultDto(Guid.NewGuid(), "x", true)));
+            => Task.FromResult(Result.Success(new AccountProvisionResultDto(Guid.NewGuid(), "x", "pw", true)));
         public Task<BulkProvisionResultDto> ProvisionTeachersAsync(IReadOnlyCollection<Guid> teacherProfileIds, ProvisionAccountOptions? options = null, CancellationToken ct = default)
             => Task.FromResult(new BulkProvisionResultDto(0, 0, 0, []));
         public Task<Result> ResetTeacherPasswordAsync(Guid teacherProfileId, string? newPassword = null, CancellationToken ct = default) => Ok;
         public Task<Result> SetTeacherLockedAsync(Guid teacherProfileId, bool locked, CancellationToken ct = default) => Ok;
+        public Task<Result> UnlinkTeacherAsync(Guid teacherProfileId, CancellationToken ct = default) => Ok;
+        public Task<Result> LinkTeacherAsync(Guid teacherProfileId, Guid userId, CancellationToken ct = default) => Ok;
     }
 
     private sealed class FakeUserDirectory : IUserDirectory

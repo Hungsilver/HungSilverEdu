@@ -1,4 +1,5 @@
 using HungSilver.Application.Abstractions;
+using HungSilver.Application.Common;
 using HungSilver.Application.Common.Models;
 using HungSilver.Domain.Common.Results;
 using HungSilver.Domain.Entities;
@@ -8,8 +9,8 @@ namespace HungSilver.Application.Exams;
 
 public interface IExamService
 {
-    Task<Result<PagedResult<ExamListItemDto>>> GetPagedBySubjectAsync(Guid subjectId, ExamStatus? status, PagedRequest paging, CancellationToken ct = default);
-    Task<Result<PagedResult<ExamListItemDto>>> GetPagedByMaterialAsync(Guid materialId, PagedRequest paging, CancellationToken ct = default);
+    /// <summary>Danh sách đề có lọc tổng hợp (môn/tài liệu/khối/trạng thái/tìm kiếm/đã giao) — dùng cho màn "Đề &amp; Bài tập".</summary>
+    Task<Result<PagedResult<ExamListItemDto>>> GetPagedAsync(ExamListFilter filter, PagedRequest paging, CancellationToken ct = default);
     Task<Result<ExamDetailDto>> GetDetailAsync(Guid examId, CancellationToken ct = default);
     Task<Result<ExamDetailDto>> UpdateExamAsync(Guid examId, UpdateExamRequest request, CancellationToken ct = default);
     Task<Result<ExamQuestionDto>> UpsertQuestionAsync(Guid examId, Guid? questionId, UpsertQuestionRequest request, CancellationToken ct = default);
@@ -25,6 +26,8 @@ public sealed class ExamService(
     IRepository<ExamQuestion> questions,
     IRepository<LearningMaterial> materials,
     IRepository<ExamAssignment> assignments,
+    IRepository<StoredFile> storedFiles,
+    IClassAccessGuard accessGuard,
     IUserDirectory userDirectory,
     IUnitOfWork unitOfWork) : IExamService
 {
@@ -38,17 +41,53 @@ public sealed class ExamService(
     private Task<bool> HasAssignmentsAsync(Guid examId, CancellationToken ct) =>
         assignments.AnyAsync(a => a.ExamId == examId, ct);
 
-    public async Task<Result<PagedResult<ExamListItemDto>>> GetPagedBySubjectAsync(Guid subjectId, ExamStatus? status, PagedRequest paging, CancellationToken ct = default)
+    public async Task<Result<PagedResult<ExamListItemDto>>> GetPagedAsync(ExamListFilter filter, PagedRequest paging, CancellationToken ct = default)
     {
+        var subjectId = filter.SubjectId;
+        var materialId = filter.MaterialId;
+        var gradeBand = string.IsNullOrWhiteSpace(filter.GradeBand) ? null : filter.GradeBand.Trim();
+        var status = filter.Status;
+        var term = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim().ToLower();
+
+        // "Đang giao" lọc theo lượt giao NHÌN THẤY ĐƯỢC (Admin: tất cả; GV: chỉ lớp mình phụ trách).
+        List<Guid>? assignedExamIds = null;
+        if (filter.AssignedOnly)
+        {
+            assignedExamIds = (await ScopedAssignmentsAsync(null, ct)).Select(a => a.ExamId).Distinct().ToList();
+            if (assignedExamIds.Count == 0)
+                return new PagedResult<ExamListItemDto> { Items = [], Page = paging.Page, PageSize = paging.PageSize, TotalCount = 0 };
+        }
+
         var paged = await exams.GetPagedAsync(paging.Page, paging.PageSize,
-            e => e.SubjectId == subjectId && (status == null || e.Status == status), ct: ct);
+            e => (subjectId == null || e.SubjectId == subjectId)
+                 && (materialId == null || e.MaterialId == materialId)
+                 && (gradeBand == null || e.GradeBand == gradeBand)
+                 && (status == null || e.Status == status)
+                 && (term == null || e.Title.ToLower().Contains(term))
+                 && (assignedExamIds == null || assignedExamIds.Contains(e.Id)),
+            ct: ct);
+
         return await ToListAsync(paged, ct);
     }
 
-    public async Task<Result<PagedResult<ExamListItemDto>>> GetPagedByMaterialAsync(Guid materialId, PagedRequest paging, CancellationToken ct = default)
+    /// <summary>
+    /// Lượt giao trong phạm vi người dùng: Admin thấy tất cả, GV chỉ thấy lượt giao của lớp mình phụ trách.
+    /// <paramref name="examIds"/> null = lấy toàn bộ (dùng cho bộ lọc "đang giao").
+    /// Lưu ý: KHÔNG dùng cho <see cref="HasAssignmentsAsync"/> — khóa cấu trúc đề phải xét mọi lượt giao.
+    /// </summary>
+    private async Task<List<ExamAssignment>> ScopedAssignmentsAsync(List<Guid>? examIds, CancellationToken ct)
     {
-        var paged = await exams.GetPagedAsync(paging.Page, paging.PageSize, e => e.MaterialId == materialId, ct: ct);
-        return await ToListAsync(paged, ct);
+        if (examIds is { Count: 0 }) return [];
+
+        var list = examIds is null
+            ? await assignments.FindAsync(a => true, ct)
+            : await assignments.FindAsync(a => examIds.Contains(a.ExamId), ct);
+
+        var scopeId = await accessGuard.GetTeacherScopeIdAsync(ct);
+        if (scopeId is null) return [.. list]; // Admin
+
+        var owned = await accessGuard.GetOwnedClassIdsAsync(ct);
+        return list.Where(a => owned.Contains(a.ClassId)).ToList();
     }
 
     public async Task<Result<ExamDetailDto>> GetDetailAsync(Guid examId, CancellationToken ct = default)
@@ -193,13 +232,31 @@ public sealed class ExamService(
         var ids = paged.Items.Select(e => e.Id).ToList();
         var counts = await LoadQuestionCountsAsync(ids, ct);
         var creatorNames = await LoadCreatorNamesAsync(paged.Items, ct);
+        var assignCounts = (await ScopedAssignmentsAsync(ids, ct))
+            .GroupBy(a => a.ExamId).ToDictionary(g => g.Key, g => g.Count());
+        var materialTitles = await LoadMaterialTitlesAsync(paged.Items, ct);
+
         return new PagedResult<ExamListItemDto>
         {
-            Items = paged.Items.Select(e => ToListItem(e, counts.GetValueOrDefault(e.Id), CreatorName(e, creatorNames))).ToList(),
+            Items = paged.Items.Select(e => ToListItem(
+                e,
+                counts.GetValueOrDefault(e.Id),
+                e.MaterialId is { } mid ? materialTitles.GetValueOrDefault(mid) : null,
+                assignCounts.GetValueOrDefault(e.Id),
+                CreatorName(e, creatorNames))).ToList(),
             Page = paged.Page,
             PageSize = paged.PageSize,
             TotalCount = paged.TotalCount
         };
+    }
+
+    /// <summary>Tên tài liệu nguồn (live) cho danh sách đề — tài liệu đã xóa mềm sẽ không có tên.</summary>
+    private async Task<Dictionary<Guid, string>> LoadMaterialTitlesAsync(IEnumerable<Exam> items, CancellationToken ct)
+    {
+        var ids = items.Where(e => e.MaterialId.HasValue).Select(e => e.MaterialId!.Value).Distinct().ToList();
+        if (ids.Count == 0) return [];
+        var found = await materials.FindAsync(m => ids.Contains(m.Id), ct);
+        return found.ToDictionary(m => m.Id, m => m.Title);
     }
 
     private async Task<Dictionary<Guid, int>> LoadQuestionCountsAsync(List<Guid> examIds, CancellationToken ct)
@@ -219,28 +276,33 @@ public sealed class ExamService(
         // Ưu tiên file snapshot trên đề (đề mới); fallback tra tài liệu cho đề cũ trước migration.
         string? sourceFileUrl = null;
         string? sourceFilePreviewUrl = null;
-        var fileId = exam.SourceStoredFileId;
-        if (fileId is null && exam.MaterialId is not null)
-        {
-            var material = await materials.GetByIdAsync(exam.MaterialId.Value, ct: ct);
-            if (material?.Source == MaterialSource.ServerFile && material.StoredFileId is not null)
-                fileId = material.StoredFileId;
-        }
+        var material = exam.MaterialId is { } mid ? await materials.GetByIdAsync(mid, ct: ct) : null;
+        var materialFileId = material?.Source == MaterialSource.ServerFile ? material.StoredFileId : null;
+
+        var fileId = exam.SourceStoredFileId ?? materialFileId;
         if (fileId is not null)
         {
             sourceFileUrl = $"/api/files/{fileId}";
             sourceFilePreviewUrl = $"/api/files/{fileId}/preview";
         }
+
+        // AI đọc file KHÁC file của tài liệu (chọn tài liệu khác trong bộ / tải file câu hỏi riêng)
+        // ⇒ nêu rõ tên file đó để GV không tưởng đề sinh từ chính bài học đang đứng.
+        string? questionSourceName = null;
+        if (fileId is not null && fileId != materialFileId)
+            questionSourceName = (await storedFiles.GetByIdAsync(fileId.Value, ct: ct))?.FileName;
+
         var creatorNames = await LoadCreatorNamesAsync([exam], ct);
 
         return new ExamDetailDto(exam.Id, exam.MaterialId, exam.SubjectId, exam.SubjectName, exam.Title, exam.Description,
             exam.GradeBand, exam.DurationMinutes, exam.TotalPoints, exam.Status, exam.Source, sourceFileUrl, sourceFilePreviewUrl,
+            material?.Title, questionSourceName,
             grs, qs, CreatorName(exam, creatorNames), exam.CreatedAt);
     }
 
-    private static ExamListItemDto ToListItem(Exam e, int questionCount, string? createdByName) =>
+    private static ExamListItemDto ToListItem(Exam e, int questionCount, string? materialTitle, int assignmentCount, string? createdByName) =>
         new(e.Id, e.MaterialId, e.SubjectId, e.SubjectName, e.Title, e.GradeBand, e.DurationMinutes, e.TotalPoints,
-            e.Status, e.Source, questionCount, createdByName, e.CreatedAt);
+            e.Status, e.Source, questionCount, materialTitle, assignmentCount, createdByName, e.CreatedAt);
 
     private async Task<Dictionary<Guid, string>> LoadCreatorNamesAsync(IEnumerable<Exam> items, CancellationToken ct)
     {

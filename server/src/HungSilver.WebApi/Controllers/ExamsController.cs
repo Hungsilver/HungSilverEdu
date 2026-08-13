@@ -54,10 +54,49 @@ public class ExamsController(
     public async Task<ActionResult<CreateExamFromQuestionsResult>> Duplicate(Guid id, CancellationToken ct) =>
         (await questionBank.DuplicateExamAsync(id, UserId, ct)).ToActionResult();
 
-    /// <summary>Bắt đầu job sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả jobId ngay để client polling, tránh timeout proxy.</summary>
+    /// <summary>
+    /// Bắt đầu job sinh đề từ 1 tài liệu (PDF/Word) bằng AI — trả jobId ngay để client polling, tránh timeout proxy.
+    /// <para>
+    /// <c>QuestionSourceMaterialId</c> (tùy chọn): trỏ AI sang đọc file của MỘT TÀI LIỆU KHÁC trong cùng bộ —
+    /// dùng khi file bài học lẫn cả lý thuyết lẫn bài tập, còn phần câu hỏi nằm ở file riêng.
+    /// Đề vẫn gắn vào tài liệu ở route để nằm đúng chỗ trong Kho.
+    /// </para>
+    /// </summary>
     [HttpPost("generate/{materialId:guid}")]
-    public async Task<ActionResult<ExamGenerationJobStartResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct) =>
-        (await generationJobs.StartAsync(materialId, request, UserId, ct: ct)).ToActionResult();
+    public async Task<ActionResult<ExamGenerationJobStartResult>> Generate(Guid materialId, GenerateExamRequest request, CancellationToken ct)
+    {
+        var questionSource = await ResolveQuestionSourceAsync(materialId, request.QuestionSourceMaterialId, ct);
+        if (questionSource.IsFailure) return questionSource.Error.ToProblemResult();
+
+        return (await generationJobs.StartAsync(materialId, request, UserId, questionSource.Value, ct)).ToActionResult();
+    }
+
+    /// <summary>
+    /// Đổi "tài liệu chứa câu hỏi" thành file id để AI đọc. Validate ngay tại đây (không đẩy xuống job nền)
+    /// để GV nhận lỗi tức thì thay vì đợi job Failed.
+    /// </summary>
+    private async Task<Result<Guid?>> ResolveQuestionSourceAsync(Guid targetMaterialId, Guid? questionSourceMaterialId, CancellationToken ct)
+    {
+        if (questionSourceMaterialId is not Guid sourceId || sourceId == targetMaterialId)
+            return Result.Success<Guid?>(null);
+
+        var target = await materialService.GetByIdAsync(targetMaterialId, ct);
+        if (target.IsFailure) return Result.Failure<Guid?>(target.Error);
+
+        var source = await materialService.GetByIdAsync(sourceId, ct);
+        if (source.IsFailure)
+            return Result.Failure<Guid?>(Error.NotFound("Exam.QuestionSourceNotFound", "Không tìm thấy tài liệu chứa câu hỏi."));
+
+        if (source.Value.FolderId != target.Value.FolderId)
+            return Result.Failure<Guid?>(Error.Validation("Exam.QuestionSourceInvalid",
+                "Tài liệu chứa câu hỏi phải nằm cùng bộ tài liệu với tài liệu được gắn đề."));
+
+        if (source.Value.Source != MaterialSource.ServerFile || source.Value.StoredFileId is null)
+            return Result.Failure<Guid?>(Error.Validation("Exam.QuestionSourceNotFile",
+                "Tài liệu chứa câu hỏi phải là file đã tải lên — không đọc được đường dẫn ngoài."));
+
+        return Result.Success<Guid?>(source.Value.StoredFileId);
+    }
 
     /// <summary>
     /// Upload một file đề rồi bắt đầu job sinh đề AI từ file đó — đề gắn thẳng vào tài liệu nguồn,
@@ -86,11 +125,14 @@ public class ExamsController(
         StoredFileDto uploaded;
         await using (var stream = request.File.OpenReadStream())
         {
+            // enforceStorageMode: false — file này KHÔNG nhập kho, chỉ là nguồn tạm để AI đọc.
+            // Trung tâm tắt "tải file lên server" vẫn phải sinh đề được, nếu không sẽ mất luôn tính năng.
             var upload = await fileService.UploadAsync(
                 stream,
                 request.File.FileName!,
                 string.IsNullOrWhiteSpace(request.File.ContentType) ? "application/octet-stream" : request.File.ContentType,
                 request.File.Length,
+                enforceStorageMode: false,
                 ct: ct);
             if (upload.IsFailure)
                 return upload.Error.ToProblemResult();
@@ -121,19 +163,15 @@ public class ExamsController(
     public ActionResult<ExamGenerationJobDto> GenerationJob(Guid jobId) =>
         generationJobs.Get(jobId, UserId).ToActionResult();
 
-    /// <summary>Danh sách đề theo Môn (kèm bộ lọc trạng thái) hoặc theo tài liệu — phân trang.</summary>
+    /// <summary>Danh sách đề toàn trung tâm — lọc theo Môn/Tài liệu/Khối/Trạng thái/từ khóa/đang giao, phân trang.</summary>
     [HttpGet]
     public async Task<ActionResult<PagedResult<ExamListItemDto>>> List(
-        [FromQuery] Guid? subjectId, [FromQuery] Guid? materialId, [FromQuery] ExamStatus? status,
-        [FromQuery] PagedRequest paging, CancellationToken ct)
-    {
-        if (materialId is not null)
-            return (await service.GetPagedByMaterialAsync(materialId.Value, paging, ct)).ToActionResult();
-        if (subjectId is not null)
-            return (await service.GetPagedBySubjectAsync(subjectId.Value, status, paging, ct)).ToActionResult();
-        return Result.Failure<PagedResult<ExamListItemDto>>(
-            Error.Validation("Exam.QueryRequired", "Cần truyền subjectId hoặc materialId.")).ToActionResult();
-    }
+        [FromQuery] Guid? subjectId, [FromQuery] Guid? materialId, [FromQuery] string? gradeBand,
+        [FromQuery] ExamStatus? status, [FromQuery] bool assignedOnly,
+        [FromQuery] PagedRequest paging, CancellationToken ct) =>
+        (await service.GetPagedAsync(
+            new ExamListFilter(subjectId, materialId, gradeBand, status, paging.Search, assignedOnly),
+            paging, ct)).ToActionResult();
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ExamDetailDto>> Detail(Guid id, CancellationToken ct) =>
@@ -173,6 +211,13 @@ public class ExamsController(
     [HttpGet("{examId:guid}/assignments")]
     public async Task<ActionResult<List<ExamAssignmentDto>>> Assignments(Guid examId, CancellationToken ct) =>
         (await assignments.ListByExamAsync(examId, ct)).ToActionResult();
+
+    /// <summary>Mọi lượt giao trong phạm vi người dùng (tab "Đã giao cho lớp") — lọc lớp/trạng thái, phân trang.</summary>
+    [HttpGet("assignments")]
+    public async Task<ActionResult<PagedResult<ExamAssignmentDto>>> AssignmentList(
+        [FromQuery] Guid? classId, [FromQuery] ExamAssignmentStatus? status,
+        [FromQuery] PagedRequest paging, CancellationToken ct) =>
+        (await assignments.GetPagedAsync(classId, status, paging, ct)).ToActionResult();
 
     /// <summary>Các lượt giao đề gắn với một buổi học (section Bài tập trong màn hình buổi học).</summary>
     [HttpGet("assignments/by-session/{sessionId:guid}")]

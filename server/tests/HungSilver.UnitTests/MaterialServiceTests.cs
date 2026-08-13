@@ -17,14 +17,13 @@ namespace HungSilver.UnitTests;
 
 /// <summary>
 /// Kiểm thử Kho tài liệu thiết kế mới: mã TL0001 tăng dần (không tái cấp sau xóa mềm),
-/// danh sách phân trang lọc môn/loại/khối + search, update không đổi mã, validator môn/loại bắt buộc.
+/// danh sách phân trang lọc môn/khối + search, update không đổi mã, validator môn bắt buộc.
 /// </summary>
 public sealed class MaterialServiceTests : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly AppDbContext _context;
     private readonly Guid _subjectId;
-    private readonly Guid _categoryId;
 
     public MaterialServiceTests()
     {
@@ -38,12 +37,9 @@ public sealed class MaterialServiceTests : IDisposable
         _context.Database.EnsureCreated();
 
         var subject = new Subject { Code = "ANH", Name = "Tiếng Anh" };
-        var category = new MaterialCategory { Name = "Đề kiểm tra", SortOrder = 1 };
         _context.Subjects.Add(subject);
-        _context.MaterialCategories.Add(category);
         _context.SaveChanges();
         _subjectId = subject.Id;
-        _categoryId = category.Id;
     }
 
     public void Dispose()
@@ -54,15 +50,13 @@ public sealed class MaterialServiceTests : IDisposable
 
     private MaterialService NewService() => new(
         new Repository<LearningMaterial>(_context),
-        new Repository<MaterialCategory>(_context),
         new Repository<Subject>(_context),
         new Repository<StoredFile>(_context),
         new Repository<MaterialFolder>(_context),
         new Repository<MaterialUnit>(_context),
-        new AdminGuard(),
+        new Repository<Exam>(_context),
         new CurrentRelationCleanupService(_context),
         new UnitOfWork(_context),
-        new FakeCurrentUser(),
         new CreateMaterialRequestValidator(),
         new UpdateMaterialRequestValidator());
 
@@ -75,7 +69,7 @@ public sealed class MaterialServiceTests : IDisposable
     }
 
     private CreateMaterialRequest NewRequest(string title, string? gradeBand = null, Guid? coverFileId = null) =>
-        new(_categoryId, _subjectId, gradeBand, title, MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, coverFileId);
+        new(_subjectId, gradeBand, title, MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, coverFileId);
 
     private async Task<StoredFile> SeedStoredFileAsync(string contentType = "image/png")
     {
@@ -104,7 +98,6 @@ public sealed class MaterialServiceTests : IDisposable
         Assert.Equal("TL0001", first.Value.Code);
         Assert.Equal("TL0002", second.Value.Code);
         Assert.Equal("Tiếng Anh", first.Value.SubjectName);
-        Assert.Equal("Đề kiểm tra", first.Value.CategoryName);
     }
 
     [Fact]
@@ -136,7 +129,7 @@ public sealed class MaterialServiceTests : IDisposable
         Assert.Single(bySearchCode.Value.Items);
         Assert.Equal("TL0002", bySearchCode.Value.Items[0].Code);
 
-        var bySubject = await svc.GetPagedAsync(new MaterialListFilter { SubjectId = _subjectId, CategoryId = _categoryId }, new PagedRequest());
+        var bySubject = await svc.GetPagedAsync(new MaterialListFilter { SubjectId = _subjectId }, new PagedRequest());
         Assert.Equal(2, bySubject.Value.TotalCount);
 
         var noMatch = await svc.GetPagedAsync(new MaterialListFilter { SubjectId = Guid.NewGuid() }, new PagedRequest());
@@ -150,7 +143,7 @@ public sealed class MaterialServiceTests : IDisposable
         var created = await svc.CreateAsync(NewRequest("Tên cũ"));
 
         var updated = await svc.UpdateAsync(created.Value.Id,
-            new UpdateMaterialRequest(_categoryId, _subjectId, "9", "Tên mới", MaterialSource.ExternalUrl, "https://x.vn/tl2", null, null, null));
+            new UpdateMaterialRequest(_subjectId, "9", "Tên mới", MaterialSource.ExternalUrl, "https://x.vn/tl2", null, null, null));
 
         Assert.True(updated.IsSuccess);
         Assert.Equal("Tên mới", updated.Value.Title);
@@ -158,34 +151,32 @@ public sealed class MaterialServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Create_WithoutSubjectOrCategory_FailsValidation()
+    public async Task Create_WithoutSubject_FailsValidation()
     {
         var svc = NewService();
 
-        var noSubject = await svc.CreateAsync(new CreateMaterialRequest(_categoryId, null, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null, null));
-        var noCategory = await svc.CreateAsync(new CreateMaterialRequest(null, _subjectId, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null, null));
+        // Tài liệu chung (không thuộc bộ) bắt buộc chọn Môn.
+        var noSubject = await svc.CreateAsync(new CreateMaterialRequest(null, null, "T", MaterialSource.ExternalUrl, "https://x.vn", null, null, null));
 
         Assert.True(noSubject.IsFailure);
-        Assert.True(noCategory.IsFailure);
         Assert.Equal("Material.Validation", noSubject.Error.Code);
     }
 
     [Fact]
-    public async Task Create_InFolder_SnapshotsSubjectFromFolder_CategoryOptional()
+    public async Task Create_InFolder_SnapshotsSubjectFromFolder()
     {
         var svc = NewService();
         var folder = SeedFolder(gradeBand: "10");
 
-        // Không gửi Subject/Category/GradeBand — chỉ FolderId (form tối giản); client có gửi Subject lạ cũng bị bỏ qua.
+        // Không gửi Subject/GradeBand — chỉ FolderId (form tối giản); client có gửi Subject lạ cũng bị bỏ qua.
         var created = await svc.CreateAsync(new CreateMaterialRequest(
-            null, Guid.NewGuid(), "99", "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, folder.Id));
+            Guid.NewGuid(), "99", "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, folder.Id));
 
         Assert.True(created.IsSuccess);
         Assert.Equal(folder.Id, created.Value.FolderId);
         Assert.Equal(_subjectId, created.Value.SubjectId);        // snapshot TỪ BỘ, bỏ qua Guid lạ client gửi
         Assert.Equal("Tiếng Anh", created.Value.SubjectName);
         Assert.Equal("10", created.Value.GradeBand);              // kế thừa Khối của bộ, bỏ qua "99"
-        Assert.Null(created.Value.CategoryId);
     }
 
     [Fact]
@@ -193,7 +184,7 @@ public sealed class MaterialServiceTests : IDisposable
     {
         var svc = NewService();
         var result = await svc.CreateAsync(new CreateMaterialRequest(
-            null, null, null, "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, Guid.NewGuid()));
+            null, null, "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, Guid.NewGuid()));
         Assert.True(result.IsFailure);
         Assert.Equal("Material.FolderNotFound", result.Error.Code);
     }
@@ -204,7 +195,7 @@ public sealed class MaterialServiceTests : IDisposable
         var svc = NewService();
         var folder = SeedFolder();
         await svc.CreateAsync(new CreateMaterialRequest(
-            null, null, null, "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, folder.Id));
+            null, null, "Unit 1", MaterialSource.ExternalUrl, "https://x.vn/u1", null, null, null, folder.Id));
         await svc.CreateAsync(NewRequest("Tài liệu chung")); // FolderId null
 
         var inFolder = await svc.GetPagedAsync(new MaterialListFilter { FolderId = folder.Id }, new PagedRequest());
@@ -231,7 +222,7 @@ public sealed class MaterialServiceTests : IDisposable
 
         // Gỡ ảnh bìa khi sửa ⇒ về null (file cũ thành orphan, FileCleanupService dọn — không lỗi).
         var updated = await svc.UpdateAsync(created.Value.Id,
-            new UpdateMaterialRequest(_categoryId, _subjectId, null, "Tài liệu có bìa", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null));
+            new UpdateMaterialRequest(_subjectId, null, "Tài liệu có bìa", MaterialSource.ExternalUrl, "https://x.vn/tl", null, null, null));
         Assert.True(updated.IsSuccess);
         Assert.Null(updated.Value.CoverFileId);
     }

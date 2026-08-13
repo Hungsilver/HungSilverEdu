@@ -48,7 +48,10 @@ import { ThemeService } from '../core/theme.service';
             <nz-icon nzType="dollar" /><span>Học phí</span>
           </li>
           <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-            <nz-icon nzType="link" /><span>Kho tài liệu</span>
+            <nz-icon nzType="read" /><span>Kho tài liệu</span>
+          </li>
+          <li nz-menu-item routerLink="/exams" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="file-done" /><span>Đề &amp; Bài tập</span>
           </li>
           <li nz-menu-item routerLink="/evaluations" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="audit" /><span>Đánh giá hàng tháng</span>
@@ -82,7 +85,10 @@ import { ThemeService } from '../core/theme.service';
             <nz-icon nzType="dollar" /><span>Học phí</span>
           </li>
           <li nz-menu-item routerLink="/materials" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
-            <nz-icon nzType="link" /><span>Kho tài liệu</span>
+            <nz-icon nzType="read" /><span>Kho tài liệu</span>
+          </li>
+          <li nz-menu-item routerLink="/exams" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
+            <nz-icon nzType="file-done" /><span>Đề &amp; Bài tập</span>
           </li>
           <li nz-menu-item routerLink="/evaluations" routerLinkActive="ant-menu-item-selected" (click)="closeDrawer()">
             <nz-icon nzType="audit" /><span>Đánh giá hàng tháng</span>

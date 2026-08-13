@@ -4,15 +4,16 @@ using HungSilver.Domain.Enums;
 namespace HungSilver.Application.Files;
 
 /// <summary>
-/// Upload/tải file. Upload chỉ được phép khi cấu hình FileStorage.Mode = "Server" (do Admin đặt);
-/// nếu là "ExternalUrl" thì từ chối và yêu cầu lưu link ngoài. Validate: dung lượng, phần mở rộng,
+/// Upload/tải file. Upload chỉ được phép khi cấu hình <c>FileStorage.AllowServerUpload = true</c> (do Admin đặt);
+/// tắt thì từ chối và yêu cầu dùng đường dẫn ngoài. Validate: dung lượng, phần mở rộng,
 /// chữ ký nội dung (magic-byte), hạn mức theo user; dedup theo SHA-256.
 /// </summary>
 public interface IFileService
 {
     /// <param name="enforceStorageMode">
-    /// true (mặc định): chỉ cho upload khi FileStorage.Mode = Server và áp hạn mức/user. false: luôn lưu server,
-    /// bỏ qua hạn mức (dùng cho ảnh đại diện — không phụ thuộc cấu hình lưu link ngoài).
+    /// true (mặc định): chỉ cho upload khi <c>FileStorage.AllowServerUpload = true</c> và áp hạn mức/user.
+    /// false: luôn lưu server, bỏ qua hạn mức — dùng cho file KHÔNG nhập kho (ảnh đại diện, ảnh bìa,
+    /// file nguồn sinh đề), vì các luồng đó không phụ thuộc cấu hình cách nạp tài liệu.
     /// </param>
     /// <param name="visibility">Mức truy cập khi tải xuống (mặc định Authenticated).</param>
     Task<Result<StoredFileDto>> UploadAsync(
