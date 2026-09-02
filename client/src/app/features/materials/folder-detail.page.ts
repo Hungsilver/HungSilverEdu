@@ -77,12 +77,12 @@ import { MaterialFormModal } from './material-form.modal';
         <button nz-button nzSize="small" (click)="openCreateUnit()"><nz-icon nzType="plus" /> Thêm Unit</button>
       }
     </div>
-
     <nz-spin [nzSpinning]="loading()">
       <div class="toc">
         @for (u of units(); track u.id) {
-          <button class="unit-card" [class.is-review]="u.kind === Kind.Review"
-                  [attr.aria-selected]="u.id === activeUnitId()" (click)="selectUnit(u.id)">
+          <div class="unit-card" role="button" tabindex="0" [class.is-review]="u.kind === Kind.Review"
+               [attr.aria-selected]="u.id === activeUnitId()" (click)="selectUnit(u.id)"
+               (keydown.enter)="selectUnit(u.id)" (keydown.space)="$event.preventDefault(); selectUnit(u.id)">
             <span class="unit-no">{{ u.kind === Kind.Review ? 'R' + u.unitNo : u.unitNo }}</span>
             <span class="unit-text">
               <span class="unit-lab">{{ u.kind === Kind.Review ? 'Review ' + u.unitNo : 'Unit ' + u.unitNo }}</span>
@@ -92,7 +92,7 @@ import { MaterialFormModal } from './material-form.modal';
               </span>
             </span>
             @if (canManage()) {
-              <span class="unit-tools" (click)="$event.stopPropagation()">
+              <span class="unit-tools" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
                 <button nz-button nzType="text" nzSize="small" [disabled]="isFirst(u)"
                         nz-tooltip nzTooltipTitle="Lên trên" aria-label="Chuyển Unit lên trên" (click)="moveUnit(u, -1)">
                   <nz-icon nzType="arrow-up" />
@@ -111,18 +111,20 @@ import { MaterialFormModal } from './material-form.modal';
                 </button>
               </span>
             }
-          </button>
+          </div>
         }
 
         <!-- Tài liệu chưa thuộc Unit nằm ngay trong mục lục, không cần cột riêng -->
-        <button class="unit-card is-none" [attr.aria-selected]="activeUnitId() === null" (click)="selectUnit(null)">
+        <div class="unit-card is-none" role="button" tabindex="0"
+             [attr.aria-selected]="activeUnitId() === null" (click)="selectUnit(null)"
+             (keydown.enter)="selectUnit(null)" (keydown.space)="$event.preventDefault(); selectUnit(null)">
           <span class="unit-no">?</span>
           <span class="unit-text">
             <span class="unit-lab">Ngoài mục lục</span>
             <span class="unit-name">Chưa thuộc Unit</span>
             <span class="unit-meta">{{ unassignedCount() }} tài liệu</span>
           </span>
-        </button>
+        </div>
       </div>
     </nz-spin>
 
@@ -226,7 +228,6 @@ import { MaterialFormModal } from './material-form.modal';
       (closed)="examsOpen.set(false)" (changed)="reloadAfterMaterialChange()" />
   `,
   styles: `
-    /* Hero: ảnh bìa làm nền mờ; màu lấy từ design system chung (không dùng bảng màu riêng nữa). */
     .hero { position: relative; border-radius: 16px; overflow: hidden; margin-bottom: 18px;
       border: 1px solid var(--hs-border); background: var(--hs-surface); }
     .hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center;
@@ -236,9 +237,9 @@ import { MaterialFormModal } from './material-form.modal';
     .hero-inner { position: relative; display: flex; align-items: center; gap: 14px; padding: 18px; flex-wrap: wrap; }
     .hero-home { flex: 0 0 auto; }
     .hero-text { flex: 1; min-width: 0; }
-    .hero-crumb { font-size: 11.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+    .hero-crumb { font-size: 11.5px; font-weight: 800; text-transform: uppercase;
       color: var(--hs-primary, #4f46e5); }
-    .hero-title { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.3px; text-wrap: balance; }
+    .hero-title { margin: 2px 0 0; font-size: 24px; font-weight: 800; letter-spacing: 0; text-wrap: balance; }
     .hero-meta { font-size: 12.5px; color: var(--hs-text-muted); }
 
     .toc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
@@ -246,25 +247,24 @@ import { MaterialFormModal } from './material-form.modal';
       text-transform: uppercase; color: var(--hs-text-muted); }
     .toc-head .rule { flex: 1; height: 1px; background: var(--hs-border); }
 
-    /* Lưới thẻ Unit tự xuống dòng — thấy hết Unit kèm tên, không phải cuộn ngang. */
-    .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)); gap: 10px; margin-bottom: 18px; }
-    .unit-card { display: flex; align-items: center; gap: 11px; text-align: left; cursor: pointer;
-      padding: 10px 12px; border-radius: 12px; border: 1px solid var(--hs-border-strong, #cbcee4);
-      background: var(--hs-surface); color: inherit; transition: border-color .14s, transform .14s, box-shadow .14s; }
-    .unit-card:hover { border-color: var(--hs-primary, #4f46e5); transform: translateY(-1px); }
+    .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .unit-card { display: grid; grid-template-columns: 40px minmax(0, 1fr);
+      align-items: center; gap: 9px 11px; text-align: left; cursor: pointer;
+      padding: 11px 12px; border-radius: 10px; border: 1px solid var(--hs-border-strong, #cbcee4);
+      background: var(--hs-surface); color: inherit; }
+    .unit-card:hover, .unit-card:focus-visible { border-color: var(--hs-primary, #4f46e5); }
     .unit-card[aria-selected="true"] { border-color: var(--hs-primary, #4f46e5);
       box-shadow: 0 0 0 2px var(--hs-primary-weak, #eef0fe) inset; }
-    .unit-no { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; display: grid; place-items: center;
+    .unit-no { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
       font-weight: 800; font-size: 15px; background: var(--hs-primary-weak, #eef0fe); color: var(--hs-primary, #4f46e5); }
     .unit-card.is-review .unit-no { background: #fdf3e3; color: #b45309; font-size: 13px; }
-    .unit-card.is-none .unit-no { background: var(--hs-surface-3, #edeff8); color: var(--hs-text-muted); }
-    .unit-text { display: block; min-width: 0; flex: 1; }
-    .unit-lab { display: block; font-size: 10px; font-weight: 800; letter-spacing: .8px;
+    .unit-text { display: block; min-width: 0; }
+    .unit-lab { display: block; font-size: 10px; font-weight: 800;
       text-transform: uppercase; color: var(--hs-text-muted); }
     .unit-name { display: block; font-size: 13.5px; font-weight: 700; line-height: 1.28; overflow-wrap: anywhere; }
-    .unit-meta { display: block; font-size: 11.5px; color: var(--hs-text-muted); margin-top: 1px; }
-    .unit-tools { display: none; gap: 0; }
-    .unit-card:hover .unit-tools, .unit-card[aria-selected="true"] .unit-tools { display: flex; }
+    .unit-meta { display: block; font-size: 11.5px; color: var(--hs-text-muted); margin-top: 3px; }
+    .unit-tools { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 2px;
+      padding-top: 8px; border-top: 1px solid var(--hs-border); }
 
     .lessons-card :where(.ant-card-body) { padding: 0; }
     .lessons-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -295,7 +295,6 @@ import { MaterialFormModal } from './material-form.modal';
       .toc { grid-template-columns: 1fr; }
       .lesson { flex-wrap: wrap; }
       .lesson-actions { width: 100%; justify-content: flex-start; }
-      .unit-tools { display: flex; }
     }
   `
 })
