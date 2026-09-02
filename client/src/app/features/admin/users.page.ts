@@ -38,6 +38,16 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
     <app-page-header title="Quản lý người dùng" subtitle="Tài khoản & phân quyền" icon="team">
       <input nz-input placeholder="Tìm theo tài khoản, email hoặc tên..." class="search"
              [ngModel]="search()" (ngModelChange)="search.set($event)" (keyup.enter)="applyFilters()" />
+      <nz-select
+        class="role-filter"
+        nzAllowClear
+        nzPlaceHolder="Lọc quyền"
+        [ngModel]="roleFilter()"
+        (ngModelChange)="roleFilter.set($event); applyFilters()">
+        <nz-option [nzValue]="ROLE_ADMIN" nzLabel="Quản trị viên" />
+        <nz-option [nzValue]="ROLE_TEACHER" nzLabel="Giáo viên" />
+        <nz-option [nzValue]="ROLE_USER" nzLabel="Học sinh" />
+      </nz-select>
       <button nz-button (click)="applyFilters()"><nz-icon nzType="search" /> Tìm kiếm</button>
       <button nz-button nzType="primary" (click)="openCreate()">
         <nz-icon nzType="user-add" /> Tạo tài khoản
@@ -307,6 +317,10 @@ import { TableDragScroll } from '../../shared/table-drag-scroll.directive';
       width: 260px;
     }
 
+    .role-filter {
+      width: 180px;
+    }
+
     .roles-select {
       min-width: 160px;
     }
@@ -350,6 +364,7 @@ export class UsersPage {
   protected readonly PAGE_SIZE_OPTIONS = PAGE_SIZE_OPTIONS;
   protected readonly scrollY = TABLE_SCROLL_Y;
   protected readonly search = signal('');
+  protected readonly roleFilter = signal<string | null>(null);
   protected readonly loading = signal(false);
 
   // Cột cấu hình được (Thao tác cố định cuối).
@@ -504,7 +519,12 @@ export class UsersPage {
 
   protected load(): void {
     this.loading.set(true);
-    this.usersService.getPaged(this.page(), this.pageSize(), this.search() || undefined).subscribe({
+    this.usersService.getPaged(
+      this.page(),
+      this.pageSize(),
+      this.search() || undefined,
+      this.roleFilter() || undefined
+    ).subscribe({
       next: result => {
         this.users.set(result.items);
         this.total.set(result.totalCount);

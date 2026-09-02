@@ -15,7 +15,7 @@ namespace HungSilver.WebApi.Controllers;
 public class UsersController(IUserAdminService userAdminService) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<PagedResult<UserListItemDto>>> GetUsers([FromQuery] PagedRequest request, CancellationToken ct) =>
+    public async Task<ActionResult<PagedResult<UserListItemDto>>> GetUsers([FromQuery] UserListRequest request, CancellationToken ct) =>
         (await userAdminService.GetUsersAsync(request, ct)).ToActionResult();
 
     /// <summary>Admin tạo tài khoản Admin/Giáo viên.</summary>

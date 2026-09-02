@@ -9,9 +9,10 @@ export class UsersService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/users`;
 
-  getPaged(page: number, pageSize: number, search?: string): Observable<PagedResult<UserListItem>> {
+  getPaged(page: number, pageSize: number, search?: string, role?: string): Observable<PagedResult<UserListItem>> {
     let params = new HttpParams().set('page', page).set('pageSize', pageSize);
     if (search) params = params.set('search', search);
+    if (role) params = params.set('role', role);
     return this.http.get<PagedResult<UserListItem>>(this.apiUrl, { params });
   }
 

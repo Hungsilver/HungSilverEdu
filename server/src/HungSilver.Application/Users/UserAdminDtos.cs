@@ -1,4 +1,11 @@
+using HungSilver.Application.Common.Models;
+
 namespace HungSilver.Application.Users;
+
+public sealed class UserListRequest : PagedRequest
+{
+    public string? Role { get; set; }
+}
 
 public sealed record UserListItemDto(
     Guid Id,

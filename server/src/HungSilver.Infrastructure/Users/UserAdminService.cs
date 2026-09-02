@@ -23,10 +23,29 @@ public sealed class UserAdminService(
     private static readonly Error UserNotFound =
         Error.NotFound("Users.NotFound", "Không tìm thấy người dùng.");
 
-    public async Task<Result<PagedResult<UserListItemDto>>> GetUsersAsync(PagedRequest request, CancellationToken ct = default)
+    public async Task<Result<PagedResult<UserListItemDto>>> GetUsersAsync(UserListRequest request, CancellationToken ct = default)
     {
         // IgnoreQueryFilters: admin xem được cả user đã xóa mềm để khôi phục.
         var query = context.Users.IgnoreQueryFilters().AsNoTracking();
+
+        var requestedRole = request.Role?.Trim();
+        if (!string.IsNullOrWhiteSpace(requestedRole))
+        {
+            var matchedRole = AppRoles.All.FirstOrDefault(r => string.Equals(r, requestedRole, StringComparison.OrdinalIgnoreCase));
+            if (matchedRole is null)
+                return Result.Failure<PagedResult<UserListItemDto>>(
+                    Error.Validation("Users.InvalidRoleFilter", "Quyền lọc không hợp lệ."));
+
+            var normalizedRole = userManager.NormalizeName(matchedRole);
+            var roleId = await context.Roles
+                .Where(r => r.NormalizedName == normalizedRole)
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync(ct);
+
+            query = roleId == Guid.Empty
+                ? query.Where(_ => false)
+                : query.Where(u => context.UserRoles.Any(ur => ur.UserId == u.Id && ur.RoleId == roleId));
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
